@@ -478,7 +478,7 @@ PFEggGeneratorState3 *pf_eggGenerate3(uint32_t seedHeld, uint32_t seedPickup,
                                        uint8_t parentANature, uint8_t parentBNature,
                                        uint16_t eggSpecie, bool masuda,
                                        uint16_t tid, uint16_t sid,
-                                       uint8_t game, bool deadBattery,
+                                       uint32_t game, bool deadBattery,
                                        uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
                                        const uint8_t ivMin[6], const uint8_t ivMax[6],
                                        const bool natures[25], const bool powers[16],
@@ -496,7 +496,7 @@ PFEggGeneratorState4 *pf_eggGenerate4(uint32_t seedHeld, uint32_t seedPickup,
                                        uint8_t parentANature, uint8_t parentBNature,
                                        uint16_t eggSpecie, bool masuda,
                                        uint16_t tid, uint16_t sid,
-                                       uint8_t game,
+                                       uint32_t game,
                                        uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
                                        const uint8_t ivMin[6], const uint8_t ivMax[6],
                                        const bool natures[25], const bool powers[16],
@@ -637,6 +637,7 @@ PFSeedSearchHandle pf_galesSeedSearch_start(uint16_t enemyHP0, uint16_t enemyHP1
 PFSeedSearchHandle pf_channelSeedSearch_start(const uint8_t *pattern, int patternLength, int threads);
 
 int pf_seedSearch_progress(PFSeedSearchHandle handle);
+bool pf_seedSearch_done(PFSeedSearchHandle handle);
 uint32_t *pf_seedSearch_getResults(PFSeedSearchHandle handle, int *outCount);
 void pf_seedSearch_cancel(PFSeedSearchHandle handle);
 void pf_seedSearch_free(PFSeedSearchHandle handle);
@@ -663,6 +664,7 @@ PFIDSearch4Handle pf_idSearch4_start(bool infinite, uint16_t year,
                                       uint16_t targetTSV, bool filterTSV);
 
 int pf_idSearch4_progress(PFIDSearch4Handle handle);
+bool pf_idSearch4_done(PFIDSearch4Handle handle);
 PFIDState4 *pf_idSearch4_getResults(PFIDSearch4Handle handle, int *outCount);
 void pf_idSearch4_cancel(PFIDSearch4Handle handle);
 void pf_idSearch4_free(PFIDSearch4Handle handle);

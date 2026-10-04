@@ -3714,11 +3714,11 @@ struct FinderRootView: View {
                                 .textInputAutocapitalization(.characters)
                                 #endif
                         }
-                        RNGIntField(label: "Timer0 Min", value: $gen5Timer0Min)
-                        RNGIntField(label: "Timer0 Max", value: $gen5Timer0Max)
-                        RNGIntField(label: "VCount", value: $gen5VCount)
-                        RNGIntField(label: "GxStat", value: $gen5GxStat)
-                        RNGIntField(label: "VFrame", value: $gen5VFrame)
+                        RNGIntField(label: "Timer0 Min", value: $gen5Timer0Min, range: RNGFieldRange.word)
+                        RNGIntField(label: "Timer0 Max", value: $gen5Timer0Max, range: RNGFieldRange.word)
+                        RNGIntField(label: "VCount", value: $gen5VCount, range: RNGFieldRange.byte)
+                        RNGIntField(label: "GxStat", value: $gen5GxStat, range: RNGFieldRange.byte)
+                        RNGIntField(label: "VFrame", value: $gen5VFrame, range: RNGFieldRange.byte)
 
                         Picker("DS Type", selection: $gen5DSType) {
                             Text("DS Lite").tag(UInt8(0))
@@ -4372,8 +4372,8 @@ struct FinderRootView: View {
                 SectionCard(title: "Delay & Advance Range", icon: "clock") {
                     FinderUInt16Field(label: "Min Delay", value: $minDelay)
                     FinderUInt16Field(label: "Max Delay", value: $maxDelay)
-                    RNGIntField(label: "Min Advance", value: $searcherMinAdvance)
-                    RNGIntField(label: "Max Advance", value: $searcherMaxAdvance)
+                    RNGIntField(label: "Min Advance", value: $searcherMinAdvance, range: RNGFieldRange.advances)
+                    RNGIntField(label: "Max Advance", value: $searcherMaxAdvance, range: RNGFieldRange.advances)
                 }
             }
 
@@ -4383,10 +4383,10 @@ struct FinderRootView: View {
                     DatePicker("End Date", selection: $gen5EndDate, displayedComponents: .date)
                 }
                 SectionCard(title: "IV Advance Range", icon: "number") {
-                    RNGIntField(label: "Min IV Advance", value: $gen5IVMinAdvance)
-                    RNGIntField(label: "Max IV Advance", value: $gen5IVMaxAdvance)
-                    RNGIntField(label: "Min PID Advance", value: $searcherMinAdvance)
-                    RNGIntField(label: "Max PID Advance", value: $searcherMaxAdvance)
+                    RNGIntField(label: "Min IV Advance", value: $gen5IVMinAdvance, range: RNGFieldRange.advances)
+                    RNGIntField(label: "Max IV Advance", value: $gen5IVMaxAdvance, range: RNGFieldRange.advances)
+                    RNGIntField(label: "Min PID Advance", value: $searcherMinAdvance, range: RNGFieldRange.advances)
+                    RNGIntField(label: "Max PID Advance", value: $searcherMaxAdvance, range: RNGFieldRange.advances)
                 }
             }
         }
@@ -4435,8 +4435,8 @@ struct FinderRootView: View {
                         #endif
                 }
             }
-            RNGIntField(label: "Initial Advance", value: $genInitAdvance)
-            RNGIntField(label: "Max Advance", value: $genMaxAdvance)
+            RNGIntField(label: "Initial Advance", value: $genInitAdvance, range: RNGFieldRange.advances)
+            RNGIntField(label: "Max Advance", value: $genMaxAdvance, range: RNGFieldRange.advances)
         }
     }
 
@@ -4540,6 +4540,7 @@ struct FinderRootView: View {
                     Text("Range: \u{00B1}")
                         .font(.caption)
                     TextField("200", value: $flipSearchRange, format: .number)
+                        .clamping($flipSearchRange, to: RNGFieldRange.word)
                         #if os(iOS)
                         .keyboardType(.numberPad)
                         #endif
@@ -4593,7 +4594,7 @@ struct FinderRootView: View {
 
         let observed = flipInput
         let targetSeed = UInt32(genSeedText, radix: 16) ?? 0
-        let range = UInt32(flipSearchRange)
+        let range = UInt32(clamping: flipSearchRange)
         let lo = targetSeed &- range
         let hi = targetSeed &+ range
 
@@ -4667,6 +4668,7 @@ struct FinderRootView: View {
                     Text("Range: \u{00B1}")
                         .font(.caption)
                     TextField("200", value: $callSearchRange, format: .number)
+                        .clamping($callSearchRange, to: RNGFieldRange.word)
                         #if os(iOS)
                         .keyboardType(.numberPad)
                         #endif
@@ -4739,7 +4741,7 @@ struct FinderRootView: View {
 
         let observed = callInput
         let targetSeed = UInt32(genSeedText, radix: 16) ?? 0
-        let range = UInt32(callSearchRange)
+        let range = UInt32(clamping: callSearchRange)
         let skips = roamerCount
         let lo = targetSeed &- range
         let hi = targetSeed &+ range
@@ -4796,12 +4798,12 @@ struct FinderRootView: View {
         let spdMin = minSpD, spdMax = maxSpD
         let speMin = minSpe, speMax = maxSpe
         let delMin = minDelay, delMax = maxDelay
-        let srcMinAdv = UInt32(searcherMinAdvance), srcMaxAdv = UInt32(searcherMaxAdvance)
+        let srcMinAdv = UInt32(clamping: searcherMinAdvance), srcMaxAdv = UInt32(clamping: searcherMaxAdvance)
         let ld = lead, sNat = syncNature
         let seedVal = UInt32(genSeedText, radix: 16) ?? 0
         let seedVal64 = UInt64(genSeedText, radix: 16) ?? 0
-        let initAdv = UInt32(genInitAdvance)
-        let maxAdv = UInt32(genMaxAdvance)
+        let initAdv = UInt32(clamping: genInitAdvance)
+        let maxAdv = UInt32(clamping: genMaxAdvance)
         let genderFilter = filterGender
         let abilityFilter = filterAbility
         let hpFilter: [Bool] = {
@@ -4815,12 +4817,12 @@ struct FinderRootView: View {
         // Gen 5 profile params
         let g5Mac = UInt64(gen5MacText.replacingOccurrences(of: ":", with: ""), radix: 16) ?? 0
         let g5Keys = gen5Keypresses
-        let g5VCount = UInt8(gen5VCount)
-        let g5GxStat = UInt8(gen5GxStat)
-        let g5VFrame = UInt8(gen5VFrame)
+        let g5VCount = UInt8(clamping: gen5VCount)
+        let g5GxStat = UInt8(clamping: gen5GxStat)
+        let g5VFrame = UInt8(clamping: gen5VFrame)
         let g5SkipLR = gen5SkipLR
-        let g5Timer0Min = UInt16(gen5Timer0Min)
-        let g5Timer0Max = UInt16(gen5Timer0Max)
+        let g5Timer0Min = UInt16(clamping: gen5Timer0Min)
+        let g5Timer0Max = UInt16(clamping: gen5Timer0Max)
         let g5MemoryLink = gen5MemoryLink
         let g5ShinyCharm = gen5ShinyCharm
         let g5DSType = gen5DSType
@@ -4875,8 +4877,8 @@ struct FinderRootView: View {
         let g5EndYear = UInt16(g5EndComponents.year ?? 2000)
         let g5EndMonth = UInt8(g5EndComponents.month ?? 1)
         let g5EndDay = UInt8(g5EndComponents.day ?? 2)
-        let g5IVMinAdv = UInt32(gen5IVMinAdvance)
-        let g5IVMaxAdv = UInt32(gen5IVMaxAdvance)
+        let g5IVMinAdv = UInt32(clamping: gen5IVMinAdvance)
+        let g5IVMaxAdv = UInt32(clamping: gen5IVMaxAdvance)
 
         // Wild encounter context (pre-compute on main actor)
         let encMode = encounterMode
@@ -5757,6 +5759,9 @@ struct RNGCreditsView: View {
 struct RNGIntField: View {
     let label: String
     @Binding var value: Int
+    /// What the field allows; an entry outside it is clamped when it
+    /// commits, so the screen shows what's used.
+    var range: ClosedRange<Int>? = nil
     var body: some View {
         // At accessibility sizes the field moves under its label.
         AdaptiveStack(spacing: 6) {
@@ -5764,6 +5769,30 @@ struct RNGIntField: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             TextField("", value: $value, format: .number)
                 .textFieldStyle(.roundedBorder).scaledWidth(100).multilineTextAlignment(.trailing)
+        }
+    .clamping($value, to: range)
+    }
+}
+
+/// What the RNG tools' number fields allow, so an entry can't overflow the
+/// search's integer types.
+enum RNGFieldRange {
+    static let advances = 0...Int(UInt32.max)
+    static let byte = 0...Int(UInt8.max)
+    static let word = 0...Int(UInt16.max)
+}
+
+extension Comparable {
+    func clamped(to range: ClosedRange<Self>) -> Self { min(max(self, range.lowerBound), range.upperBound) }
+}
+
+extension View {
+    /// Clamps a number field's value to `range` when it commits.
+    func clamping(_ value: Binding<Int>, to range: ClosedRange<Int>?) -> some View {
+        onChange(of: value.wrappedValue, initial: true) {
+            guard let range else { return }
+            let clamped = value.wrappedValue.clamped(to: range)
+            if clamped != value.wrappedValue { value.wrappedValue = clamped }
         }
     }
 }
