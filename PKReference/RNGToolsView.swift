@@ -629,9 +629,11 @@ enum FinderMethod: String, CaseIterable, Identifiable, Sendable {
     case method5CGear = "Method 5 C-Gear"
     var id: String { rawValue }
 
-    static func methods(for gen: FinderGeneration) -> [FinderMethod] {
+    /// PokéFinder's Gen 3 static generator has no Method 2 (it gives Method
+    /// 1), so statics offer the two it has in both modes.
+    static func methods(for gen: FinderGeneration, staticEncounter: Bool = false) -> [FinderMethod] {
         switch gen {
-        case .gen3: return [.method1, .method2, .method4]
+        case .gen3: return staticEncounter ? [.method1, .method4] : [.method1, .method2, .method4]
         case .gen4: return [.method1, .methodJ, .methodK]
         case .gen5: return [.method5, .method5IVs, .method5CGear]
         case .gen8: return [.method1]
@@ -680,19 +682,57 @@ enum FinderLead: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    static func leads(for gen: FinderGeneration, encounterMode: Bool) -> [FinderLead] {
-        if !encounterMode { return [.none, .synchronize] }
-        switch gen {
-        case .gen3:
-            return [.none, .synchronize, .magnetPull, .staticLead, .pressure, .compoundEyes, .suctionCups, .arenaTrap]
-        case .gen4:
-            return [.none, .synchronize, .cuteCharmF, .cuteCharmM, .magnetPull, .staticLead, .pressure, .compoundEyes, .suctionCups, .flashFire, .harvest, .stormDrain, .arenaTrap]
-        case .gen5:
-            return [.none, .synchronize, .cuteCharmF, .cuteCharmM, .magnetPull, .staticLead, .pressure, .compoundEyes, .suctionCups, .flashFire, .harvest, .stormDrain, .arenaTrap]
-        case .gen8:
-            return [.none, .synchronize, .cuteCharmF, .cuteCharmM, .magnetPull, .staticLead, .pressure, .compoundEyes, .suctionCups, .flashFire, .harvest, .stormDrain, .arenaTrap]
+    /// What the picker shows: the abilities whose encounter effect is the
+    /// same share a lead.
+    var name: String {
+        switch self {
+        case .pressure: return "Pressure / Hustle / Vital Spirit"
+        case .suctionCups: return "Suction Cups / Sticky Hold"
+        default: return rawValue
         }
     }
+
+    /// The leads PokéFinder's generator for this encounter reads; it ignores
+    /// the rest.
+    static func leads(for gen: FinderGeneration, mode: FinderRootView.EncounterMode,
+                      game: FinderGameVersion) -> [FinderLead] {
+        switch mode {
+        case .static_:
+            // Gen 3's static generator and searcher take no lead.
+            return gen == .gen3 ? [.none] : [.none, .synchronize, .cuteCharmF, .cuteCharmM]
+        case .underground:
+            return [.none, .synchronize, .cuteCharmF, .cuteCharmM, .pressure, .compoundEyes]
+        case .egg, .raid, .id:
+            return [.none]
+        case .wild:
+            switch gen {
+            case .gen3:
+                // Of Gen 3, only Emerald has leads' encounter effects.
+                return game == .emerald
+                    ? [.none, .synchronize, .cuteCharmF, .cuteCharmM, .magnetPull, .staticLead, .pressure]
+                    : [.none]
+            case .gen4:
+                return [.none, .synchronize, .cuteCharmF, .cuteCharmM, .magnetPull, .staticLead, .pressure,
+                        .suctionCups, .compoundEyes, .arenaTrap]
+            case .gen5:
+                return [.none, .synchronize, .cuteCharmF, .cuteCharmM, .magnetPull, .staticLead, .pressure,
+                        .suctionCups, .compoundEyes]
+            case .gen8:
+                return [.none, .synchronize, .cuteCharmF, .cuteCharmM, .magnetPull, .staticLead, .harvest,
+                        .flashFire, .stormDrain, .pressure, .compoundEyes]
+            }
+        }
+    }
+}
+
+/// BDSP's Grand Underground: what PokéFinder's Underground screen offers.
+/// The story stage (1–6) sets which Pokémon appear and how often; the level
+/// flag (0–8) sets their levels.
+enum UndergroundProgress {
+    static let stories = ["Underground Unlocked", "Strength Obtained", "Defog Obtained",
+                          "7 Badges", "Waterfall Obtained", "National Dex"]
+    static let levels = ["0/1 Badges", "2 Badges", "3 Badges", "4 Badges", "5 Badges",
+                         "6 Badges", "7 Badges", "8 Badges", "National Dex"]
 }
 
 /// PokéFinder's shiny filter for a Shiny Only switch: star or square (1 | 2).
@@ -1737,7 +1777,7 @@ nonisolated func undergroundGenerateGen8Streaming(
     syncNature: UInt8 = 0,
     game: PFGame,
     shinyCharm: Bool,
-    diglett: Bool, storyFlag: Int32,
+    diglett: Bool, storyFlag: Int32, levelFlag: UInt8 = 0,
     filterGender: UInt8 = 255, filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
     onResult: (StaticSearchResult) -> Void
@@ -1751,7 +1791,7 @@ nonisolated func undergroundGenerateGen8Streaming(
         seed0: seed0, seed1: seed1,
         initialAdvances: initialAdvance, maxAdvances: maxAdvance,
         lead: pfLead,
-        diglett: diglett, levelFlag: 0,
+        diglett: diglett, levelFlag: levelFlag,
         tid: tid, sid: sid, game: game,
         shinyCharm: shinyCharm,
         storyFlag: storyFlag,
@@ -3424,10 +3464,10 @@ struct FinderRootView: View {
             case .gen3, .gen4, .gen5:
                 return [.static_, .wild]
             case .gen8:
-                var modes: [EncounterMode] = [.static_, .wild, .egg, .id]
-                if game.isSwSh { modes.insert(.raid, at: 3) }
-                if game.isBDSP { modes.insert(.underground, at: 3) }
-                return modes
+                // PokéFinder's Gen 8 static, wild, egg and ID generators are
+                // BDSP's, and its Sword/Shield areas are BDSP's under other
+                // names: only raids are Sword/Shield's own.
+                return game.isSwSh ? [.raid] : [.static_, .wild, .egg, .underground, .id]
             }
         }
     }
@@ -3523,7 +3563,10 @@ struct FinderRootView: View {
 
     // Gen 8 Underground parameters (BDSP)
     @AppStorage("finder_gen8diglett") private var gen8Diglett: Bool = false
-    @AppStorage("finder_gen8storyFlag") private var gen8StoryFlag: Int = 0
+    /// PokéFinder's story stage, 1–6 (`UndergroundProgress.stories`).
+    @AppStorage("finder_gen8storyStage") private var gen8StoryStage: Int = 1
+    /// PokéFinder's level flag, 0–8 (`UndergroundProgress.levels`).
+    @AppStorage("finder_gen8levelFlag") private var gen8LevelFlag: Int = 0
 
     // Gen 8 ID filter parameters
     @AppStorage("finder_gen8filterTID") private var gen8FilterTIDText: String = ""
@@ -3656,7 +3699,7 @@ struct FinderRootView: View {
                                 // for Diamond, Pearl and Platinum's legends).
                                 .onChange(of: selectedEncounter) {
                                     if let encounterMethod = selectedEncounter?.method,
-                                       FinderMethod.methods(for: generation).contains(encounterMethod) {
+                                       availableMethods.contains(encounterMethod) {
                                         method = encounterMethod
                                     }
                                 }
@@ -3856,29 +3899,24 @@ struct FinderRootView: View {
                     }
                 }
 
-                // Method (hidden for ID mode)
-                if encounterMode != .id {
-                    SectionCard(title: "Method", icon: "cpu") {
-                    Picker("Method", selection: $method) {
-                        ForEach(FinderMethod.methods(for: generation)) { m in
-                            Text(m.rawValue).tag(m)
+                // Method and lead, where there's a choice (not Gen 8's one
+                // method, nor its eggs, raids and TID/SID)
+                if encounterMode != .id && (availableMethods.count > 1 || leadApplies) {
+                    SectionCard(title: availableMethods.count > 1 ? "Method" : "Lead", icon: "cpu") {
+                    if availableMethods.count > 1 {
+                        Picker("Method", selection: $method) {
+                            ForEach(availableMethods) { m in
+                                Text(m.rawValue).tag(m)
+                            }
                         }
                     }
-                    .onChange(of: generation) {
-                        let available = FinderLead.leads(for: generation, encounterMode: encounterMode == .wild)
-                        if !available.contains(lead) { lead = .none }
-                    }
-                    .onChange(of: encounterMode) {
-                        let available = FinderLead.leads(for: generation, encounterMode: encounterMode == .wild)
-                        if !available.contains(lead) { lead = .none }
-                    }
 
-                    // PokéFinder's Gen 3 static generator and searcher take no
-                    // lead.
+                    // Only where PokéFinder reads one: not Gen 3 statics, nor
+                    // Ruby, Sapphire, FireRed and LeafGreen.
                     if leadApplies {
                         Picker("Lead Ability", selection: $lead) {
-                            ForEach(FinderLead.leads(for: generation, encounterMode: encounterMode == .wild)) { l in
-                                Text(l.rawValue).tag(l)
+                            ForEach(availableLeads) { l in
+                                Text(l.name).tag(l)
                             }
                         }
                     }
@@ -3988,9 +4026,7 @@ struct FinderRootView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if needsStaticEncounter {
-                        Text(StaticEncounterData.categories(for: selectedGame).isEmpty
-                             ? "PokéFinder has no static encounters for \(selectedGame.rawValue)."
-                             : "Choose the Pokémon under Encounter: Gen 5 and 8 searches need its template.")
+                        Text("Choose the Pokémon under Encounter: Gen 5 and 8 searches need its template.")
                             .font(.caption).foregroundStyle(.orange)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -4044,6 +4080,10 @@ struct FinderRootView: View {
         } message: {
             Text(verbatim: "Save profile for \(selectedGame.rawValue) TID \(tid) / SID \(sid)")
         }
+        .onAppear { fixStoredSelections() }
+        .onChange(of: generation) { fixLead() }
+        .onChange(of: encounterMode) { fixLead() }
+        .onChange(of: selectedGame) { fixLead() }
         .leaveWarning(isSearching ? "The search in progress will stop." : nil)
         #if DEBUG && os(macOS)
         // With `-finder_game FireRed -finder_encounterCategory Gifts`: opens
@@ -4063,7 +4103,35 @@ struct FinderRootView: View {
 
     // MARK: Encounter Helpers
 
-    private var leadApplies: Bool { !(generation == .gen3 && encounterMode == .static_) }
+    private var availableLeads: [FinderLead] {
+        FinderLead.leads(for: generation, mode: encounterMode, game: selectedGame)
+    }
+
+    private var leadApplies: Bool { availableLeads.count > 1 }
+
+    private var availableMethods: [FinderMethod] {
+        FinderMethod.methods(for: generation, staticEncounter: encounterMode == .static_)
+    }
+
+    private func fixLead() {
+        if !availableLeads.contains(lead) { lead = .none }
+    }
+
+    /// Stored choices the current game no longer offers (Sword/Shield's
+    /// Static, or Method 2 for a Gen 3 static), as changing the game would.
+    private func fixStoredSelections() {
+        let modes = EncounterMode.modes(for: generation, game: selectedGame)
+        if !modes.contains(encounterMode) { encounterMode = modes[0] }
+        if !availableMethods.contains(method) { autoSelectMethod() }
+        fixLead()
+        // The story picker offered 0 ("Pre-National Dex") and 1 ("Post-
+        // National Dex"); PokéFinder's stages are 1–6.
+        let defaults = UserDefaults.standard
+        if let oldFlag = defaults.object(forKey: "finder_gen8storyFlag") as? Int {
+            gen8StoryStage = oldFlag == 1 ? UndergroundProgress.stories.count : 1
+            defaults.removeObject(forKey: "finder_gen8storyFlag")
+        }
+    }
 
     /// Gen 3 and 4's searchers take Synchronize with any nature; everything
     /// else runs PokéFinder's generators (Gen 5's searches too), which take
@@ -4441,9 +4509,22 @@ struct FinderRootView: View {
     private var gen8UndergroundParametersView: some View {
         VStack(spacing: 8) {
             Toggle("Diglett Bonus", isOn: $gen8Diglett)
-            Picker("Story Progress", selection: $gen8StoryFlag) {
-                Text("Pre-National Dex").tag(0)
-                Text("Post-National Dex").tag(1)
+            // Labelled: on iOS a menu shows only its value.
+            LabeledContent("Story Progress") {
+                Picker("Story Progress", selection: $gen8StoryStage) {
+                    ForEach(Array(UndergroundProgress.stories.enumerated()), id: \.offset) { i, name in
+                        Text(name).tag(i + 1)
+                    }
+                }
+                .labelsHidden()
+            }
+            LabeledContent("Levels") {
+                Picker("Levels", selection: $gen8LevelFlag) {
+                    ForEach(Array(UndergroundProgress.levels.enumerated()), id: \.offset) { i, name in
+                        Text(name).tag(i)
+                    }
+                }
+                .labelsHidden()
             }
         }
     }
@@ -4993,7 +5074,8 @@ struct FinderRootView: View {
 
         // Gen 8 Underground params
         let g8Diglett = gen8Diglett
-        let g8StoryFlag = Int32(gen8StoryFlag)
+        let g8StoryFlag = Int32(gen8StoryStage.clamped(to: 1...UndergroundProgress.stories.count))
+        let g8LevelFlag = UInt8(gen8LevelFlag.clamped(to: 0...(UndergroundProgress.levels.count - 1)))
 
         // Gen 8 ID filter params
         let g8FilterTID = UInt16(gen8FilterTIDText) ?? 0
@@ -5102,7 +5184,7 @@ struct FinderRootView: View {
                     natures: natFilter, tid: tID, sid: sID,
                     shinyOnly: shiny, lead: ld, syncNature: sNat, game: pfGameVal,
                     shinyCharm: g8ShinyCharm,
-                    diglett: g8Diglett, storyFlag: g8StoryFlag,
+                    diglett: g8Diglett, storyFlag: g8StoryFlag, levelFlag: g8LevelFlag,
                     filterGender: genderFilter, filterAbility: abilityFilter,
                     hiddenPowers: hpFilter
                 ) { continuation.yield(.result($0)) }

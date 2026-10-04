@@ -2292,7 +2292,7 @@ nonisolated enum PFBridge {
                                       diglett: Bool = false, levelFlag: UInt8 = 0,
                                       tid: UInt16, sid: UInt16, game: PFGame,
                                       nationalDex: Bool = true, shinyCharm: Bool = false, ovalCharm: Bool = false,
-                                      storyFlag: Int32 = 0,
+                                      storyFlag: Int32 = 1,
                                       filterGender: UInt8 = 255, filterAbility: UInt8 = 255, filterShiny: UInt8 = 255,
                                       ivMin: [UInt8] = [0,0,0,0,0,0], ivMax: [UInt8] = [31,31,31,31,31,31],
                                       natures: [Bool] = Array(repeating: false, count: 25),
