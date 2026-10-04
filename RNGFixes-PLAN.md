@@ -1,7 +1,7 @@
 # RNG tools fixes: plan
 
-Status: **PRs 1 and 2 built** (2026-10-03/04); PRs 3 and 4 planned. From
-the RNG audit's 45 findings, and one found since (46). This plan covers findings 1–10 in detail (§2–§5), as four PRs,
+Status: **PRs 1–3 built** (2026-10-03/04); PR 4 planned. From
+the RNG audit's 45 findings, and two found since (46, 47). This plan covers findings 1–10 in detail (§2–§5), as four PRs,
 and groups the rest for later (§7). The owner took every recommendation in
 §8.
 
@@ -158,10 +158,10 @@ and BDSP have no entries, Gen 4 legends say Method 1, HeartGold/SoulSilver
 swap Kyogre and Groudon, many levels are off, and searches find the
 template by species, or not at all.
 
-- **Bridge:** `PFStaticTemplate` gains each template's method (Gen 4),
-  shiny lock, form and, for BDSP, fixed IV count, alongside species, level
-  and games. Every generation's list is already bridged
-  (`pf_getStaticEncounters3/4/5/8`).
+- **Bridge:** `PFStaticTemplate` gains each template's method (Gen 4) and
+  fixed IV count, alongside species, form, level, shiny lock and games.
+  Every generation's list was already bridged (`pf_getStaticEncounters3/4/5/8`);
+  form names come from PokéFinder's translator (`pf_getFormName`).
 - **Model:** a static encounter becomes a reference into PokéFinder's
   tables (generation, type, index) with what the template says. Categories
   follow each generation's table order (Gen 5 adds Mythics, Curtis and
@@ -172,23 +172,38 @@ template by species, or not at all.
   - Gen 3: by reference, replacing #72's species lookup.
   - Gen 4: a streaming searcher with the template (`pf_staticSearch4_start`,
     as Gen 3's), and the generator with the template. This takes in the
-    queued "Stream the Gen 4 static search" task.
-  - Gen 5: the generator and searcher already take `staticType` and
-    `staticIndex`; pass them.
-  - Gen 8: the generator already takes them; pass them.
+    queued "Stream the Gen 4 static search" task. The searcher also takes
+    the lead now (Synchronize or Cute Charm searches were ignored).
+  - Gen 5: the generator and searcher already took `staticType` and
+    `staticIndex`; they're passed now.
+  - Gen 8: the generator already took them; they're passed now.
+  - Gen 5 and 8 look the template up without bounds checks, so they need
+    the Pokémon chosen; Search stays off until it is. Sword and Shield have
+    no PokéFinder statics, and say so.
+- **Found while building it:** PokéFinder's Gen 5 static and wild
+  generators pair each PID advance with each IV advance, and the bridge
+  passed the PID range as the IV range too: (n + 1)² results, 100 million
+  at the default 0–10,000. Both take their own IV range now
+  (`ivInitialAdvances`, `ivMaxAdvances`), from the IV Advance fields, which
+  Generator mode shows for Gen 5 as well.
 - **Method:** choosing an encounter sets the Method picker to its method
   (Method J for Diamond/Pearl/Platinum legends, Method K for
-  HeartGold/SoulSilver ones). You can still change it.
-- **FireRed/LeafGreen calibration** keeps working: its context already
-  holds a template reference.
+  HeartGold/SoulSilver ones). You can still change it. Gen 5 and BDSP
+  encounters carry no method (BDSP's Xorshift has none).
+- **FireRed/LeafGreen calibration** keeps working: it takes the template
+  from the encounter. The FireRed/LeafGreen Mew event is generated from
+  Emerald's Mew template (§8).
+- **The Statics browser** lists the same encounters, for Gen 3, 4, 5 and 8,
+  with shiny locks marked.
 - **Tests:**
   - Every PokéFinder template appears, and nothing else does (but §8's Mew).
   - Gen 4 legends carry J or K.
   - HeartGold has Kyogre and SoulSilver Groudon.
   - Reshiram (shiny-locked) gives no shiny results.
   - BDSP Dialga has three 31s in every result.
-  - Gender follows the species in Gen 4/5/8.
-  - The Gen 4 searcher streams and cancels.
+  - Gender follows the species in Gen 4.
+  - The Gen 4 searcher streams, filters gender by the template, and cancels.
+  - The Gen 5 generator gives PID advances × IV advances.
 
 ---
 
@@ -261,6 +276,11 @@ Grouped by area; each group could be a PR. Numbers are the audit's.
   ("Pre-National Dex"), which reads `flagRates[-1]` (the slot rates come
   out wrong), and 1 ("Post-National Dex"), which is the earliest stage.
   Offer PokéFinder's six stages, with their names.
+- 47: The streaming searchers keep every result. They show the first 500,
+  but a wide-open search (every IV, a long delay range) keeps collecting:
+  a Gen 4 static search gathers about 4,500 a second, and Gen 3's does the
+  same, so a search left running grows without limit. Cap the kept results
+  (say 100,000) and say so, as the Eggs tool's estimate does.
 
 ---
 

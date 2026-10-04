@@ -120,6 +120,10 @@ typedef struct {
     uint8_t ability;
     uint8_t gender;
     uint8_t level;
+    /// PokéFinder's Method; Gen 4 only (Method 1, J or K), else 0.
+    uint8_t method;
+    /// IVs fixed at 31 (BDSP legends' three).
+    uint8_t ivCount;
 } PFStaticTemplate;
 
 // MARK: - Wild Generator State
@@ -299,8 +303,9 @@ PFGeneratorState4 *pf_staticGenerate4(uint32_t seed,
                                        uint32_t offset,
                                        uint8_t method,
                                        uint8_t lead,
+                                       int staticType, int staticIndex,
                                        uint16_t tid, uint16_t sid,
-                                       uint8_t game,
+                                       uint32_t game,
                                        uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
                                        const uint8_t ivMin[6], const uint8_t ivMax[6],
                                        const bool natures[25], const bool powers[16],
@@ -308,21 +313,27 @@ PFGeneratorState4 *pf_staticGenerate4(uint32_t seed,
 
 // MARK: - Gen 4 Searchers
 
-PFSearcherState4 *pf_staticSearch4(uint32_t minAdvance, uint32_t maxAdvance,
-                                    uint32_t minDelay, uint32_t maxDelay,
-                                    uint8_t method,
-                                    uint8_t lead,
-                                    uint16_t tid, uint16_t sid,
-                                    uint8_t game,
-                                    uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
-                                    const uint8_t ivMin[6], const uint8_t ivMax[6],
-                                    const bool natures[25], const bool powers[16],
-                                    int *outCount);
+typedef void *PFStaticSearch4Handle;
+
+PFStaticSearch4Handle pf_staticSearch4_start(uint32_t minAdvance, uint32_t maxAdvance,
+                                             uint32_t minDelay, uint32_t maxDelay,
+                                             uint8_t method, uint8_t lead,
+                                             int staticType, int staticIndex,
+                                             uint16_t tid, uint16_t sid, uint32_t game,
+                                             uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
+                                             const uint8_t ivMin[6], const uint8_t ivMax[6],
+                                             const bool natures[25], const bool powers[16]);
+int pf_staticSearch4_progress(PFStaticSearch4Handle handle);
+bool pf_staticSearch4_done(PFStaticSearch4Handle handle);
+PFSearcherState4 *pf_staticSearch4_getResults(PFStaticSearch4Handle handle, int *outCount);
+void pf_staticSearch4_cancel(PFStaticSearch4Handle handle);
+void pf_staticSearch4_free(PFStaticSearch4Handle handle);
 
 // MARK: - Translator
 
 void pf_initTranslator(const char *locale);
 char *pf_getSpecieName(uint16_t specie);
+char *pf_getFormName(uint16_t specie, uint8_t form);
 char *pf_getAbilityName(uint16_t ability);
 char *pf_getNatureName(uint8_t nature);
 char *pf_getHiddenPowerName(uint8_t power);
@@ -733,6 +744,7 @@ PFGeneratorState5 *pf_staticGenerate5(uint64_t seed,
                                        uint32_t initialAdvances,
                                        uint32_t maxAdvances,
                                        uint32_t offset,
+                                       uint32_t ivInitialAdvances, uint32_t ivMaxAdvances,
                                        uint8_t method,
                                        uint8_t lead,
                                        uint16_t tid, uint16_t sid,
@@ -756,6 +768,7 @@ PFWildGeneratorState5 *pf_wildGenerate5(uint64_t seed,
                                          uint32_t initialAdvances,
                                          uint32_t maxAdvances,
                                          uint32_t offset,
+                                         uint32_t ivInitialAdvances, uint32_t ivMaxAdvances,
                                          uint8_t method,
                                          uint8_t lead,
                                          uint16_t tid, uint16_t sid,

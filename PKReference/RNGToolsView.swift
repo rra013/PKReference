@@ -1192,13 +1192,15 @@ nonisolated func staticGenerateGen4(
     shinyOnly: Bool,
     method: FinderMethod,
     lead: FinderLead,
-    syncNature: UInt8 = 0
+    syncNature: UInt8 = 0,
+    game: PFGame = .none,
+    template: PFStaticTemplateRef? = nil
 ) -> [StaticSearchResult] {
     var results: [StaticSearchResult] = []
     staticGenerateGen4Streaming(
         seed: seed, initialAdvance: initialAdvance, maxAdvance: maxAdvance,
         natures: natures, tid: tid, sid: sid, shinyOnly: shinyOnly,
-        method: method, lead: lead, syncNature: syncNature
+        method: method, lead: lead, syncNature: syncNature, game: game, template: template
     ) { results.append($0) }
     return results
 }
@@ -1214,6 +1216,8 @@ nonisolated func staticGenerateGen4Streaming(
     method: FinderMethod,
     lead: FinderLead,
     syncNature: UInt8 = 0,
+    game: PFGame = .none,
+    template: PFStaticTemplateRef? = nil,
     filterGender: UInt8 = 255,
     filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
@@ -1225,9 +1229,11 @@ nonisolated func staticGenerateGen4Streaming(
     for n in natures { natArr[Int(n)] = true }
     let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
+    // The encounter's template gives its gender; without one, every result
+    // is genderless.
     let results = PFBridge.staticGenerate4(
         seed: seed, initialAdvances: initialAdvance, maxAdvances: maxAdvance,
-        method: pfMethod, lead: pfLead, tid: tid, sid: sid,
+        method: pfMethod, lead: pfLead, template: template, tid: tid, sid: sid, game: game,
         filterGender: filterGender, filterAbility: filterAbility,
         filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
 
@@ -1272,6 +1278,10 @@ nonisolated func staticSearchGen4(
     return results
 }
 
+/// Streams PokéFinder's searcher, read every tenth of a second, as Gen 3's
+/// does. `template` is the static encounter's, for its gender; without one,
+/// every result is genderless. `lead` is the searcher's (Synchronize with
+/// any nature).
 nonisolated func staticSearchGen4Streaming(
     minIVs: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8),
     maxIVs: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8),
@@ -1280,6 +1290,9 @@ nonisolated func staticSearchGen4Streaming(
     sid: UInt16,
     shinyOnly: Bool,
     method: FinderMethod,
+    lead: FinderLead = .none,
+    game: PFGame = .none,
+    template: PFStaticTemplateRef? = nil,
     minAdvance: UInt32 = 0,
     maxAdvance: UInt32 = 0,
     minDelay: UInt16,
@@ -1287,6 +1300,7 @@ nonisolated func staticSearchGen4Streaming(
     filterGender: UInt8 = 255,
     filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
+    onProgress: (Double) -> Void = { _ in },
     onResult: (StaticSearchResult) -> Void
 ) {
     let pfMethod = finderMethodToPF(method)
@@ -1296,26 +1310,40 @@ nonisolated func staticSearchGen4Streaming(
     let ivMin = [minIVs.0, minIVs.1, minIVs.2, minIVs.3, minIVs.4, minIVs.5]
     let ivMax = [maxIVs.0, maxIVs.1, maxIVs.2, maxIVs.3, maxIVs.4, maxIVs.5]
 
-    let results = PFBridge.staticSearch4(
+    let handle = PFBridge.staticSearch4Start(
         minAdvance: minAdvance, maxAdvance: maxAdvance,
         minDelay: UInt32(minDelay), maxDelay: UInt32(maxDelay),
-        method: pfMethod, tid: tid, sid: sid,
+        method: pfMethod, lead: lead.pfLead, template: template, tid: tid, sid: sid, game: game,
         filterGender: filterGender, filterAbility: filterAbility,
         filterShiny: shinyFilter, ivMin: ivMin, ivMax: ivMax,
         natures: natArr, powers: hiddenPowers)
+    defer { PFBridge.staticSearch4Free(handle) }
 
-    for r in results {
-        if Task.isCancelled { return }
-        onResult(StaticSearchResult(
-            seed: r.seed, pid: r.pid,
-            ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
-            ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
-            nature: r.nature, ability: r.ability,
-            gender: r.gender, shiny: r.shiny > 0,
-            advances: r.advances, method: method,
-            hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength
-        ))
+    func send(_ results: [PFSearcherState4Swift]) {
+        for r in results {
+            onResult(StaticSearchResult(
+                seed: r.seed, pid: r.pid,
+                ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
+                ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
+                nature: r.nature, ability: r.ability,
+                gender: r.gender, shiny: r.shiny > 0,
+                advances: r.advances, method: method,
+                hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength
+            ))
+        }
     }
+
+    while !PFBridge.staticSearch4Done(handle) {
+        if Task.isCancelled {
+            PFBridge.staticSearch4Cancel(handle)
+            return
+        }
+        send(PFBridge.staticSearch4Results(handle))
+        onProgress(Double(PFBridge.staticSearch4Progress(handle)))
+        Thread.sleep(forTimeInterval: 0.1)
+    }
+    send(PFBridge.staticSearch4Results(handle))
+    onProgress(100)
 }
 
 // ============================================================================
@@ -1326,6 +1354,8 @@ nonisolated func staticGenerateGen5Streaming(
     seed: UInt64,
     initialAdvance: UInt32,
     maxAdvance: UInt32,
+    ivInitialAdvance: UInt32 = 0,
+    ivMaxAdvance: UInt32 = 0,
     natures: Set<UInt8>,
     tid: UInt16,
     sid: UInt16,
@@ -1342,6 +1372,7 @@ nonisolated func staticGenerateGen5Streaming(
     filterGender: UInt8 = 255,
     filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
+    staticType: Int32 = 0, staticIndex: Int32 = 0,
     onResult: (StaticSearchResult) -> Void
 ) {
     let pfMethod = finderMethodToPF(method)
@@ -1352,7 +1383,9 @@ nonisolated func staticGenerateGen5Streaming(
 
     let results = PFBridge.staticGenerate5(
         seed: seed, initialAdvances: initialAdvance, maxAdvances: maxAdvance,
+        ivInitialAdvances: ivInitialAdvance, ivMaxAdvances: ivMaxAdvance,
         method: pfMethod, lead: pfLead, tid: tid, sid: sid, game: game,
+        staticType: staticType, staticIndex: staticIndex,
         mac: mac, keypresses: keypresses,
         vcount: vcount, gxstat: gxstat, vframe: vframe,
         skipLR: skipLR, timer0Min: timer0Min, timer0Max: timer0Max,
@@ -1380,6 +1413,8 @@ nonisolated func wildGenerateGen5Streaming(
     seed: UInt64,
     initialAdvance: UInt32,
     maxAdvance: UInt32,
+    ivInitialAdvance: UInt32 = 0,
+    ivMaxAdvance: UInt32 = 0,
     natures: Set<UInt8>,
     tid: UInt16,
     sid: UInt16,
@@ -1408,6 +1443,7 @@ nonisolated func wildGenerateGen5Streaming(
 
     let results = PFBridge.wildGenerate5(
         seed: seed, initialAdvances: initialAdvance, maxAdvances: maxAdvance,
+        ivInitialAdvances: ivInitialAdvance, ivMaxAdvances: ivMaxAdvance,
         method: pfMethod, lead: pfLead, tid: tid, sid: sid, game: game,
         encounter: encounter, location: location, season: season,
         mac: mac, keypresses: keypresses,
@@ -3596,12 +3632,19 @@ struct FinderRootView: View {
                                         Text("\(e.speciesName) Lv\(e.level)").tag(StaticEncounter?.some(e))
                                     }
                                 }
+                                // Its method is the template's (Method J
+                                // for Diamond, Pearl and Platinum's legends).
+                                .onChange(of: selectedEncounter) {
+                                    if let encounterMethod = selectedEncounter?.method,
+                                       FinderMethod.methods(for: generation).contains(encounterMethod) {
+                                        method = encounterMethod
+                                    }
+                                }
                             }
                         }
 
                         if let enc = selectedEncounter {
-                            encounterInfoCard(name: enc.speciesName, level: enc.level,
-                                              game: selectedGame.rawValue, method: enc.method.rawValue)
+                            encounterInfoCard(enc)
                         }
                     } else if encounterMode == .wild {
                         let locations = PFEncounterDataProvider.locationNames(for: selectedGame)
@@ -3918,6 +3961,14 @@ struct FinderRootView: View {
                               systemImage: "magnifyingglass")
                     }
                     .buttonStyle(.primaryAction)
+                    .disabled(needsStaticEncounter)
+                    if needsStaticEncounter {
+                        Text(StaticEncounterData.categories(for: selectedGame).isEmpty
+                             ? "PokéFinder has no static encounters for \(selectedGame.rawValue)."
+                             : "Choose the Pokémon under Encounter: Gen 5 and 8 searches need its template.")
+                            .font(.caption).foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
 
                 if frlgFiltering {
@@ -4020,18 +4071,29 @@ struct FinderRootView: View {
         }
     }
 
-    private func encounterInfoCard(name: String, level: UInt8, game: String, method: String) -> some View {
-        HStack(spacing: 8) {
+    /// What the chosen encounter's template sets: its method, shiny lock and
+    /// fixed IVs.
+    private func encounterInfoCard(_ encounter: StaticEncounter) -> some View {
+        let notes = [selectedGame.rawValue, encounter.method?.rawValue,
+                     encounter.shinyLocked ? "shiny-locked" : nil,
+                     encounter.fixedIVs > 0 ? "\(encounter.fixedIVs) IVs of 31" : nil].compactMap { $0 }
+        return HStack(spacing: 8) {
             Image(systemName: "target")
                 .foregroundStyle(.orange)
-            Text("\(name) Lv\(level)")
+            Text("\(encounter.speciesName) Lv\(encounter.level)")
                 .font(.callout).bold()
-            Text("(\(game), \(method))")
+            Text("(\(notes.joined(separator: ", ")))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer()
         }
         .padding(.vertical, 4)
+    }
+
+    /// Gen 5 and 8's static searches need the Pokémon's template.
+    private var needsStaticEncounter: Bool {
+        encounterMode == .static_ && (generation == .gen5 || generation == .gen8) && selectedEncounter == nil
     }
 
     private func wildSlotTable(route: WildEncounterRoute) -> some View {
@@ -4473,8 +4535,17 @@ struct FinderRootView: View {
                         #endif
                 }
             }
-            RNGIntField(label: "Initial Advance", value: $genInitAdvance, range: RNGFieldRange.advances)
-            RNGIntField(label: "Max Advance", value: $genMaxAdvance, range: RNGFieldRange.advances)
+            if generation == .gen5 {
+                // Gen 5 draws IVs and the PID from separate RNGs; PokéFinder
+                // pairs each PID advance with each IV one.
+                RNGIntField(label: "Initial PID Advance", value: $genInitAdvance, range: RNGFieldRange.advances)
+                RNGIntField(label: "Max PID Advance", value: $genMaxAdvance, range: RNGFieldRange.advances)
+                RNGIntField(label: "Min IV Advance", value: $gen5IVMinAdvance, range: RNGFieldRange.advances)
+                RNGIntField(label: "Max IV Advance", value: $gen5IVMaxAdvance, range: RNGFieldRange.advances)
+            } else {
+                RNGIntField(label: "Initial Advance", value: $genInitAdvance, range: RNGFieldRange.advances)
+                RNGIntField(label: "Max Advance", value: $genMaxAdvance, range: RNGFieldRange.advances)
+            }
         }
     }
 
@@ -4934,11 +5005,11 @@ struct FinderRootView: View {
             return findLocationID(pfGame: pfGameVal, pfEnc: pfEncVal,
                                   isGen3: isGen3, locationName: encLocation)
         }()
-        // A Gen 3 static encounter's template, for its gender.
-        let gen3Template: PFStaticTemplateRef? = gen == .gen3 && encMode == .static_
-            ? selectedEncounter.flatMap {
-                PFBridge.staticTemplate3(species: $0.species, game: pfGameVal, preferring: $0.category.pfStaticType3)
-            } : nil
+        // The static encounter's place in PokéFinder's tables, for its
+        // template: gender, shiny lock, fixed IVs.
+        let staticTemplate: PFStaticTemplateRef? = encMode == .static_
+            ? selectedEncounter.flatMap { $0.generation == gen ? $0.template : nil } : nil
+        let gen3Template = gen == .gen3 ? staticTemplate : nil
         let slotSpecies: [UInt16]
         if let route = PFEncounterDataProvider.wildEncounter(for: selectedGame,
                                                               location: encLocation,
@@ -5032,6 +5103,7 @@ struct FinderRootView: View {
                 } else if gen == .gen5 {
                     wildGenerateGen5Streaming(
                         seed: seedVal64, initialAdvance: initAdv, maxAdvance: maxAdv,
+                        ivInitialAdvance: g5IVMinAdv, ivMaxAdvance: g5IVMaxAdv,
                         natures: natFilter, tid: tID, sid: sID, shinyOnly: shiny,
                         method: meth, lead: ld, syncNature: sNat, game: pfGameVal,
                         encounter: pfEncVal, location: locationIDVal, season: g5Season,
@@ -5077,22 +5149,27 @@ struct FinderRootView: View {
                 }
             } else if m == .searcher {
                 if gen == .gen5 {
-                    staticSearchGen5Streaming(
-                        initialAdvance: srcMinAdv, maxAdvance: srcMaxAdv,
-                        ivInitialAdvance: g5IVMinAdv, ivMaxAdvance: g5IVMaxAdv,
-                        natures: natFilter, tid: tID, sid: sID, shinyOnly: shiny,
-                        method: meth, lead: ld, syncNature: sNat, game: pfGameVal,
-                        mac: g5Mac, keypresses: g5Keys,
-                        vcount: g5VCount, gxstat: g5GxStat, vframe: g5VFrame,
-                        skipLR: g5SkipLR, timer0Min: g5Timer0Min, timer0Max: g5Timer0Max,
-                        memoryLink: g5MemoryLink, shinyCharm: g5ShinyCharm,
-                        dsType: g5DSType, language: g5Language,
-                        startYear: g5StartYear, startMonth: g5StartMonth, startDay: g5StartDay,
-                        endYear: g5EndYear, endMonth: g5EndMonth, endDay: g5EndDay,
-                        filterGender: genderFilter, filterAbility: abilityFilter,
-                        hiddenPowers: hpFilter,
-                        onResult: { continuation.yield(.result($0)) },
-                        onProgress: { continuation.yield(.progress($0)) })
+                    // Gen 5 needs the Pokémon: the Finder doesn't search
+                    // without one.
+                    if let staticTemplate {
+                        staticSearchGen5Streaming(
+                            initialAdvance: srcMinAdv, maxAdvance: srcMaxAdv,
+                            ivInitialAdvance: g5IVMinAdv, ivMaxAdvance: g5IVMaxAdv,
+                            natures: natFilter, tid: tID, sid: sID, shinyOnly: shiny,
+                            method: meth, lead: ld, syncNature: sNat, game: pfGameVal,
+                            staticType: staticTemplate.type, staticIndex: staticTemplate.index,
+                            mac: g5Mac, keypresses: g5Keys,
+                            vcount: g5VCount, gxstat: g5GxStat, vframe: g5VFrame,
+                            skipLR: g5SkipLR, timer0Min: g5Timer0Min, timer0Max: g5Timer0Max,
+                            memoryLink: g5MemoryLink, shinyCharm: g5ShinyCharm,
+                            dsType: g5DSType, language: g5Language,
+                            startYear: g5StartYear, startMonth: g5StartMonth, startDay: g5StartDay,
+                            endYear: g5EndYear, endMonth: g5EndMonth, endDay: g5EndDay,
+                            filterGender: genderFilter, filterAbility: abilityFilter,
+                            hiddenPowers: hpFilter,
+                            onResult: { continuation.yield(.result($0)) },
+                            onProgress: { continuation.yield(.progress($0)) })
+                    }
                 } else if gen == .gen3 {
                     staticSearchGen3Streaming(
                         minIVs: (hpMin, atkMin, defMin, spaMin, spdMin, speMin),
@@ -5110,10 +5187,12 @@ struct FinderRootView: View {
                         maxIVs: (hpMax, atkMax, defMax, spaMax, spdMax, speMax),
                         natures: natFilter, tid: tID, sid: sID,
                         shinyOnly: shiny, method: meth,
+                        lead: ld, game: pfGameVal, template: staticTemplate,
                         minAdvance: srcMinAdv, maxAdvance: srcMaxAdv,
                         minDelay: delMin, maxDelay: delMax,
                         filterGender: genderFilter, filterAbility: abilityFilter,
-                        hiddenPowers: hpFilter
+                        hiddenPowers: hpFilter,
+                        onProgress: { continuation.yield(.progress($0)) }
                     ) { continuation.yield(.result($0)) }
                 }
                 continuation.yield(.progress(100))
@@ -5129,35 +5208,44 @@ struct FinderRootView: View {
                         hiddenPowers: hpFilter
                     ) { continuation.yield(.result($0)) }
                 } else if gen == .gen5 {
-                    staticGenerateGen5Streaming(
-                        seed: seedVal64, initialAdvance: initAdv, maxAdvance: maxAdv,
-                        natures: natFilter, tid: tID, sid: sID, shinyOnly: shiny,
-                        method: meth, lead: ld, syncNature: sNat, game: pfGameVal,
-                        mac: g5Mac, keypresses: g5Keys,
-                        vcount: g5VCount, gxstat: g5GxStat, vframe: g5VFrame,
-                        skipLR: g5SkipLR, timer0Min: g5Timer0Min, timer0Max: g5Timer0Max,
-                        memoryLink: g5MemoryLink, shinyCharm: g5ShinyCharm,
-                        dsType: g5DSType, language: g5Language,
-                        filterGender: genderFilter, filterAbility: abilityFilter,
-                        hiddenPowers: hpFilter
-                    ) { continuation.yield(.result($0)) }
+                    // Gen 5 and 8 need the Pokémon: the Finder doesn't
+                    // generate without one.
+                    if let staticTemplate {
+                        staticGenerateGen5Streaming(
+                            seed: seedVal64, initialAdvance: initAdv, maxAdvance: maxAdv,
+                            ivInitialAdvance: g5IVMinAdv, ivMaxAdvance: g5IVMaxAdv,
+                            natures: natFilter, tid: tID, sid: sID, shinyOnly: shiny,
+                            method: meth, lead: ld, syncNature: sNat, game: pfGameVal,
+                            mac: g5Mac, keypresses: g5Keys,
+                            vcount: g5VCount, gxstat: g5GxStat, vframe: g5VFrame,
+                            skipLR: g5SkipLR, timer0Min: g5Timer0Min, timer0Max: g5Timer0Max,
+                            memoryLink: g5MemoryLink, shinyCharm: g5ShinyCharm,
+                            dsType: g5DSType, language: g5Language,
+                            filterGender: genderFilter, filterAbility: abilityFilter,
+                            hiddenPowers: hpFilter,
+                            staticType: staticTemplate.type, staticIndex: staticTemplate.index
+                        ) { continuation.yield(.result($0)) }
+                    }
                 } else if gen == .gen8 {
-                    staticGenerateGen8Streaming(
-                        seed0: g8Seed0, seed1: g8Seed1,
-                        initialAdvance: initAdv, maxAdvance: maxAdv,
-                        natures: natFilter, tid: tID, sid: sID,
-                        shinyOnly: shiny, lead: ld, syncNature: sNat, game: pfGameVal,
-                        shinyCharm: g8ShinyCharm,
-                        filterGender: genderFilter, filterAbility: abilityFilter,
-                        hiddenPowers: hpFilter
-                    ) { continuation.yield(.result($0)) }
+                    if let staticTemplate {
+                        staticGenerateGen8Streaming(
+                            seed0: g8Seed0, seed1: g8Seed1,
+                            initialAdvance: initAdv, maxAdvance: maxAdv,
+                            natures: natFilter, tid: tID, sid: sID,
+                            shinyOnly: shiny, lead: ld, syncNature: sNat, game: pfGameVal,
+                            shinyCharm: g8ShinyCharm,
+                            staticType: staticTemplate.type, staticIndex: staticTemplate.index,
+                            filterGender: genderFilter, filterAbility: abilityFilter,
+                            hiddenPowers: hpFilter
+                        ) { continuation.yield(.result($0)) }
+                    }
                 } else {
                     staticGenerateGen4Streaming(
                         seed: seedVal, initialAdvance: initAdv,
                         maxAdvance: maxAdv,
                         natures: natFilter, tid: tID, sid: sID,
                         shinyOnly: shiny, method: meth,
-                        lead: ld, syncNature: sNat,
+                        lead: ld, syncNature: sNat, game: pfGameVal, template: staticTemplate,
                         filterGender: genderFilter, filterAbility: abilityFilter,
                         hiddenPowers: hpFilter
                     ) { continuation.yield(.result($0)) }

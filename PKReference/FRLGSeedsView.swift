@@ -671,9 +671,8 @@ struct FRLGCalibrationView: View {
         }
         .navigationTitle("Calibrate")
         .onAppear {
-            guard template == nil, let encounter = context.encounter else { return }
-            template = PFBridge.staticTemplate3(species: encounter.species, game: search.version.game,
-                                                preferring: encounter.category.pfStaticType3)
+            guard template == nil, let encounter = context.encounter, encounter.generation == .gen3 else { return }
+            template = encounter.template
             lines[0].level = Int(encounter.level)
         }
         .onChange(of: lines) { recalculate() }

@@ -154,10 +154,15 @@ struct PFStaticTemplateSwift: Identifiable {
     let game: UInt32
     let specie: UInt16
     let form: UInt8
+    /// PokéFinder's Shiny: 0 random, 1 never, 2 always.
     let shiny: UInt8
     let ability: UInt8
     let gender: UInt8
     let level: UInt8
+    /// Gen 4's method (PFMethod's raw value); 0 elsewhere.
+    var method: UInt8 = 0
+    /// IVs fixed at 31.
+    var ivCount: UInt8 = 0
     var specieName: String { PFBridge.specieName(specie) }
 }
 
@@ -549,7 +554,7 @@ nonisolated enum PFBridge {
 
     /// 0–100.
     static func staticSearch3Progress(_ handle: UnsafeMutableRawPointer) -> Int {
-        Int(pf_staticSearch3_progress(handle))
+        min(100, max(0, Int(pf_staticSearch3_progress(handle))))
     }
 
     static func staticSearch3Done(_ handle: UnsafeMutableRawPointer) -> Bool {
@@ -618,8 +623,9 @@ nonisolated enum PFBridge {
                                  offset: UInt32 = 0,
                                  method: PFMethod,
                                  lead: PFLead = .none,
+                                 template: PFStaticTemplateRef? = nil,
                                  tid: UInt16, sid: UInt16,
-                                 game: UInt8 = 0,
+                                 game: PFGame = .none,
                                  filterGender: UInt8 = 255,
                                  filterAbility: UInt8 = 255,
                                  filterShiny: UInt8 = 255,
@@ -629,7 +635,9 @@ nonisolated enum PFBridge {
                                  powers: [Bool] = Array(repeating: false, count: 16)) -> [PFGeneratorState4Swift] {
         var count: Int32 = 0
         let ptr = pf_staticGenerate4(seed, initialAdvances, maxAdvances, offset,
-                                      method.rawValue, lead.rawValue, tid, sid, game,
+                                      method.rawValue, lead.rawValue,
+                                      template?.type ?? -1, template?.index ?? -1,
+                                      tid, sid, game.rawValue,
                                       filterGender, filterAbility, filterShiny,
                                       ivMin, ivMax, natures, powers, &count)
         guard let ptr else { return [] }
@@ -649,29 +657,37 @@ nonisolated enum PFBridge {
 
     // MARK: Gen 4 Searcher
 
-    static func staticSearch4(minAdvance: UInt32 = 0,
-                               maxAdvance: UInt32 = 0,
-                               minDelay: UInt32 = 0,
-                               maxDelay: UInt32 = 0,
-                               method: PFMethod,
-                               lead: PFLead = .none,
-                               tid: UInt16, sid: UInt16,
-                               game: UInt8 = 0,
-                               filterGender: UInt8 = 255,
-                               filterAbility: UInt8 = 255,
-                               filterShiny: UInt8 = 255,
-                               ivMin: [UInt8] = [0,0,0,0,0,0],
-                               ivMax: [UInt8] = [31,31,31,31,31,31],
-                               natures: [Bool] = Array(repeating: false, count: 25),
-                               powers: [Bool] = Array(repeating: false, count: 16)) -> [PFSearcherState4Swift] {
-        var count: Int32 = 0
-        let ptr = pf_staticSearch4(minAdvance, maxAdvance, minDelay, maxDelay,
-                                    method.rawValue, lead.rawValue, tid, sid, game,
-                                    filterGender, filterAbility, filterShiny,
-                                    ivMin, ivMax, natures, powers, &count)
-        guard let ptr else { return [] }
-        defer { pf_freeResults(ptr) }
+    /// Starts PokéFinder's Gen 4 static searcher on its own thread: poll
+    /// `staticSearch4Results` and `staticSearch4Progress` until
+    /// `staticSearch4Done`, then `staticSearch4Free`. With the encounter's
+    /// `template`, gender follows it; without one, every result is
+    /// genderless.
+    static func staticSearch4Start(minAdvance: UInt32, maxAdvance: UInt32, minDelay: UInt32, maxDelay: UInt32,
+                                   method: PFMethod, lead: PFLead = .none, template: PFStaticTemplateRef?,
+                                   tid: UInt16, sid: UInt16, game: PFGame,
+                                   filterGender: UInt8 = 255, filterAbility: UInt8 = 255, filterShiny: UInt8 = 255,
+                                   ivMin: [UInt8] = [0,0,0,0,0,0], ivMax: [UInt8] = [31,31,31,31,31,31],
+                                   natures: [Bool] = Array(repeating: false, count: 25),
+                                   powers: [Bool] = Array(repeating: false, count: 16)) -> UnsafeMutableRawPointer {
+        pf_staticSearch4_start(minAdvance, maxAdvance, minDelay, maxDelay, method.rawValue, lead.rawValue,
+                               template?.type ?? -1, template?.index ?? -1, tid, sid, game.rawValue,
+                               filterGender, filterAbility, filterShiny, ivMin, ivMax, natures, powers)
+    }
 
+    /// 0–100.
+    static func staticSearch4Progress(_ handle: UnsafeMutableRawPointer) -> Int {
+        min(100, max(0, Int(pf_staticSearch4_progress(handle))))
+    }
+
+    static func staticSearch4Done(_ handle: UnsafeMutableRawPointer) -> Bool {
+        pf_staticSearch4_done(handle)
+    }
+
+    /// What the search has found since the last call.
+    static func staticSearch4Results(_ handle: UnsafeMutableRawPointer) -> [PFSearcherState4Swift] {
+        var count: Int32 = 0
+        guard let ptr = pf_staticSearch4_getResults(handle, &count) else { return [] }
+        defer { pf_freeResults(ptr) }
         return (0..<Int(count)).map { i in
             let r = ptr[i]
             let ivs = [r.ivs.0, r.ivs.1, r.ivs.2, r.ivs.3, r.ivs.4, r.ivs.5]
@@ -681,6 +697,15 @@ nonisolated enum PFBridge {
                                           hiddenPower: r.hiddenPower,
                                           hiddenPowerStrength: r.hiddenPowerStrength)
         }
+    }
+
+    static func staticSearch4Cancel(_ handle: UnsafeMutableRawPointer) {
+        pf_staticSearch4_cancel(handle)
+    }
+
+    /// Waits for the search to end, so cancel first to stop it early.
+    static func staticSearch4Free(_ handle: UnsafeMutableRawPointer) {
+        pf_staticSearch4_free(handle)
     }
 
     // MARK: Translator
@@ -697,6 +722,14 @@ nonisolated enum PFBridge {
         initTranslator()
         guard specie > 0 else { return "???" }
         guard let cStr = pf_getSpecieName(specie) else { return "???" }
+        defer { pf_freeString(cStr) }
+        return String(cString: cStr)
+    }
+
+    /// A form's name, such as Deoxys's "Attack"; empty when it has none.
+    static func formName(specie: UInt16, form: UInt8) -> String {
+        initTranslator()
+        guard let cStr = pf_getFormName(specie, form) else { return "" }
         defer { pf_freeString(cStr) }
         return String(cString: cStr)
     }
@@ -831,7 +864,8 @@ nonisolated enum PFBridge {
             let r = ptr[i]
             return PFStaticTemplateSwift(game: r.game, specie: r.specie, form: r.form,
                                           shiny: r.shiny, ability: r.ability,
-                                          gender: r.gender, level: r.level)
+                                          gender: r.gender, level: r.level,
+                                          method: r.method, ivCount: r.ivCount)
         }
     }
 
@@ -845,7 +879,8 @@ nonisolated enum PFBridge {
             let r = ptr[i]
             return PFStaticTemplateSwift(game: r.game, specie: r.specie, form: r.form,
                                           shiny: r.shiny, ability: r.ability,
-                                          gender: r.gender, level: r.level)
+                                          gender: r.gender, level: r.level,
+                                          method: r.method, ivCount: r.ivCount)
         }
     }
 
@@ -1671,6 +1706,7 @@ nonisolated enum PFBridge {
 
     static func staticGenerate5(seed: UInt64,
                                  initialAdvances: UInt32, maxAdvances: UInt32, offset: UInt32 = 0,
+                                 ivInitialAdvances: UInt32, ivMaxAdvances: UInt32,
                                  method: PFMethod, lead: PFLead = .none,
                                  tid: UInt16, sid: UInt16, game: PFGame,
                                  staticType: Int32 = 0, staticIndex: Int32 = 0,
@@ -1684,7 +1720,7 @@ nonisolated enum PFBridge {
                                  natures: [Bool] = Array(repeating: false, count: 25),
                                  powers: [Bool] = Array(repeating: false, count: 16)) -> [Gen5StaticResult] {
         var count: Int32 = 0
-        let ptr = pf_staticGenerate5(seed, initialAdvances, maxAdvances, offset,
+        let ptr = pf_staticGenerate5(seed, initialAdvances, maxAdvances, offset, ivInitialAdvances, ivMaxAdvances,
                                       method.rawValue, lead.rawValue, tid, sid, game.rawValue,
                                       staticType, staticIndex,
                                       mac, keypresses, vcount, gxstat, vframe,
@@ -1709,6 +1745,7 @@ nonisolated enum PFBridge {
 
     static func wildGenerate5(seed: UInt64,
                                initialAdvances: UInt32, maxAdvances: UInt32, offset: UInt32 = 0,
+                                 ivInitialAdvances: UInt32, ivMaxAdvances: UInt32,
                                method: PFMethod, lead: PFLead = .none,
                                tid: UInt16, sid: UInt16, game: PFGame,
                                encounter: PFEncounter, location: UInt8, season: UInt8 = 0,
@@ -1723,7 +1760,7 @@ nonisolated enum PFBridge {
                                powers: [Bool] = Array(repeating: true, count: 16),
                                encounterSlots: [Bool] = Array(repeating: true, count: 12)) -> [Gen5WildResult] {
         var count: Int32 = 0
-        let ptr = pf_wildGenerate5(seed, initialAdvances, maxAdvances, offset,
+        let ptr = pf_wildGenerate5(seed, initialAdvances, maxAdvances, offset, ivInitialAdvances, ivMaxAdvances,
                                     method.rawValue, lead.rawValue, tid, sid, game.rawValue,
                                     encounter.rawValue, location, season,
                                     mac, keypresses, vcount, gxstat, vframe,
@@ -1792,7 +1829,8 @@ nonisolated enum PFBridge {
             let r = ptr[i]
             return PFStaticTemplateSwift(game: r.game, specie: r.specie, form: r.form,
                                           shiny: r.shiny, ability: r.ability,
-                                          gender: r.gender, level: r.level)
+                                          gender: r.gender, level: r.level,
+                                          method: r.method, ivCount: r.ivCount)
         }
     }
 
@@ -2308,7 +2346,8 @@ nonisolated enum PFBridge {
             let r = ptr[i]
             return PFStaticTemplateSwift(game: r.game, specie: r.specie, form: r.form,
                                           shiny: r.shiny, ability: r.ability,
-                                          gender: r.gender, level: r.level)
+                                          gender: r.gender, level: r.level,
+                                          method: r.method, ivCount: r.ivCount)
         }
     }
 
