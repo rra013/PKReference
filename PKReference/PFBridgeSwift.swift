@@ -335,7 +335,7 @@ struct PFGeneratorState4Swift: Identifiable {
     let chatot: UInt8
 }
 
-struct PFSearcherStateSwift: Identifiable {
+nonisolated struct PFSearcherStateSwift: Identifiable, Sendable {
     let id = UUID()
     let seed: UInt32
     let pid: UInt32
@@ -1445,19 +1445,50 @@ nonisolated enum PFBridge {
 
     // MARK: - GameCube Searcher
 
-    static func gamecubeSearchShadow(method: PFMethod = .xdColo, unset: Bool,
-                                       tid: UInt16, sid: UInt16, game: UInt32,
-                                       filterShiny: UInt8 = 255,
-                                       ivMin: [UInt8] = [0,0,0,0,0,0], ivMax: [UInt8] = [31,31,31,31,31,31],
-                                       natures: [Bool] = [Bool](repeating: false, count: 25),
-                                       powers: [Bool] = [Bool](repeating: false, count: 16),
-                                       shadowIndex: Int) -> [PFSearcherStateSwift] {
+    /// Starts PokéFinder's shadow searcher on its own thread: poll
+    /// `gamecubeSearchResults` and `gamecubeSearchProgress` until
+    /// `gamecubeSearchDone`, then `gamecubeSearchFree`. Nil if `shadowIndex`
+    /// isn't a shadow Pokémon.
+    static func gamecubeSearchShadowStart(method: PFMethod = .xdColo, unset: Bool,
+                                          tid: UInt16, sid: UInt16, game: UInt32,
+                                          filterShiny: UInt8 = 255,
+                                          ivMin: [UInt8] = [0,0,0,0,0,0], ivMax: [UInt8] = [31,31,31,31,31,31],
+                                          natures: [Bool] = [Bool](repeating: false, count: 25),
+                                          powers: [Bool] = [Bool](repeating: false, count: 16),
+                                          shadowIndex: Int) -> UnsafeMutableRawPointer? {
+        pf_gamecubeSearchShadow_start(method.rawValue, unset, tid, sid, game,
+                                      255, 255, filterShiny,
+                                      ivMin, ivMax, natures, powers,
+                                      Int32(shadowIndex))
+    }
+
+    /// The same for a non-shadow (`staticType` 8) or Channel (9) template.
+    static func gamecubeSearchStaticStart(method: PFMethod, unset: Bool = false,
+                                          tid: UInt16, sid: UInt16, game: UInt32,
+                                          filterShiny: UInt8 = 255,
+                                          ivMin: [UInt8] = [0,0,0,0,0,0], ivMax: [UInt8] = [31,31,31,31,31,31],
+                                          natures: [Bool] = [Bool](repeating: false, count: 25),
+                                          powers: [Bool] = [Bool](repeating: false, count: 16),
+                                          staticType: Int, staticIndex: Int) -> UnsafeMutableRawPointer? {
+        pf_gamecubeSearchStatic_start(method.rawValue, unset, tid, sid, game,
+                                      255, 255, filterShiny,
+                                      ivMin, ivMax, natures, powers,
+                                      Int32(staticType), Int32(staticIndex))
+    }
+
+    /// 0–100.
+    static func gamecubeSearchProgress(_ handle: UnsafeMutableRawPointer) -> Int {
+        min(100, max(0, Int(pf_gamecubeSearch_progress(handle))))
+    }
+
+    static func gamecubeSearchDone(_ handle: UnsafeMutableRawPointer) -> Bool {
+        pf_gamecubeSearch_done(handle)
+    }
+
+    /// What the search has found since the last call.
+    static func gamecubeSearchResults(_ handle: UnsafeMutableRawPointer) -> [PFSearcherStateSwift] {
         var count: Int32 = 0
-        let ptr = pf_gamecubeSearchShadow(method.rawValue, unset, tid, sid, game,
-                                            255, 255, filterShiny,
-                                            ivMin, ivMax, natures, powers,
-                                            Int32(shadowIndex), &count)
-        guard let ptr else { return [] }
+        guard let ptr = pf_gamecubeSearch_getResults(handle, &count) else { return [] }
         defer { pf_freeResults(ptr) }
         return (0..<Int(count)).map { i in
             let r = ptr[i]
@@ -1470,29 +1501,13 @@ nonisolated enum PFBridge {
         }
     }
 
-    static func gamecubeSearchStatic(method: PFMethod, unset: Bool = false,
-                                       tid: UInt16, sid: UInt16, game: UInt32,
-                                       filterShiny: UInt8 = 255,
-                                       ivMin: [UInt8] = [0,0,0,0,0,0], ivMax: [UInt8] = [31,31,31,31,31,31],
-                                       natures: [Bool] = [Bool](repeating: false, count: 25),
-                                       powers: [Bool] = [Bool](repeating: false, count: 16),
-                                       staticType: Int, staticIndex: Int) -> [PFSearcherStateSwift] {
-        var count: Int32 = 0
-        let ptr = pf_gamecubeSearchStatic(method.rawValue, unset, tid, sid, game,
-                                            255, 255, filterShiny,
-                                            ivMin, ivMax, natures, powers,
-                                            Int32(staticType), Int32(staticIndex), &count)
-        guard let ptr else { return [] }
-        defer { pf_freeResults(ptr) }
-        return (0..<Int(count)).map { i in
-            let r = ptr[i]
-            let ivs = [r.ivs.0, r.ivs.1, r.ivs.2, r.ivs.3, r.ivs.4, r.ivs.5]
-            return PFSearcherStateSwift(seed: r.seed, pid: r.pid, ivs: ivs,
-                                         nature: r.nature, ability: r.ability,
-                                         gender: r.gender, shiny: r.shiny,
-                                         hiddenPower: r.hiddenPower,
-                                         hiddenPowerStrength: r.hiddenPowerStrength)
-        }
+    static func gamecubeSearchCancel(_ handle: UnsafeMutableRawPointer) {
+        pf_gamecubeSearch_cancel(handle)
+    }
+
+    /// Waits for the search to end, so cancel first to stop it early.
+    static func gamecubeSearchFree(_ handle: UnsafeMutableRawPointer) {
+        pf_gamecubeSearch_free(handle)
     }
 
     // MARK: - PokeSpot

@@ -1496,6 +1496,133 @@ struct GameCubeSeedSearcherTests {
     }
 }
 
+// MARK: - GameCube Searcher Tests
+
+@MainActor
+struct GameCubeSearcherTests {
+    private static let ivMin: [UInt8] = [31, 31, 31, 31, 0, 0]
+    private static let ivMax: [UInt8] = [31, 31, 31, 31, 31, 31]
+    private static let xd = PFGame.gales.rawValue
+
+    private struct Key: Hashable { let seed: UInt32, pid: UInt32 }
+
+    /// A search streamed as the view runs it, and the same search read once
+    /// at the end.
+    private func streamedAndOneShot(_ start: () -> UnsafeMutableRawPointer?) throws
+        -> (streamed: [PFSearcherStateSwift], progress: [Double], oneShot: [PFSearcherStateSwift]) {
+        var streamed: [PFSearcherStateSwift] = []
+        var progress: [Double] = []
+        gameCubeSearchStreaming(try #require(start()), onProgress: { progress.append($0) }) { streamed += $0 }
+
+        let handle = try #require(start())
+        while !PFBridge.gamecubeSearchDone(handle) { Thread.sleep(forTimeInterval: 0.01) }
+        let oneShot = PFBridge.gamecubeSearchResults(handle)
+        PFBridge.gamecubeSearchFree(handle)
+        return (streamed, progress, oneShot)
+    }
+
+    private func checkSearch(_ search: (streamed: [PFSearcherStateSwift], progress: [Double], oneShot: [PFSearcherStateSwift])) {
+        #expect(!search.streamed.isEmpty)
+        #expect(search.streamed.count == search.oneShot.count)
+        #expect(Set(search.streamed.map { Key(seed: $0.seed, pid: $0.pid) })
+                == Set(search.oneShot.map { Key(seed: $0.seed, pid: $0.pid) }))
+        #expect(search.progress.last == 100)
+        #expect(search.progress.allSatisfy { (0...100).contains($0) })
+        #expect(zip(search.progress, search.progress.dropFirst()).allSatisfy { $0 <= $1 })
+        #expect(search.streamed.allSatisfy { r in (0..<6).allSatisfy { (Self.ivMin[$0]...Self.ivMax[$0]).contains(r.ivs[$0]) } })
+    }
+
+    @Test func shadowStreamsWhatItFinds() throws {
+        let shadow = try #require(PFBridge.getShadowTemplates().first { !$0.isColosseum })
+        let search = try streamedAndOneShot {
+            PFBridge.gamecubeSearchShadowStart(unset: false, tid: 0, sid: 0, game: Self.xd,
+                                               ivMin: Self.ivMin, ivMax: Self.ivMax, shadowIndex: shadow.id)
+        }
+        checkSearch(search)
+        // Each one's seed generates it.
+        for r in search.streamed.prefix(20) {
+            let generated = PFBridge.gamecubeGenerateShadow(seed: r.seed, initialAdvances: 0, maxAdvances: 0,
+                                                            shadowIndex: shadow.id, unset: false,
+                                                            tid: 0, sid: 0, game: Self.xd)
+            #expect(generated.first?.pid == r.pid, "seed \(String(format: "%08X", r.seed))")
+        }
+    }
+
+    @Test func nonShadowStreamsWhatItFinds() throws {
+        let templates = PFBridge.getStaticEncounters3(type: 8)
+        let index = try #require(templates.firstIndex { $0.game & Self.xd != 0 })
+        let search = try streamedAndOneShot {
+            PFBridge.gamecubeSearchStaticStart(method: .xdColo, tid: 0, sid: 0, game: Self.xd,
+                                               ivMin: Self.ivMin, ivMax: Self.ivMax, staticType: 8, staticIndex: index)
+        }
+        checkSearch(search)
+        for r in search.streamed.prefix(20) {
+            let generated = PFBridge.gamecubeGenerateStatic(seed: r.seed, initialAdvances: 0, maxAdvances: 0,
+                                                            method: .xdColo, staticType: 8, staticIndex: index,
+                                                            tid: 0, sid: 0, game: Self.xd)
+            #expect(generated.first?.pid == r.pid, "seed \(String(format: "%08X", r.seed))")
+        }
+    }
+
+    /// Channel counts seeds, 2^27 per Sp. Def IV: a whole search reads
+    /// under 100% while it runs. Cancel ends it.
+    @Test func channelProgressAndCancel() throws {
+        let handle = try #require(PFBridge.gamecubeSearchStaticStart(method: .channel, tid: 0, sid: 0, game: Self.xd,
+                                                                     staticType: 9, staticIndex: 0))
+        Thread.sleep(forTimeInterval: 0.3)
+        #expect(!PFBridge.gamecubeSearchDone(handle))
+        #expect((0..<100).contains(pf_gamecubeSearch_progress(handle)))
+        PFBridge.gamecubeSearchCancel(handle)
+        let start = Date()
+        while !PFBridge.gamecubeSearchDone(handle), Date().timeIntervalSince(start) < 2 {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        #expect(PFBridge.gamecubeSearchDone(handle))
+        PFBridge.gamecubeSearchFree(handle)
+    }
+
+    /// The view's Stop cancels the task, which stops and frees the search.
+    @Test func streamingStopsWithItsTask() async throws {
+        let xd = Self.xd
+        let task = Task.detached { () -> Bool in
+            guard let handle = PFBridge.gamecubeSearchStaticStart(method: .channel, tid: 0, sid: 0, game: xd,
+                                                                  staticType: 9, staticIndex: 0) else { return false }
+            gameCubeSearchStreaming(handle) { _ in }
+            return true
+        }
+        try await Task.sleep(for: .milliseconds(300))
+        let start = Date()
+        task.cancel()
+        #expect(await task.value)
+        #expect(Date().timeIntervalSince(start) < 3)
+    }
+
+    /// PokéFinder doesn't check template indices; the bridge does.
+    @Test func noSearchForATemplateThatIsNotOne() {
+        let shadows = PFBridge.getShadowTemplates().count
+        #expect(PFBridge.gamecubeSearchShadowStart(unset: false, tid: 0, sid: 0, game: Self.xd, shadowIndex: -1) == nil)
+        #expect(PFBridge.gamecubeSearchShadowStart(unset: false, tid: 0, sid: 0, game: Self.xd, shadowIndex: shadows) == nil)
+        let statics = PFBridge.getStaticEncounters3(type: 8).count
+        #expect(PFBridge.gamecubeSearchStaticStart(method: .xdColo, tid: 0, sid: 0, game: Self.xd,
+                                                   staticType: 8, staticIndex: statics) == nil)
+    }
+}
+
+// MARK: - Search Result Limit Tests
+
+struct SearchResultLimitTests {
+    /// Batches fill the list to the limit and no further.
+    @Test func fillsToTheLimit() {
+        var results: [Int] = []
+        #expect(!appendUpToLimit(0..<60, to: &results, limit: 100))
+        #expect(appendUpToLimit(60..<160, to: &results, limit: 100))
+        #expect(results == Array(0..<100))
+        #expect(appendUpToLimit(160..<170, to: &results, limit: 100))
+        #expect(results.count == 100)
+        #expect(searchResultLimit == 100_000)
+    }
+}
+
 // MARK: - Egg Generator Tests
 
 struct EggGeneratorTests {

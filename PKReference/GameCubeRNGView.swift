@@ -84,6 +84,12 @@ struct GameCubeRNGView: View {
     @State private var searcherResults: [PFSearcherStateSwift] = []
     @State private var pokeSpotResults: [PFBridge.PokeSpotResult] = []
     @State private var searchTask: Task<Void, Never>?
+    @State private var searchWorkTask: Task<Void, Never>?
+    /// The searcher's 0–100, or -1 while a generator runs.
+    @State private var searchProgress: Double = -1
+    private var isSearching: Bool { searchTask != nil }
+    /// The last search stopped at `searchResultLimit`.
+    @State private var stoppedAtLimit = false
 
     // Seed Searcher
     @State private var showSeedSearcher = false
@@ -159,13 +165,40 @@ struct GameCubeRNGView: View {
                 Toggle("Shiny Only", isOn: $shinyOnly)
                     .padding(.horizontal)
 
-                Button {
-                    executeSearch()
-                } label: {
-                    Label(searchMode == .searcher && mode != .pokeSpot ? "Search" : "Generate",
-                          systemImage: "sparkles")
+                if isSearching {
+                    VStack(spacing: 8) {
+                        if searchProgress < 0 {
+                            ProgressView()
+                                .padding(.vertical, 4)
+                        } else {
+                            ProgressView(value: searchProgress, total: 100)
+                                .progressViewStyle(.linear)
+                                .padding(.horizontal)
+                            Text("\(Int(searchProgress))% — \(searcherResults.count) found")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Button {
+                            stopSearch()
+                        } label: {
+                            Label("Stop", systemImage: "stop.fill")
+                        }
+                        .buttonStyle(.primaryAction)
+                        .tint(.red)
+                    }
+                } else {
+                    Button {
+                        executeSearch()
+                    } label: {
+                        Label(searchMode == .searcher && mode != .pokeSpot ? "Search" : "Generate",
+                              systemImage: "sparkles")
+                    }
+                    .buttonStyle(.primaryAction)
+                    if stoppedAtLimit && searchMode == .searcher {
+                        Text(searchResultLimitNote)
+                            .font(.caption).foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-                .buttonStyle(.primaryAction)
 
                 if mode == .pokeSpot && !pokeSpotResults.isEmpty {
                     pokeSpotResultsSection
@@ -199,6 +232,20 @@ struct GameCubeRNGView: View {
         .onTapGesture { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
         #endif
         .onAppear { loadTemplates() }
+        .onDisappear { stopSearch() }
+        #if DEBUG && os(macOS)
+        // With `-debugOpenSheet gameCubeSearch`: searches the first shadow
+        // Pokémon for shinies, as Search does. Few turn up, so a snapshot
+        // catches it running (drawing 500 results for one takes minutes).
+        .task {
+            await DebugSnapshot.openSheet("gameCubeSearch") {
+                searchMode = .searcher
+                shinyOnly = true
+                executeSearch()
+            }
+        }
+        #endif
+        .leaveWarning(isSearching ? "The search in progress will stop." : nil)
         .sheet(isPresented: $showSeedSearcher) {
             NavigationStack {
                 SeedSearcherView(game: selectedGame)
@@ -505,6 +552,9 @@ struct GameCubeRNGView: View {
     }
 
     private func executeSearch() {
+        stopSearch()
+        searchProgress = -1
+        stoppedAtLimit = false
         if mode == .pokeSpot {
             generatePokeSpot()
         } else if searchMode == .searcher {
@@ -553,8 +603,19 @@ struct GameCubeRNGView: View {
             case .pokeSpot:
                 r = []
             }
-            await MainActor.run { results = r; searcherResults = []; pokeSpotResults = [] }
+            // On the main actor, so Stop (and the next search) can't come between.
+            await MainActor.run {
+                guard !Task.isCancelled else { return }
+                results = r; searcherResults = []; pokeSpotResults = []; searchTask = nil
+            }
         }
+    }
+
+    private func stopSearch() {
+        searchWorkTask?.cancel()
+        searchWorkTask = nil
+        searchTask?.cancel()
+        searchTask = nil
     }
 
     private func searchIVs() {
@@ -571,31 +632,68 @@ struct GameCubeRNGView: View {
         let isUnset = unset
         let staticIdx = selectedStaticIndex
 
-        searchTask = Task.detached {
-            let r: [PFSearcherStateSwift]
-            switch currentMode {
+        searcherResults = []
+        results = []
+        pokeSpotResults = []
+        searchProgress = 0
+
+        enum SearchEvent: Sendable {
+            case results([PFSearcherStateSwift])
+            case progress(Double)
+        }
+        let (stream, continuation) = AsyncStream.makeStream(of: SearchEvent.self)
+
+        // The search runs off the main actor, which also frees its handle
+        // (that waits for PokéFinder's thread to stop).
+        searchWorkTask = Task.detached {
+            let handle: UnsafeMutableRawPointer? = switch currentMode {
             case .shadow:
-                r = PFBridge.gamecubeSearchShadow(
+                PFBridge.gamecubeSearchShadowStart(
                     method: .xdColo, unset: isUnset,
                     tid: tID, sid: sID, game: gameVal,
                     filterShiny: shiny, ivMin: ivMin, ivMax: ivMax,
                     natures: natArr, shadowIndex: shadowIdx)
             case .nonShadow:
-                r = PFBridge.gamecubeSearchStatic(
+                PFBridge.gamecubeSearchStaticStart(
                     method: .xdColo,
                     tid: tID, sid: sID, game: gameVal,
                     filterShiny: shiny, ivMin: ivMin, ivMax: ivMax,
                     natures: natArr, staticType: 8, staticIndex: staticIdx)
             case .channel:
-                r = PFBridge.gamecubeSearchStatic(
+                PFBridge.gamecubeSearchStaticStart(
                     method: .channel,
                     tid: tID, sid: sID, game: PFGame.gales.rawValue,
                     filterShiny: shiny, ivMin: ivMin, ivMax: ivMax,
                     natures: natArr, staticType: 9, staticIndex: 0)
             case .pokeSpot:
-                r = []
+                nil
             }
-            await MainActor.run { searcherResults = r; results = []; pokeSpotResults = [] }
+            if let handle {
+                gameCubeSearchStreaming(handle, onProgress: { continuation.yield(.progress($0)) }) {
+                    continuation.yield(.results($0))
+                }
+            }
+            continuation.finish()
+        }
+
+        searchTask = Task {
+            for await event in stream {
+                if Task.isCancelled { break }
+                switch event {
+                case .results(let batch):
+                    if appendUpToLimit(batch, to: &searcherResults) {
+                        stopSearch()
+                        stoppedAtLimit = true
+                        return
+                    }
+                case .progress(let pct):
+                    searchProgress = pct
+                }
+            }
+            // Stopping already cleared these, maybe for the next search.
+            guard !Task.isCancelled else { return }
+            searchWorkTask = nil
+            searchTask = nil
         }
     }
 
@@ -621,9 +719,39 @@ struct GameCubeRNGView: View {
                 tid: tID, sid: sID, game: gameVal,
                 pokeSpotIndex: spotIdx,
                 filterShiny: shiny, natures: natArr)
-            await MainActor.run { pokeSpotResults = r; results = []; searcherResults = [] }
+            await MainActor.run {
+                guard !Task.isCancelled else { return }
+                pokeSpotResults = r; results = []; searcherResults = []; searchTask = nil
+            }
         }
     }
+}
+
+// MARK: - GameCube Searcher
+
+/// Runs a started GameCube search: sends what it finds and its progress
+/// (0–100) every tenth of a second until it's done, then frees it. When the
+/// task is cancelled, it stops the search.
+nonisolated func gameCubeSearchStreaming(_ handle: UnsafeMutableRawPointer,
+                                         onProgress: (Double) -> Void = { _ in },
+                                         onResults: ([PFSearcherStateSwift]) -> Void) {
+    defer { PFBridge.gamecubeSearchFree(handle) }
+
+    func send(_ batch: [PFSearcherStateSwift]) {
+        if !batch.isEmpty { onResults(batch) }
+    }
+
+    while !PFBridge.gamecubeSearchDone(handle) {
+        if Task.isCancelled {
+            PFBridge.gamecubeSearchCancel(handle)
+            return
+        }
+        send(PFBridge.gamecubeSearchResults(handle))
+        onProgress(Double(PFBridge.gamecubeSearchProgress(handle)))
+        Thread.sleep(forTimeInterval: 0.1)
+    }
+    send(PFBridge.gamecubeSearchResults(handle))
+    onProgress(100)
 }
 
 // MARK: - Seed Searcher View
