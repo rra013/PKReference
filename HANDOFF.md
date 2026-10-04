@@ -38,7 +38,7 @@ and what was checked.
 | [#55](https://github.com/rra013/PKReference/pull/55) | Siri, Spotlight and Shortcuts, Phase 1; the app is named PK Reference |
 | [#56](https://github.com/rra013/PKReference/pull/56) | The Xcode project, targets, module and folders renamed to PKReference |
 
-Full suite with the streaming Gen 3 static search: 1184 tests, all passing.
+Full suite with the RNG fixes' PR 1: 1190 tests, all passing.
 
 ---
 
@@ -485,6 +485,7 @@ Roughly in order of value for effort.
 | [`AppIntents-PLAN.md`](AppIntents-PLAN.md) | Plan for Siri, Spotlight and Shortcuts actions (Phases 1 and 2 built) |
 | [`ProblemSolver-PLAN.md`](ProblemSolver-PLAN.md) | Plan for the Problem Solver: counters that OHKO a chosen set |
 | [`RNGRewrite-PLAN.md`](RNGRewrite-PLAN.md) | Plan for an independent RNG core (on hold) |
+| [`RNGFixes-PLAN.md`](RNGFixes-PLAN.md) | Fixes from the 2026-10-03 RNG tools audit: four PRs for the worst ten findings, then the rest (PR 1 built) |
 | [`tools/README.md`](tools/README.md) | Scripts that regenerate the bundled data |
 
 Removed on 2026-09-27, all in git history: `CalcCore-HANDOFF.md` (the EV

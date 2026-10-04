@@ -1335,13 +1335,7 @@ struct Gen4IDGeneratorTests {
 struct Gen4IDSearcherTests {
     private func waitForSearch(_ handle: OpaquePointer, timeout: TimeInterval = 5.0) {
         let start = Date()
-        while Date().timeIntervalSince(start) < timeout {
-            let p = PFBridge.idSearch4Progress(handle)
-            if p > 0 {
-                Thread.sleep(forTimeInterval: 0.2)
-                let p2 = PFBridge.idSearch4Progress(handle)
-                if p2 == p { return }
-            }
+        while !PFBridge.idSearch4Done(handle), Date().timeIntervalSince(start) < timeout {
             Thread.sleep(forTimeInterval: 0.05)
         }
     }
@@ -1434,6 +1428,141 @@ struct Gen4IDSearcherTests {
         let match = results.first { $0.seed == 0x01000258 }
         #expect(match != nil)
         #expect(match!.delay == 600)
+    }
+
+    /// PokéFinder's IDs come from the second MT19937 output of the seed.
+    private func referenceTID(_ seed: UInt32) -> UInt16 {
+        var mt = [UInt32](repeating: 0, count: 399)
+        mt[0] = seed
+        for i in 1..<399 { mt[i] = 1812433253 &* (mt[i - 1] ^ (mt[i - 1] >> 30)) &+ UInt32(i) }
+        let y = (mt[1] & 0x8000_0000) | (mt[2] & 0x7FFF_FFFF)
+        var v = mt[398] ^ (y >> 1) ^ ((y & 1) != 0 ? 0x9908_B0DF : 0)
+        v ^= v >> 11; v ^= (v << 7) & 0x9D2C_5680; v ^= (v << 15) & 0xEFC6_0000; v ^= v >> 18
+        return UInt16(v & 0xFFFF)
+    }
+
+    /// The search reports when it's done, at 100%, and returns every seed
+    /// with the TID: every date/time byte and hour for each delay.
+    @Test func searcher_finishesWithEveryResult() {
+        let target: UInt16 = referenceTID(0x7B0F_0259)
+        var expected = 0
+        for efgh: UInt32 in 600...604 {
+            for ab: UInt32 in 0..<256 {
+                for cd: UInt32 in 0..<24 where referenceTID((ab << 24) | (cd << 16) + efgh) == target { expected += 1 }
+            }
+        }
+        let handle = PFBridge.idSearch4Start(infinite: false, year: 2000, minDelay: 600, maxDelay: 604,
+                                             targetTID: target, filterTID: true)
+        waitForSearch(handle, timeout: 30)
+        #expect(PFBridge.idSearch4Done(handle))
+        #expect(PFBridge.idSearch4Progress(handle) == 100)
+        let results = PFBridge.idSearch4GetResults(handle)
+        PFBridge.idSearch4Free(handle)
+        #expect(expected > 0 && results.count == expected)
+        #expect(results.allSatisfy { $0.tid == target })
+    }
+
+    /// Cancel ends even an Infinite search at once.
+    @Test func searcher_cancelEndsInfiniteSearch() {
+        let handle = PFBridge.idSearch4Start(infinite: true, year: 2000, minDelay: 0, maxDelay: 0,
+                                             targetTID: 1, filterTID: true)
+        Thread.sleep(forTimeInterval: 0.1)
+        #expect(!PFBridge.idSearch4Done(handle))
+        #expect((0...100).contains(PFBridge.idSearch4Progress(handle)))
+        PFBridge.idSearch4Cancel(handle)
+        waitForSearch(handle, timeout: 2)
+        #expect(PFBridge.idSearch4Done(handle))
+        PFBridge.idSearch4Free(handle)
+    }
+}
+
+// MARK: - GameCube Seed Searcher Tests
+
+struct GameCubeSeedSearcherTests {
+    /// Progress stays 0–100 while it runs, and Cancel ends it.
+    @Test func coloSearch_progressAndCancel() {
+        let handle = PFBridge.coloSeedSearchStart(lead: 0, trainer: 0, threads: 2)
+        Thread.sleep(forTimeInterval: 0.3)
+        let progress = PFBridge.seedSearchProgress(handle)
+        #expect(!PFBridge.seedSearchDone(handle))
+        #expect((0..<100).contains(progress))
+        PFBridge.seedSearchCancel(handle)
+        let start = Date()
+        while !PFBridge.seedSearchDone(handle), Date().timeIntervalSince(start) < 5 {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        #expect(PFBridge.seedSearchDone(handle))
+        _ = PFBridge.seedSearchGetResults(handle)
+        PFBridge.seedSearchFree(handle)
+    }
+}
+
+// MARK: - Egg Generator Tests
+
+struct EggGeneratorTests {
+    /// Every Gen 3 and Gen 4 game generates eggs: the game used to be
+    /// passed as a byte, which trapped from Pearl (256) on.
+    @Test func everyGameGenerates() {
+        let ivs: [UInt8] = [31, 31, 31, 31, 31, 31]
+        for game in FinderGameVersion.allCases where game.generation == .gen4 {
+            let eggs = PFBridge.eggGenerate4(seedHeld: 0x1234_5678, seedPickup: 0x8765_4321,
+                                             initialAdvances: 0, maxAdvances: 20,
+                                             initialAdvancesPickup: 0, maxAdvancesPickup: 20,
+                                             parentAIVs: ivs, parentBIVs: ivs,
+                                             parentAAbility: 0, parentBAbility: 0, parentAGender: 0, parentBGender: 1,
+                                             parentAItem: 0, parentBItem: 0, parentANature: 0, parentBNature: 0,
+                                             eggSpecie: 1, masuda: false, tid: 0, sid: 0, game: game.pfGame)
+            #expect(!eggs.isEmpty, "\(game.rawValue)")
+        }
+        for game in FinderGameVersion.allCases where game.generation == .gen3 {
+            let eggs = PFBridge.eggGenerate3(seedHeld: 0x1234, seedPickup: 0x5678,
+                                             initialAdvances: 0, maxAdvances: 20,
+                                             initialAdvancesPickup: 0, maxAdvancesPickup: 20,
+                                             method: game == .emerald ? .eBred : .rsFRLGBred, compatibility: 20,
+                                             parentAIVs: ivs, parentBIVs: ivs,
+                                             parentAAbility: 0, parentBAbility: 0, parentAGender: 0, parentBGender: 1,
+                                             parentAItem: 0, parentBItem: 0, parentANature: 0, parentBNature: 0,
+                                             eggSpecie: 1, masuda: false, tid: 0, sid: 0, game: game.pfGame)
+            #expect(!eggs.isEmpty, "\(game.rawValue)")
+        }
+        #expect(EggRNGView.generations == [.gen3, .gen4])
+    }
+
+    /// The estimate keeps Generate off for ranges that would run out of
+    /// memory, and on for the defaults.
+    @Test func resultEstimate() {
+        let wide = EggRNGView.estimatedResults(held: 0...10_000, pickup: 0...10_000, gen3Compatibility: nil,
+                                                natures: 0, shinyOnly: false)
+        #expect(wide > Double(EggRNGView.resultLimit))
+        for compatibility in [nil, 70] {
+            let defaults = EggRNGView.estimatedResults(held: 0...5_000, pickup: 0...100, gen3Compatibility: compatibility,
+                                                        natures: 0, shinyOnly: false)
+            #expect(defaults < Double(EggRNGView.resultLimit))
+        }
+        // Gen 4 lists every pair: 101 × 51.
+        let ivs: [UInt8] = [31, 31, 31, 31, 31, 31]
+        let eggs = PFBridge.eggGenerate4(seedHeld: 1, seedPickup: 2, initialAdvances: 0, maxAdvances: 100,
+                                         initialAdvancesPickup: 0, maxAdvancesPickup: 50,
+                                         parentAIVs: ivs, parentBIVs: ivs, parentAAbility: 0, parentBAbility: 0,
+                                         parentAGender: 0, parentBGender: 1, parentAItem: 0, parentBItem: 0,
+                                         parentANature: 0, parentBNature: 0, eggSpecie: 1, masuda: false,
+                                         tid: 0, sid: 0, game: .pearl)
+        #expect(Double(eggs.count) == EggRNGView.estimatedResults(held: 0...100, pickup: 0...50, gen3Compatibility: nil,
+                                                                  natures: 0, shinyOnly: false))
+        #expect(EggRNGView.estimatedResults(held: 0...10_000, pickup: 0...10_000, gen3Compatibility: nil,
+                                            natures: 1, shinyOnly: true) < Double(EggRNGView.resultLimit))
+    }
+}
+
+// MARK: - Number Field Tests
+
+struct RNGFieldRangeTests {
+    @Test func clampsToTheSearchTypes() {
+        #expect((-5).clamped(to: RNGFieldRange.advances) == 0)
+        #expect(300.clamped(to: RNGFieldRange.byte) == 255)
+        #expect(70_000.clamped(to: RNGFieldRange.word) == 65_535)
+        #expect(RNGFieldRange.advances.upperBound == Int(UInt32.max))
+        #expect(42.clamped(to: RNGFieldRange.byte) == 42)
     }
 }
 

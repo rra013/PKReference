@@ -1158,7 +1158,7 @@ nonisolated enum PFBridge {
                               parentANature: UInt8, parentBNature: UInt8,
                               eggSpecie: UInt16, masuda: Bool,
                               tid: UInt16, sid: UInt16,
-                              game: UInt8, deadBattery: Bool = false,
+                              game: PFGame, deadBattery: Bool = false,
                               filterGender: UInt8 = 255, filterAbility: UInt8 = 255, filterShiny: UInt8 = 255,
                               ivMin: [UInt8] = [0,0,0,0,0,0], ivMax: [UInt8] = [31,31,31,31,31,31],
                               natures: [Bool] = Array(repeating: false, count: 25),
@@ -1175,7 +1175,7 @@ nonisolated enum PFBridge {
                                    parentAItem, parentBItem,
                                    parentANature, parentBNature,
                                    eggSpecie, masuda,
-                                   tid, sid, game, deadBattery,
+                                   tid, sid, game.rawValue, deadBattery,
                                    filterGender, filterAbility, filterShiny,
                                    ivMin, ivMax, natures, powers, &count)
         guard let ptr else { return [] }
@@ -1201,7 +1201,7 @@ nonisolated enum PFBridge {
                               parentAItem: UInt8, parentBItem: UInt8,
                               parentANature: UInt8, parentBNature: UInt8,
                               eggSpecie: UInt16, masuda: Bool,
-                              tid: UInt16, sid: UInt16, game: UInt8,
+                              tid: UInt16, sid: UInt16, game: PFGame,
                               filterGender: UInt8 = 255, filterAbility: UInt8 = 255, filterShiny: UInt8 = 255,
                               ivMin: [UInt8] = [0,0,0,0,0,0], ivMax: [UInt8] = [31,31,31,31,31,31],
                               natures: [Bool] = Array(repeating: false, count: 25),
@@ -1216,7 +1216,7 @@ nonisolated enum PFBridge {
                                    parentAItem, parentBItem,
                                    parentANature, parentBNature,
                                    eggSpecie, masuda,
-                                   tid, sid, game,
+                                   tid, sid, game.rawValue,
                                    filterGender, filterAbility, filterShiny,
                                    ivMin, ivMax, natures, powers, &count)
         guard let ptr else { return [] }
@@ -1285,8 +1285,13 @@ nonisolated enum PFBridge {
         return OpaquePointer(h)
     }
 
+    /// 0–100.
     static func idSearch4Progress(_ handle: OpaquePointer) -> Int {
-        Int(pf_idSearch4_progress(UnsafeMutableRawPointer(handle)))
+        min(100, max(0, Int(pf_idSearch4_progress(UnsafeMutableRawPointer(handle)))))
+    }
+
+    static func idSearch4Done(_ handle: OpaquePointer) -> Bool {
+        pf_idSearch4_done(UnsafeMutableRawPointer(handle))
     }
 
     static func idSearch4GetResults(_ handle: OpaquePointer) -> [IDResult4] {
@@ -1546,8 +1551,14 @@ nonisolated enum PFBridge {
         return OpaquePointer(h)
     }
 
+    /// 0–100.
     static func seedSearchProgress(_ handle: OpaquePointer) -> Int {
-        Int(pf_seedSearch_progress(UnsafeMutableRawPointer(handle)))
+        min(100, max(0, Int(pf_seedSearch_progress(UnsafeMutableRawPointer(handle)))))
+    }
+
+    /// Read the results once this is true: they're sorted at the end.
+    static func seedSearchDone(_ handle: OpaquePointer) -> Bool {
+        pf_seedSearch_done(UnsafeMutableRawPointer(handle))
     }
 
     static func seedSearchGetResults(_ handle: OpaquePointer) -> [UInt32] {

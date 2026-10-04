@@ -18,9 +18,9 @@ struct EggRNGView: View {
 
     // Advances
     @State private var initialAdvances: Int = 0
-    @State private var maxAdvances: Int = 10000
+    @State private var maxAdvances: Int = 5000
     @State private var initialAdvancesPickup: Int = 0
-    @State private var maxAdvancesPickup: Int = 10000
+    @State private var maxAdvancesPickup: Int = 100
 
     // Emerald-specific
     @State private var calibration: Int = 0
@@ -65,11 +65,45 @@ struct EggRNGView: View {
     @State private var results4: [PFBridge.EggResult4] = []
     @State private var searchTask: Task<Void, Never>?
 
+    static let generations: [FinderGeneration] = [.gen3, .gen4]
+
+    /// PokéFinder pairs every held egg with every pickup advance and keeps
+    /// them all, so wide ranges run out of memory: 10,000 by 10,000 is 100
+    /// million Gen 4 eggs.
+    static let resultLimit = 1_000_000
+
+    /// About how many eggs the generator will list: held × pickup advances,
+    /// in Gen 3 times the chance an egg is made at all (and each Emerald
+    /// redraw), less what the nature and shiny filters drop.
+    static func estimatedResults(held: ClosedRange<Int>?, pickup: ClosedRange<Int>?, gen3Compatibility: Int?,
+                                 redraws: Int = 1, natures: Int, shinyOnly: Bool) -> Double {
+        guard let held, let pickup else { return 0 }
+        var estimate = Double(held.count) * Double(pickup.count)
+        if let gen3Compatibility { estimate *= Double(gen3Compatibility) / 100 * Double(max(1, redraws)) }
+        if natures > 0 { estimate *= Double(natures) / 25 }
+        // Generous for the Masuda method's extra rolls.
+        if shinyOnly { estimate /= 1_000 }
+        return estimate
+    }
+
+    private var estimatedResults: Double {
+        Self.estimatedResults(
+            held: initialAdvances <= maxAdvances ? initialAdvances...maxAdvances : nil,
+            pickup: initialAdvancesPickup <= maxAdvancesPickup ? initialAdvancesPickup...maxAdvancesPickup : nil,
+            gen3Compatibility: generation == .gen3 ? compatibility : nil,
+            redraws: selectedGame == .emerald ? maxRedraw - minRedraw + 1 : 1,
+            natures: selectedNatures.count, shinyOnly: shinyOnly)
+    }
+
+    private var tooManyResults: Bool { estimatedResults > Double(Self.resultLimit) }
+
     var body: some View {
         ScrollView {
             CardStack {
+                // Gen 3 and 4 only: Gen 8 eggs are the Finder's Egg mode, and
+                // Gen 5's need the DS profile.
                 Picker("Generation", selection: $generation) {
-                    ForEach(FinderGeneration.allCases) { g in Text(g.rawValue).tag(g) }
+                    ForEach(Self.generations) { g in Text(g.rawValue).tag(g) }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -123,15 +157,15 @@ struct EggRNGView: View {
                             .multilineTextAlignment(.trailing)
                             .autocorrectionDisabled()
                     }
-                    RNGIntField(label: "Initial Advance", value: $initialAdvances)
-                    RNGIntField(label: "Max Advance", value: $maxAdvances)
-                    RNGIntField(label: "Pickup Init Adv", value: $initialAdvancesPickup)
-                    RNGIntField(label: "Pickup Max Adv", value: $maxAdvancesPickup)
+                    RNGIntField(label: "Initial Advance", value: $initialAdvances, range: RNGFieldRange.advances)
+                    RNGIntField(label: "Max Advance", value: $maxAdvances, range: RNGFieldRange.advances)
+                    RNGIntField(label: "Pickup Init Adv", value: $initialAdvancesPickup, range: RNGFieldRange.advances)
+                    RNGIntField(label: "Pickup Max Adv", value: $maxAdvancesPickup, range: RNGFieldRange.advances)
 
                     if generation == .gen3 && selectedGame == .emerald {
-                        RNGIntField(label: "Calibration", value: $calibration)
-                        RNGIntField(label: "Min Redraw", value: $minRedraw)
-                        RNGIntField(label: "Max Redraw", value: $maxRedraw)
+                        RNGIntField(label: "Calibration", value: $calibration, range: RNGFieldRange.byte)
+                        RNGIntField(label: "Min Redraw", value: $minRedraw, range: RNGFieldRange.byte)
+                        RNGIntField(label: "Max Redraw", value: $maxRedraw, range: RNGFieldRange.byte)
                     }
                 }
 
@@ -149,6 +183,7 @@ struct EggRNGView: View {
                         Text("Egg Species #")
                         Spacer()
                         TextField("", value: $eggSpecie, format: .number)
+                            .clamping($eggSpecie, to: 1...Int(UInt16.max))
                             .textFieldStyle(.roundedBorder).scaledWidth(80)
                             .multilineTextAlignment(.trailing)
                     }
@@ -177,6 +212,12 @@ struct EggRNGView: View {
                     Label("Generate", systemImage: "sparkles")
                 }
                 .buttonStyle(.primaryAction)
+                .disabled(tooManyResults)
+                if tooManyResults {
+                    Text("These ranges would list about \(Int(estimatedResults).formatted()) eggs, more than \(Self.resultLimit.formatted()). Narrow the held or pickup advances, or filter by nature or shininess.")
+                        .font(.caption).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 if generation == .gen3 && !results3.isEmpty {
                     eggResults3Section
@@ -327,17 +368,17 @@ struct EggRNGView: View {
         let seedH = UInt32(seedHeldText, radix: 16) ?? 0
         let seedP = UInt32(seedPickupText, radix: 16) ?? 0
         let tID = tid, sID = sid
-        let initAdv = UInt32(initialAdvances), maxAdv = UInt32(maxAdvances)
-        let initAdvP = UInt32(initialAdvancesPickup), maxAdvP = UInt32(maxAdvancesPickup)
-        let cal = UInt8(calibration), minR = UInt8(minRedraw), maxR = UInt8(maxRedraw)
-        let compat = UInt8(compatibility)
+        let initAdv = UInt32(clamping: initialAdvances), maxAdv = UInt32(clamping: maxAdvances)
+        let initAdvP = UInt32(clamping: initialAdvancesPickup), maxAdvP = UInt32(clamping: maxAdvancesPickup)
+        let cal = UInt8(clamping: calibration), minR = UInt8(clamping: minRedraw), maxR = UInt8(clamping: maxRedraw)
+        let compat = UInt8(clamping: compatibility)
         let pAIVs = [parentAHP, parentAAtk, parentADef, parentASpA, parentASpD, parentASpe]
         let pBIVs = [parentBHP, parentBAtk, parentBDef, parentBSpA, parentBSpD, parentBSpe]
         let pAA = parentAAbility, pBA = parentBAbility
         let pAG = parentAGender, pBG = parentBGender
         let pAI = parentAItem, pBI = parentBItem
         let pAN = parentANature, pBN = parentBNature
-        let spec = UInt16(eggSpecie)
+        let spec = UInt16(clamping: eggSpecie)
         let mas = masuda
         let gameVal = selectedGame.pfGame
         let isDeadBattery = selectedGame == .emerald
@@ -363,7 +404,7 @@ struct EggRNGView: View {
                     parentANature: pAN, parentBNature: pBN,
                     eggSpecie: spec, masuda: mas,
                     tid: tID, sid: sID,
-                    game: UInt8(gameVal.rawValue), deadBattery: isDeadBattery,
+                    game: gameVal, deadBattery: isDeadBattery,
                     filterShiny: shinyFilter, natures: natArr)
                 await MainActor.run { results3 = r }
             } else {
@@ -378,7 +419,7 @@ struct EggRNGView: View {
                     parentANature: pAN, parentBNature: pBN,
                     eggSpecie: spec, masuda: mas,
                     tid: tID, sid: sID,
-                    game: UInt8(gameVal.rawValue),
+                    game: gameVal,
                     filterShiny: shinyFilter, natures: natArr)
                 await MainActor.run { results4 = r }
             }
@@ -531,8 +572,8 @@ struct IDRNGView: View {
                 Text("FRLG/Emerald: Enter your TID to find matching SIDs")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            RNGIntField(label: "Initial Advance", value: $gen3InitAdvance)
-            RNGIntField(label: "Max Advance", value: $gen3MaxAdvance)
+            RNGIntField(label: "Initial Advance", value: $gen3InitAdvance, range: RNGFieldRange.advances)
+            RNGIntField(label: "Max Advance", value: $gen3MaxAdvance, range: RNGFieldRange.advances)
         }
     }
 
@@ -559,25 +600,28 @@ struct IDRNGView: View {
             Text("Set the DS date/time and delay range to generate possible TID/SID combinations.")
                 .font(.caption).foregroundStyle(.secondary)
 
-            RNGIntField(label: "Min Delay", value: $gen4MinDelay)
-            RNGIntField(label: "Max Delay", value: $gen4MaxDelay)
+            RNGIntField(label: "Min Delay", value: $gen4MinDelay, range: RNGFieldRange.word)
+            RNGIntField(label: "Max Delay", value: $gen4MaxDelay, range: RNGFieldRange.word)
 
             HStack {
                 Text("Date")
                 Spacer()
                 TextField("Y", value: $gen4Year, format: .number.grouping(.never))
+                    .clamping($gen4Year, to: 2000...2099)
                     .textFieldStyle(.roundedBorder).scaledWidth(60)
                     #if os(iOS)
                     .keyboardType(.numberPad)
                     #endif
                 Text("/")
                 TextField("M", value: $gen4Month, format: .number.grouping(.never))
+                    .clamping($gen4Month, to: 1...12)
                     .textFieldStyle(.roundedBorder).scaledWidth(40)
                     #if os(iOS)
                     .keyboardType(.numberPad)
                     #endif
                 Text("/")
                 TextField("D", value: $gen4Day, format: .number.grouping(.never))
+                    .clamping($gen4Day, to: 1...31)
                     .textFieldStyle(.roundedBorder).scaledWidth(40)
                     #if os(iOS)
                     .keyboardType(.numberPad)
@@ -588,12 +632,14 @@ struct IDRNGView: View {
                 Text("Time")
                 Spacer()
                 TextField("H", value: $gen4Hour, format: .number.grouping(.never))
+                    .clamping($gen4Hour, to: 0...23)
                     .textFieldStyle(.roundedBorder).scaledWidth(40)
                     #if os(iOS)
                     .keyboardType(.numberPad)
                     #endif
                 Text(":")
                 TextField("M", value: $gen4Minute, format: .number.grouping(.never))
+                    .clamping($gen4Minute, to: 0...59)
                     .textFieldStyle(.roundedBorder).scaledWidth(40)
                     #if os(iOS)
                     .keyboardType(.numberPad)
@@ -615,13 +661,14 @@ struct IDRNGView: View {
                 Text("Year")
                 Spacer()
                 TextField("", value: $gen4SearchYear, format: .number.grouping(.never))
+                    .clamping($gen4SearchYear, to: 2000...2099)
                     .textFieldStyle(.roundedBorder).scaledWidth(100).multilineTextAlignment(.trailing)
                     #if os(iOS)
                     .keyboardType(.numberPad)
                     #endif
             }
-            RNGIntField(label: "Min Delay", value: $gen4SearchMinDelay)
-            RNGIntField(label: "Max Delay", value: $gen4SearchMaxDelay)
+            RNGIntField(label: "Min Delay", value: $gen4SearchMinDelay, range: RNGFieldRange.word)
+            RNGIntField(label: "Max Delay", value: $gen4SearchMaxDelay, range: RNGFieldRange.word)
 
             Toggle("Search All Delays", isOn: $gen4SearchInfinite)
             if gen4SearchInfinite {
@@ -904,13 +951,13 @@ struct IDRNGView: View {
         let gen = generation
         let game = selectedGame
         let seedText = gen3SeedText
-        let initAdv = UInt32(gen3InitAdvance)
-        let maxAdv = UInt32(gen3MaxAdvance)
+        let initAdv = UInt32(clamping: gen3InitAdvance)
+        let maxAdv = UInt32(clamping: gen3MaxAdvance)
         let tID = gen3TID
         let isGameCube = gen3IsGameCube
-        let minDel = UInt32(gen4MinDelay), maxDel = UInt32(gen4MaxDelay)
-        let yr = UInt16(gen4Year), mo = UInt8(gen4Month), dy = UInt8(gen4Day)
-        let hr = UInt8(gen4Hour), mn = UInt8(gen4Minute)
+        let minDel = UInt32(clamping: gen4MinDelay), maxDel = UInt32(clamping: gen4MaxDelay)
+        let yr = UInt16(clamping: gen4Year), mo = UInt8(clamping: gen4Month), dy = UInt8(clamping: gen4Day)
+        let hr = UInt8(clamping: gen4Hour), mn = UInt8(clamping: gen4Minute)
         let targetTID = gen4TargetTID, fTID = gen4FilterTID
         let targetSID = gen4TargetSID, fSID = gen4FilterSID
 
@@ -948,9 +995,9 @@ struct IDRNGView: View {
 
     private func startSearch() {
         let infinite = gen4SearchInfinite
-        let year = UInt16(gen4SearchYear)
-        let minDel = UInt32(gen4SearchMinDelay)
-        let maxDel = UInt32(gen4SearchMaxDelay)
+        let year = UInt16(clamping: gen4SearchYear)
+        let minDel = UInt32(clamping: gen4SearchMinDelay)
+        let maxDel = UInt32(clamping: gen4SearchMaxDelay)
         let targetTID = gen4TargetTID, fTID = gen4FilterTID
         let targetSID = gen4TargetSID, fSID = gen4FilterSID
         let targetTSV = gen4TargetTSV, fTSV = gen4FilterTSV
@@ -968,27 +1015,23 @@ struct IDRNGView: View {
             targetTSV: targetTSV, filterTSV: fTSV)
         gen4SearchHandle = handle
 
+        // Read until the search thread ends (Cancel ends it early), so
+        // freeing the handle never waits on it. Once cancelled, the search
+        // is no longer the screen's, and its results are dropped.
         searchTask = Task {
-            while gen4Searching {
+            while !PFBridge.idSearch4Done(handle) {
                 try? await Task.sleep(for: .milliseconds(250))
-                let progress = PFBridge.idSearch4Progress(handle)
-                await MainActor.run { gen4SearchProgress = progress }
-
-                let partial = PFBridge.idSearch4GetResults(handle)
-                if !partial.isEmpty {
-                    await MainActor.run { results4.append(contentsOf: partial) }
-                }
-
-                if progress >= 100 { break }
+                guard gen4SearchHandle == handle else { continue }
+                gen4SearchProgress = PFBridge.idSearch4Progress(handle)
+                results4.append(contentsOf: PFBridge.idSearch4GetResults(handle))
             }
-
-            let final = PFBridge.idSearch4GetResults(handle)
-            await MainActor.run {
-                if !final.isEmpty { results4.append(contentsOf: final) }
-                gen4Searching = false
-                PFBridge.idSearch4Free(handle)
+            if gen4SearchHandle == handle {
+                results4.append(contentsOf: PFBridge.idSearch4GetResults(handle))
+                gen4SearchProgress = PFBridge.idSearch4Progress(handle)
                 gen4SearchHandle = nil
+                gen4Searching = false
             }
+            PFBridge.idSearch4Free(handle)
         }
     }
 
@@ -996,7 +1039,7 @@ struct IDRNGView: View {
         if let handle = gen4SearchHandle {
             PFBridge.idSearch4Cancel(handle)
         }
-        searchTask?.cancel()
+        gen4SearchHandle = nil
         gen4Searching = false
     }
 }

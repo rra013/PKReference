@@ -1340,7 +1340,7 @@ extern "C" PFEggGeneratorState3 *pf_eggGenerate3(uint32_t seedHeld, uint32_t see
                                                     uint8_t parentANature, uint8_t parentBNature,
                                                     uint16_t eggSpecie, bool masuda,
                                                     uint16_t tid, uint16_t sid,
-                                                    uint8_t game, bool deadBattery,
+                                                    uint32_t game, bool deadBattery,
                                                     uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
                                                     const uint8_t ivMin[6], const uint8_t ivMax[6],
                                                     const bool natures[25], const bool powers[16],
@@ -1404,7 +1404,7 @@ extern "C" PFEggGeneratorState4 *pf_eggGenerate4(uint32_t seedHeld, uint32_t see
                                                     uint8_t parentANature, uint8_t parentBNature,
                                                     uint16_t eggSpecie, bool masuda,
                                                     uint16_t tid, uint16_t sid,
-                                                    uint8_t game,
+                                                    uint32_t game,
                                                     uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
                                                     const uint8_t ivMin[6], const uint8_t ivMax[6],
                                                     const bool natures[25], const bool powers[16],
@@ -1539,6 +1539,7 @@ extern "C" PFIDState4 *pf_idGenerate4(uint32_t minDelay, uint32_t maxDelay,
 struct PFIDSearch4 {
     IDSearcher4 *searcher;
     std::thread thread;
+    std::atomic<bool> done { false };
 
     ~PFIDSearch4() {
         if (thread.joinable()) thread.join();
@@ -1560,12 +1561,25 @@ extern "C" PFIDSearch4Handle pf_idSearch4_start(bool infinite, uint16_t year,
     IDFilter filter(tidFilter, sidFilter, {}, tsvFilter, {}, {});
     auto *searcher = new IDSearcher4(filter);
 
+    // IDSearcher4 counts each seed it tries but has no total of its own:
+    // every delay, with each of the 256 second bytes and 24 hours. Infinite
+    // goes to 0xE8FFFF, as startSearch does.
+    u32 last = infinite ? 0xe8ffff : maxDelay;
+    u64 total = last >= minDelay ? static_cast<u64>(last - minDelay + 1) * 256 * 24 : 1;
+    searcher->setMaxProgress(total);
+
     auto *handle = new PFIDSearch4();
     handle->searcher = searcher;
-    handle->thread = std::thread([searcher, infinite, year, minDelay, maxDelay]() {
+    handle->thread = std::thread([handle, searcher, infinite, year, minDelay, maxDelay]() {
         searcher->startSearch(infinite, year, minDelay, maxDelay);
+        handle->done = true;
     });
     return handle;
+}
+
+extern "C" bool pf_idSearch4_done(PFIDSearch4Handle h)
+{
+    return static_cast<PFIDSearch4 *>(h)->done;
 }
 
 extern "C" int pf_idSearch4_progress(PFIDSearch4Handle h)
@@ -1838,10 +1852,15 @@ extern "C" PFEncounterArea *pf_getPokeSpotEncounters(int *outCount)
 
 // MARK: - Seed Searchers (GameCube) - Async
 
+// The seed searchers count each seed they try but have no total of their
+// own, so the start functions set one. Their results land when each worker
+// thread finishes and are sorted, unlocked, at the end, so read them once
+// the search is done.
 struct PFSeedSearch {
     std::variant<ColoSeedSearcher *, GalesSeedSearcher *, ChannelSeedSearcher *> searcher;
     std::thread thread;
     int type; // 0=colo, 1=gales, 2=channel
+    std::atomic<bool> done { false };
 
     ~PFSeedSearch() {
         if (thread.joinable()) thread.join();
@@ -1860,11 +1879,14 @@ extern "C" PFSeedSearchHandle pf_coloSeedSearch_start(uint8_t lead, uint8_t trai
     criteria.trainer = trainer;
 
     auto *s = new ColoSeedSearcher(criteria);
+    // Every low half of the seed (0x10000).
+    s->setMaxProgress(0x10000);
     auto *handle = new PFSeedSearch();
     handle->searcher = s;
     handle->type = 0;
-    handle->thread = std::thread([s, threads]() {
+    handle->thread = std::thread([handle, s, threads]() {
         s->startSearch(threads);
+        handle->done = true;
     });
     return handle;
 }
@@ -1883,11 +1905,14 @@ extern "C" PFSeedSearchHandle pf_galesSeedSearch_start(uint16_t enemyHP0, uint16
     criteria.playerIndex = playerIndex;
 
     auto *s = new GalesSeedSearcher(criteria);
+    // Every low half of the seed (0x10000).
+    s->setMaxProgress(0x10000);
     auto *handle = new PFSeedSearch();
     handle->searcher = s;
     handle->type = 1;
-    handle->thread = std::thread([s, threads]() {
+    handle->thread = std::thread([handle, s, threads]() {
         s->startSearch(threads);
+        handle->done = true;
     });
     return handle;
 }
@@ -1897,11 +1922,14 @@ extern "C" PFSeedSearchHandle pf_channelSeedSearch_start(const uint8_t *pattern,
     std::vector<u8> criteria(pattern, pattern + patternLength);
 
     auto *s = new ChannelSeedSearcher(criteria);
+    // 0x40000001 to 0xFFFFFFFF.
+    s->setMaxProgress(0xbffffffe);
     auto *handle = new PFSeedSearch();
     handle->searcher = s;
     handle->type = 2;
-    handle->thread = std::thread([s, threads]() {
+    handle->thread = std::thread([handle, s, threads]() {
         s->startSearch(threads);
+        handle->done = true;
     });
     return handle;
 }
@@ -1915,6 +1943,11 @@ extern "C" int pf_seedSearch_progress(PFSeedSearchHandle h)
         case 2: return std::get<ChannelSeedSearcher *>(handle->searcher)->getProgress();
     }
     return 0;
+}
+
+extern "C" bool pf_seedSearch_done(PFSeedSearchHandle h)
+{
+    return static_cast<PFSeedSearch *>(h)->done;
 }
 
 extern "C" uint32_t *pf_seedSearch_getResults(PFSeedSearchHandle h, int *outCount)

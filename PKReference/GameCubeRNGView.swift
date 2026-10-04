@@ -243,8 +243,8 @@ struct GameCubeRNGView: View {
                     .multilineTextAlignment(.trailing)
                     .autocorrectionDisabled()
             }
-            RNGIntField(label: "Initial Advance", value: $initialAdvances)
-            RNGIntField(label: "Max Advance", value: $maxAdvances)
+            RNGIntField(label: "Initial Advance", value: $initialAdvances, range: RNGFieldRange.advances)
+            RNGIntField(label: "Max Advance", value: $maxAdvances, range: RNGFieldRange.advances)
         }
     }
 
@@ -277,10 +277,10 @@ struct GameCubeRNGView: View {
                     .multilineTextAlignment(.trailing)
                     .autocorrectionDisabled()
             }
-            RNGIntField(label: "Food Init Adv", value: $initialAdvances)
-            RNGIntField(label: "Food Max Adv", value: $maxAdvances)
-            RNGIntField(label: "Enc Init Adv", value: $initialAdvancesEncounter)
-            RNGIntField(label: "Enc Max Adv", value: $maxAdvancesEncounter)
+            RNGIntField(label: "Food Init Adv", value: $initialAdvances, range: RNGFieldRange.advances)
+            RNGIntField(label: "Food Max Adv", value: $maxAdvances, range: RNGFieldRange.advances)
+            RNGIntField(label: "Enc Init Adv", value: $initialAdvancesEncounter, range: RNGFieldRange.advances)
+            RNGIntField(label: "Enc Max Adv", value: $maxAdvancesEncounter, range: RNGFieldRange.advances)
         }
     }
 
@@ -516,8 +516,8 @@ struct GameCubeRNGView: View {
 
     private func generate() {
         let seed = UInt32(seedText, radix: 16) ?? 0
-        let initAdv = UInt32(initialAdvances)
-        let maxAdv = UInt32(maxAdvances)
+        let initAdv = UInt32(clamping: initialAdvances)
+        let maxAdv = UInt32(clamping: maxAdvances)
         let tID = tid, sID = sid
         let gameVal = selectedGame.pfGameValue
         let shiny: UInt8 = shinyOnly ? 1 : 255
@@ -602,10 +602,10 @@ struct GameCubeRNGView: View {
     private func generatePokeSpot() {
         let seedFood = UInt32(seedFoodText, radix: 16) ?? 0
         let seedEnc = UInt32(seedEncounterText, radix: 16) ?? 0
-        let initAdv = UInt32(initialAdvances)
-        let maxAdv = UInt32(maxAdvances)
-        let initAdvEnc = UInt32(initialAdvancesEncounter)
-        let maxAdvEnc = UInt32(maxAdvancesEncounter)
+        let initAdv = UInt32(clamping: initialAdvances)
+        let maxAdv = UInt32(clamping: maxAdvances)
+        let initAdvEnc = UInt32(clamping: initialAdvancesEncounter)
+        let maxAdvEnc = UInt32(clamping: maxAdvancesEncounter)
         let tID = tid, sID = sid
         let gameVal = selectedGame.pfGameValue
         let shiny: UInt8 = shinyOnly ? 1 : 255
@@ -712,6 +712,7 @@ struct SeedSearcherView: View {
             .padding()
         }
         .scrollDismissesKeyboard(.interactively)
+        .onDisappear { cancelSearch() }
         .leaveWarning(searching ? "The search in progress will stop." : nil)
     }
 
@@ -826,24 +827,22 @@ struct SeedSearcherView: View {
 
         guard let handle = searchHandle else { searching = false; return }
 
+        // Progress until the search thread ends (Cancel ends it early); the
+        // results are sorted at the end, so they're read then, and freeing
+        // the handle never waits on the search. Once cancelled, the search
+        // is no longer the screen's.
         pollTask = Task {
-            while !Task.isCancelled {
-                let p = PFBridge.seedSearchProgress(handle)
-                let batch = PFBridge.seedSearchGetResults(handle)
-                await MainActor.run {
-                    progress = Double(p)
-                    if !batch.isEmpty { seedResults.append(contentsOf: batch) }
-                }
-                if p >= 100 { break }
+            while !PFBridge.seedSearchDone(handle) {
+                if searchHandle == handle { progress = Double(PFBridge.seedSearchProgress(handle)) }
                 try? await Task.sleep(for: .milliseconds(200))
             }
-            let finalBatch = PFBridge.seedSearchGetResults(handle)
-            PFBridge.seedSearchFree(handle)
-            await MainActor.run {
-                if !finalBatch.isEmpty { seedResults.append(contentsOf: finalBatch) }
-                searching = false
+            if searchHandle == handle {
+                progress = 100
+                seedResults = PFBridge.seedSearchGetResults(handle)
                 searchHandle = nil
+                searching = false
             }
+            PFBridge.seedSearchFree(handle)
         }
     }
 
@@ -851,7 +850,8 @@ struct SeedSearcherView: View {
         if let handle = searchHandle {
             PFBridge.seedSearchCancel(handle)
         }
-        pollTask?.cancel()
+        searchHandle = nil
+        searching = false
     }
 }
 
@@ -876,8 +876,8 @@ struct JirachiPatternView: View {
                             .multilineTextAlignment(.trailing)
                             .autocorrectionDisabled()
                     }
-                    RNGIntField(label: "Target Advance", value: $targetAdvance)
-                    RNGIntField(label: "Brute Force Range", value: $bruteForce)
+                    RNGIntField(label: "Target Advance", value: $targetAdvance, range: RNGFieldRange.advances)
+                    RNGIntField(label: "Brute Force Range", value: $bruteForce, range: RNGFieldRange.advances)
                 }
 
                 Button {
@@ -924,7 +924,7 @@ struct JirachiPatternView: View {
         let seed = UInt32(seedText, radix: 16) ?? 0
         jirachiSeed = PFBridge.computeJirachiSeed(seed)
         actions = PFBridge.jirachiPattern(seed: seed,
-                                            targetAdvance: UInt32(targetAdvance),
-                                            bruteForce: UInt32(bruteForce))
+                                            targetAdvance: UInt32(clamping: targetAdvance),
+                                            bruteForce: UInt32(clamping: bruteForce))
     }
 }
