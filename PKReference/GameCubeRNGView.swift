@@ -520,7 +520,7 @@ struct GameCubeRNGView: View {
         let maxAdv = UInt32(clamping: maxAdvances)
         let tID = tid, sID = sid
         let gameVal = selectedGame.pfGameValue
-        let shiny: UInt8 = shinyOnly ? 1 : 255
+        let shiny: UInt8 = pfShinyFilter(shinyOnly)
         var natArr = [Bool](repeating: selectedNatures.isEmpty, count: 25)
         for n in selectedNatures { natArr[Int(n)] = true }
 
@@ -560,7 +560,7 @@ struct GameCubeRNGView: View {
     private func searchIVs() {
         let tID = tid, sID = sid
         let gameVal = selectedGame.pfGameValue
-        let shiny: UInt8 = shinyOnly ? 1 : 255
+        let shiny: UInt8 = pfShinyFilter(shinyOnly)
         var natArr = [Bool](repeating: selectedNatures.isEmpty, count: 25)
         for n in selectedNatures { natArr[Int(n)] = true }
         let ivMin = [minHP, minAtk, minDef, minSpA, minSpD, minSpe]
@@ -608,7 +608,7 @@ struct GameCubeRNGView: View {
         let maxAdvEnc = UInt32(clamping: maxAdvancesEncounter)
         let tID = tid, sID = sid
         let gameVal = selectedGame.pfGameValue
-        let shiny: UInt8 = shinyOnly ? 1 : 255
+        let shiny: UInt8 = pfShinyFilter(shinyOnly)
         var natArr = [Bool](repeating: selectedNatures.isEmpty, count: 25)
         for n in selectedNatures { natArr[Int(n)] = true }
         let spotIdx = selectedPokeSpotIndex

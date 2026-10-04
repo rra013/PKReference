@@ -125,6 +125,35 @@ struct PFAsyncSearch {
 
 // MARK: - Helpers
 
+// All-false means "no filter" in Swift convention; normalize to all-true
+// so PokeFinder's per-element checks (!natures[i]) don't reject everything.
+template <size_t N>
+static std::array<bool, N> allowedOrAll(const bool *values)
+{
+    std::array<bool, N> arr;
+    std::copy(values, values + N, arr.begin());
+    if (std::none_of(arr.begin(), arr.end(), [](bool b) { return b; })) arr.fill(true);
+    return arr;
+}
+
+// PokéFinder's filters have a `skip` that passes everything, IVs, natures
+// and Hidden Powers included, so it's only for when nothing is filtered.
+template <size_t N>
+static bool allTrue(const std::array<bool, N> &arr)
+{
+    return std::all_of(arr.begin(), arr.end(), [](bool b) { return b; });
+}
+
+static bool filtersNothing(uint8_t gender, uint8_t ability, uint8_t shiny,
+                           const std::array<u8, 6> &min, const std::array<u8, 6> &max,
+                           const std::array<bool, 25> &natures, const std::array<bool, 16> &powers)
+{
+    for (int i = 0; i < 6; i++) {
+        if (min[i] > 0 || max[i] < 31) return false;
+    }
+    return gender == 255 && ability == 255 && shiny == 255 && allTrue(natures) && allTrue(powers);
+}
+
 static StateFilter makeFilter(uint8_t gender, uint8_t ability, uint8_t shiny,
                                const uint8_t ivMin[6], const uint8_t ivMax[6],
                                const bool natures[25], const bool powers[16])
@@ -133,32 +162,10 @@ static StateFilter makeFilter(uint8_t gender, uint8_t ability, uint8_t shiny,
     std::copy(ivMin, ivMin + 6, min.begin());
     std::copy(ivMax, ivMax + 6, max.begin());
 
-    std::array<bool, 25> natArr;
-    std::copy(natures, natures + 25, natArr.begin());
+    auto natArr = allowedOrAll<25>(natures);
+    auto powArr = allowedOrAll<16>(powers);
 
-    std::array<bool, 16> powArr;
-    std::copy(powers, powers + 16, powArr.begin());
-
-    // All-false means "no filter" in Swift convention; normalize to all-true
-    // so PokeFinder's per-element checks (!natures[i]) don't reject everything
-    bool anyNature = false;
-    for (int i = 0; i < 25; i++) { if (natArr[i]) { anyNature = true; break; } }
-    if (!anyNature) natArr.fill(true);
-
-    bool anyPower = false;
-    for (int i = 0; i < 16; i++) { if (powArr[i]) { anyPower = true; break; } }
-    if (!anyPower) powArr.fill(true);
-
-    // skip only when genuinely nothing is filtered
-    bool allNatures = true;
-    for (int i = 0; i < 25; i++) { if (!natArr[i]) { allNatures = false; break; } }
-    bool allPowers = true;
-    for (int i = 0; i < 16; i++) { if (!powArr[i]) { allPowers = false; break; } }
-    bool noIVFilter = true;
-    for (int i = 0; i < 6; i++) { if (min[i] > 0 || max[i] < 31) { noIVFilter = false; break; } }
-
-    bool skip = (gender == 255 && ability == 255 && shiny == 255
-                 && allNatures && allPowers && noIVFilter);
+    bool skip = filtersNothing(gender, ability, shiny, min, max, natArr, powArr);
     return StateFilter(gender, ability, shiny, 0, 255, 0, 255, skip, min, max, natArr, powArr);
 }
 
@@ -255,21 +262,13 @@ static WildStateFilter makeWildFilter(uint8_t gender, uint8_t ability, uint8_t s
     std::copy(ivMin, ivMin + 6, min.begin());
     std::copy(ivMax, ivMax + 6, max.begin());
 
-    std::array<bool, 25> natArr;
-    std::copy(natures, natures + 25, natArr.begin());
-
-    std::array<bool, 16> powArr;
-    std::copy(powers, powers + 16, powArr.begin());
+    auto natArr = allowedOrAll<25>(natures);
+    auto powArr = allowedOrAll<16>(powers);
 
     std::array<bool, 12> slotArr;
     std::copy(encounterSlots, encounterSlots + 12, slotArr.begin());
 
-    bool skip = (gender == 255 && ability == 255 && shiny == 255);
-    if (skip) {
-        for (int i = 0; i < 12; i++) {
-            if (!slotArr[i]) { skip = false; break; }
-        }
-    }
+    bool skip = filtersNothing(gender, ability, shiny, min, max, natArr, powArr) && allTrue(slotArr);
     return WildStateFilter(gender, ability, shiny, 0, 255, 0, 255, skip, min, max, natArr, powArr, slotArr);
 }
 
@@ -2880,24 +2879,22 @@ extern "C" PFUndergroundState *pf_undergroundGenerate8(uint64_t seed0, uint64_t 
     std::copy(ivMin, ivMin + 6, min.begin());
     std::copy(ivMax, ivMax + 6, max.begin());
 
-    std::array<bool, 25> natArr;
-    std::copy(natures, natures + 25, natArr.begin());
-    bool anyNature = false;
-    for (int i = 0; i < 25; i++) { if (natArr[i]) { anyNature = true; break; } }
-    if (!anyNature) natArr.fill(true);
-
-    std::array<bool, 16> powArr;
-    std::copy(powers, powers + 16, powArr.begin());
-    bool anyPower = false;
-    for (int i = 0; i < 16; i++) { if (powArr[i]) { anyPower = true; break; } }
-    if (!anyPower) powArr.fill(true);
-
-    bool skip = (filterGender == 255 && filterAbility == 255 && filterShiny == 255);
-    UndergroundStateFilter filter(filterGender, filterAbility, filterShiny, 0, 255, 0, 255,
-                                   skip, min, max, natArr, powArr, {});
+    auto natArr = allowedOrAll<25>(natures);
+    auto powArr = allowedOrAll<16>(powers);
 
     auto undergroundAreas = Encounters8::getUndergroundEncounters(storyFlag, diglett, &profile);
     if (undergroundAreas.empty()) { *outCount = 0; return nullptr; }
+
+    // The filter also checks the species against this list, so it holds
+    // every one the areas can give.
+    std::vector<u16> species;
+    for (const auto &area : undergroundAreas) {
+        auto areaSpecies = area.getSpecies();
+        species.insert(species.end(), areaSpecies.begin(), areaSpecies.end());
+    }
+    bool skip = filtersNothing(filterGender, filterAbility, filterShiny, min, max, natArr, powArr);
+    UndergroundStateFilter filter(filterGender, filterAbility, filterShiny, 0, 255, 0, 255,
+                                   skip, min, max, natArr, powArr, species);
 
     std::vector<PFUndergroundState> allResults;
 

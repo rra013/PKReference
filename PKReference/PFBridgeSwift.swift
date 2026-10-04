@@ -30,21 +30,29 @@ enum PFMethod: UInt8 {
     case method5 = 24
 }
 
-enum PFLead: UInt8 {
-    case none = 255
-    case synchronize = 0
-    case synchronizeEnd = 24
-    case cuteCharmF = 25
-    case cuteCharmM = 26
-    case magnetPull = 27
-    case staticLead = 28
-    case harvest = 29
-    case flashFire = 30
-    case stormDrain = 31
-    case pressure = 32
-    case suctionCups = 33
-    case compoundEyes = 34
-    case arenaTrap = 35
+/// PokéFinder's lead. Synchronize carries its nature: PokéFinder's
+/// generators read leads 0–24 as Synchronize with that nature, and its
+/// searchers read 0 as Synchronize with any nature.
+nonisolated struct PFLead: RawRepresentable, Hashable, Sendable {
+    let rawValue: UInt8
+    init(rawValue: UInt8) { self.rawValue = rawValue }
+
+    static let none = PFLead(rawValue: 255)
+    /// For a searcher: Synchronize with any nature.
+    static let synchronize = PFLead(rawValue: 0)
+    /// For a generator: Synchronize with `nature`.
+    static func synchronize(nature: UInt8) -> PFLead { PFLead(rawValue: min(nature, 24)) }
+    static let cuteCharmF = PFLead(rawValue: 25)
+    static let cuteCharmM = PFLead(rawValue: 26)
+    static let magnetPull = PFLead(rawValue: 27)
+    static let staticLead = PFLead(rawValue: 28)
+    static let harvest = PFLead(rawValue: 29)
+    static let flashFire = PFLead(rawValue: 30)
+    static let stormDrain = PFLead(rawValue: 31)
+    static let pressure = PFLead(rawValue: 32)
+    static let suctionCups = PFLead(rawValue: 33)
+    static let compoundEyes = PFLead(rawValue: 34)
+    static let arenaTrap = PFLead(rawValue: 35)
 }
 
 enum PFGame: UInt32 {
