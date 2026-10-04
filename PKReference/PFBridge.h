@@ -587,23 +587,34 @@ PFGeneratorState *pf_gamecubeGenerateStatic(uint32_t seed,
                                              const bool natures[25], const bool powers[16],
                                              int *outCount);
 
-// MARK: - GameCube Searcher
+// MARK: - GameCube Searcher (Async)
 
-PFSearcherState *pf_gamecubeSearchShadow(uint8_t method, bool unset,
-                                          uint16_t tid, uint16_t sid, uint32_t game,
-                                          uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
-                                          const uint8_t ivMin[6], const uint8_t ivMax[6],
-                                          const bool natures[25], const bool powers[16],
-                                          int shadowIndex,
-                                          int *outCount);
+/// A GameCube search on its own thread, as Gen 3's static searcher: poll
+/// `_getResults` and `_progress` until `_done`, then `_free`.
+typedef void *PFGameCubeSearchHandle;
 
-PFSearcherState *pf_gamecubeSearchStatic(uint8_t method, bool unset,
-                                          uint16_t tid, uint16_t sid, uint32_t game,
-                                          uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
-                                          const uint8_t ivMin[6], const uint8_t ivMax[6],
-                                          const bool natures[25], const bool powers[16],
-                                          int staticType, int staticIndex,
-                                          int *outCount);
+/// A shadow Pokémon's search; NULL if `shadowIndex` isn't one.
+PFGameCubeSearchHandle pf_gamecubeSearchShadow_start(uint8_t method, bool unset,
+                                                     uint16_t tid, uint16_t sid, uint32_t game,
+                                                     uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
+                                                     const uint8_t ivMin[6], const uint8_t ivMax[6],
+                                                     const bool natures[25], const bool powers[16],
+                                                     int shadowIndex);
+
+/// A non-shadow (staticType 8) or Channel (9) search; NULL if the template
+/// isn't one.
+PFGameCubeSearchHandle pf_gamecubeSearchStatic_start(uint8_t method, bool unset,
+                                                     uint16_t tid, uint16_t sid, uint32_t game,
+                                                     uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
+                                                     const uint8_t ivMin[6], const uint8_t ivMax[6],
+                                                     const bool natures[25], const bool powers[16],
+                                                     int staticType, int staticIndex);
+
+int pf_gamecubeSearch_progress(PFGameCubeSearchHandle handle);
+bool pf_gamecubeSearch_done(PFGameCubeSearchHandle handle);
+PFSearcherState *pf_gamecubeSearch_getResults(PFGameCubeSearchHandle handle, int *outCount);
+void pf_gamecubeSearch_cancel(PFGameCubeSearchHandle handle);
+void pf_gamecubeSearch_free(PFGameCubeSearchHandle handle);
 
 // MARK: - PokeSpot Generator
 

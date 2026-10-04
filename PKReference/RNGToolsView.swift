@@ -699,6 +699,22 @@ enum FinderLead: String, CaseIterable, Identifiable, Sendable {
 /// The games show both the same way.
 nonisolated func pfShinyFilter(_ shinyOnly: Bool) -> UInt8 { shinyOnly ? 3 : 255 }
 
+/// The most results a search keeps before it stops. One with every IV can
+/// find millions: an XD shadow Pokémon with no locks finds about 270,000 a
+/// second, at about 170 bytes each: the app grew by about 110 MB a second,
+/// past 1.5 GB in under a minute. The lists show the first 500.
+nonisolated let searchResultLimit = 100_000
+
+/// Adds what fits under `searchResultLimit`; true once the list is full.
+nonisolated func appendUpToLimit<T>(_ batch: some Collection<T>, to results: inout [T],
+                                    limit: Int = searchResultLimit) -> Bool {
+    results.append(contentsOf: batch.prefix(max(0, limit - results.count)))
+    return results.count >= limit
+}
+
+/// Said under the Search button when a search stopped at the limit.
+let searchResultLimitNote = "Stopped at \(searchResultLimit.formatted()) results. Narrow the search to find the rest."
+
 nonisolated func finderMethodToPF(_ method: FinderMethod) -> PFMethod {
     switch method {
     case .method1: return .method1
@@ -2689,6 +2705,8 @@ struct RNGToolsView: View {
             // `-debugOpenSheet frlgCalibration`: the Finder, then a FireRed
             // Eevee target, then its first seed's Calibrate.
             .task { await DebugSnapshot.openSheet("frlgCalibration") { selectedTool = RNGToolTab.finder.rawValue } }
+            // `-debugOpenSheet gameCubeSearch`: the GameCube tab, then a search.
+            .task { await DebugSnapshot.openSheet("gameCubeSearch") { selectedTool = RNGToolTab.gamecube.rawValue } }
             #endif
             .onChange(of: FinderTimerBridge.shared.shouldSwitchToTimer) {
                 if FinderTimerBridge.shared.shouldSwitchToTimer {
@@ -3538,6 +3556,8 @@ struct FinderRootView: View {
     @State private var searchTask: Task<Void, Never>?
     @State private var searchWorkTask: Task<Void, Never>?
     @State private var searchProgressValue: Double = -1
+    /// The last search stopped at `searchResultLimit`.
+    @State private var stoppedAtLimit = false
     private var isSearching: Bool { searchTask != nil }
     @State private var selectedResult: StaticSearchResult?
 
@@ -3962,6 +3982,11 @@ struct FinderRootView: View {
                     }
                     .buttonStyle(.primaryAction)
                     .disabled(needsStaticEncounter)
+                    if stoppedAtLimit {
+                        Text(searchResultLimitNote)
+                            .font(.caption).foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     if needsStaticEncounter {
                         Text(StaticEncounterData.categories(for: selectedGame).isEmpty
                              ? "PokéFinder has no static encounters for \(selectedGame.rawValue)."
@@ -4892,6 +4917,7 @@ struct FinderRootView: View {
         stopSearch()
         if mode == .searcher { searcherResults = [] } else { generatorResults = [] }
         searchProgressValue = -1
+        stoppedAtLimit = false
 
         // Capture all @State values before entering task
         let gen = generation
@@ -5263,27 +5289,30 @@ struct FinderRootView: View {
                 switch event {
                 case .result(let result):
                     buffer.append(result)
-                    if buffer.count >= 100 {
-                        if isSearcherMode { searcherResults.append(contentsOf: buffer) }
-                        else { generatorResults.append(contentsOf: buffer) }
-                        buffer.removeAll(keepingCapacity: true)
-                    }
+                    guard buffer.count >= 100 else { continue }
                 case .progress(let pct):
-                    if !buffer.isEmpty {
-                        if isSearcherMode { searcherResults.append(contentsOf: buffer) }
-                        else { generatorResults.append(contentsOf: buffer) }
-                        buffer.removeAll(keepingCapacity: true)
-                    }
                     searchProgressValue = pct
                 }
+                let full = keep(buffer, searcher: isSearcherMode)
+                buffer.removeAll(keepingCapacity: true)
+                if full {
+                    stopSearch()
+                    stoppedAtLimit = true
+                    return
+                }
             }
-            if !buffer.isEmpty {
-                if isSearcherMode { searcherResults.append(contentsOf: buffer) }
-                else { generatorResults.append(contentsOf: buffer) }
-            }
+            // Stopping already cleared these, maybe for the next search,
+            // whose list the rest of this one's would land in.
+            guard !Task.isCancelled else { return }
+            stoppedAtLimit = keep(buffer, searcher: isSearcherMode)
             searchWorkTask = nil
             searchTask = nil
         }
+    }
+
+    /// Adds a batch to the list being filled; true once it's full.
+    private func keep(_ batch: [StaticSearchResult], searcher: Bool) -> Bool {
+        searcher ? appendUpToLimit(batch, to: &searcherResults) : appendUpToLimit(batch, to: &generatorResults)
     }
 }
 

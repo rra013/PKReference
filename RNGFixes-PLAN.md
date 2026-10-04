@@ -1,7 +1,7 @@
 # RNG tools fixes: plan
 
-Status: **PRs 1–3 built** (2026-10-03/04); PR 4 planned. From
-the RNG audit's 45 findings, and two found since (46, 47). This plan covers findings 1–10 in detail (§2–§5), as four PRs,
+Status: **PRs 1–4 built** (2026-10-03/04). From
+the RNG audit's 45 findings, and three found since (46–48). This plan covers findings 1–10 in detail (§2–§5), as four PRs,
 and groups the rest for later (§7). The owner took every recommendation in
 §8.
 
@@ -22,7 +22,7 @@ filters, the values it passes, and the data and screens around it.
 | 1 | 1–4 (and 18) | Stop the crashes and freezes |
 | 2 | 6–8 (and 41) | Make the filters and leads do what they say |
 | 3 | 9, 10, the Gen 4 part of 5 (and 22, 23) | Static encounters from PokéFinder's tables |
-| 4 | the GameCube part of 5 | Stream the GameCube searchers |
+| 4 | the GameCube part of 5 (and 47) | Stream the GameCube searchers |
 
 PR 1 is small and stops data loss and crashes, so it goes first. PR 2 is
 the biggest correctness win for the least code. PR 3 is the largest: it
@@ -209,11 +209,36 @@ template by species, or not at all.
 
 ## 5. PR 4: GameCube searchers
 
-The shadow and non-shadow searchers (`GameCubeSearcher`) block until done,
-with no progress or cancel, as Gen 3's did before #72. Give them a handle
-with a progress total (the IV combinations), a `done` flag and cancel, read
-every tenth of a second. **Tests:** results stream and match the one-shot
-search; Cancel stops it.
+The shadow, non-shadow and Channel searchers (`GameCubeSearcher`) blocked
+until done, with no progress or cancel, as Gen 3's did before #72. A full
+Channel search tries 2^32 seeds.
+
+- **Bridge:** one handle for all three (`pf_gamecubeSearchShadow_start`,
+  `pf_gamecubeSearchStatic_start`, then `_progress`, `_done`, `_getResults`,
+  `_cancel`, `_free`), with PokéFinder's searcher on its own thread. The
+  progress total is the IV combinations, or for Channel the seeds it tries
+  (2^27 per Sp. Def IV). PokéFinder's `getShadowTeam` and
+  `getStaticEncounter` don't check the index, so the starts do, and give no
+  handle for one that isn't a template. The blocking searchers are gone.
+- **View:** the search runs off the main actor and streams its results
+  every tenth of a second, with progress and Stop, as the Finder's do. The
+  search stops when the tab closes or the RNG tool changes.
+- **Found while building it, so 47 is in this PR:** an XD shadow Pokémon
+  with no locks (Ledyba) finds about 270,000 results a second with every
+  IV, and the app grew by about 110 MB a second, past 1.5 GB in under a
+  minute. The blocking searcher had the same fault, unseen. The GameCube
+  searcher and every Finder search and generate now keep at most 100,000
+  results (`searchResultLimit`, about 17 MB): the search stops there and
+  says so under the button. Generators still build all theirs first (48).
+- **Tests:** shadow and non-shadow searches stream the same results as one
+  read at the end, reach 100% in order, stay in the IV range, and each
+  result's seed generates it; a whole Channel search reads under 100% while
+  it runs and Cancel ends it; cancelling the task stops and frees the
+  search; indices that aren't templates give no handle; the limit fills to
+  100,000 and no further. On the simulator: Ledyba stops at 100,000 with
+  the note; a shiny Channel search counts up to 100% (7,320 results);
+  leaving the tab drops the CPU to 0; a BDSP generate of 1,000,000
+  advances stops at 100,000.
 
 ---
 
@@ -276,11 +301,17 @@ Grouped by area; each group could be a PR. Numbers are the audit's.
   ("Pre-National Dex"), which reads `flagRates[-1]` (the slot rates come
   out wrong), and 1 ("Post-National Dex"), which is the earliest stage.
   Offer PokéFinder's six stages, with their names.
-- 47: The streaming searchers keep every result. They show the first 500,
-  but a wide-open search (every IV, a long delay range) keeps collecting:
+- 47: The streaming searchers kept every result. They show the first 500,
+  but a wide-open search (every IV, a long delay range) kept collecting:
   a Gen 4 static search gathers about 4,500 a second, and Gen 3's does the
-  same, so a search left running grows without limit. Cap the kept results
-  (say 100,000) and say so, as the Eggs tool's estimate does.
+  same, so a search left running grew without limit. Done in PR 4 (§5):
+  searches stop at 100,000 results and say so.
+- 48: Generators build every result before the app sees any. PokéFinder's
+  generators return one vector, so a Finder or GameCube Generator with a
+  Max Advance in the hundreds of millions runs out of memory in the bridge,
+  before the 100,000 limit applies (after a BDSP generate of 1,000,000
+  advances, the app sat at 625 MB). Have the bridge stop at the limit, or
+  estimate first as the Eggs tool does.
 
 ---
 

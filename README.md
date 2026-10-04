@@ -474,7 +474,7 @@ project has no Swift package dependencies.
    later launches work offline, except for Tournaments. The Mac app is
    sandboxed, with outgoing network access.
 
-**Tests:** 1,203 tests written with Swift Testing. They cover the damage engines
+**Tests:** 1,209 tests written with Swift Testing. They cover the damage engines
 and the port, the battle engine by mechanic tier, the EV and two-hit solvers,
 speed tiers, paste parsing and import, Champions filters and legality, RNG
 tools, ML parity, the tournament import and data store, Team Search's parser,

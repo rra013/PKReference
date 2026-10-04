@@ -1777,29 +1777,110 @@ extern "C" PFGeneratorState *pf_gamecubeGenerateStatic(uint32_t seed,
     return out;
 }
 
-// MARK: - GameCube Searcher (Shadow)
+// MARK: - GameCube Searcher (Async)
 
-extern "C" PFSearcherState *pf_gamecubeSearchShadow(uint8_t method, bool unset,
-                                                      uint16_t tid, uint16_t sid, uint32_t game,
-                                                      uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
-                                                      const uint8_t ivMin[6], const uint8_t ivMax[6],
-                                                      const bool natures[25], const bool powers[16],
-                                                      int shadowIndex,
-                                                      int *outCount)
+// PokéFinder's searcher on its own thread, as pf_staticSearch3_start's: read
+// results and progress as it goes, until done. Its templates are PokéFinder's
+// own tables, which outlive any search.
+struct PFGameCubeSearch {
+    GameCubeSearcher searcher;
+    std::thread thread;
+    std::atomic<bool> done { false };
+
+    PFGameCubeSearch(Method method, bool unset, const Profile3 &profile, const StateFilter &filter) :
+        searcher(method, unset, profile, filter)
+    {
+    }
+
+    ~PFGameCubeSearch()
+    {
+        if (thread.joinable()) thread.join();
+    }
+};
+
+// Each IV combination the searcher tries, as pf_staticSearch3_start counts;
+// Channel tries every seed for each Sp. Def IV (2^27 of them).
+static u64 gameCubeSearchTotal(Method method, const std::array<u8, 6> &min, const std::array<u8, 6> &max)
+{
+    if (method == Method::Channel)
+    {
+        return min[4] <= max[4] ? static_cast<u64>(max[4] - min[4] + 1) << 27 : 0;
+    }
+    u64 total = 1;
+    for (int i = 0; i < 6; i++) total *= min[i] <= max[i] ? static_cast<u64>(max[i] - min[i] + 1) : 0;
+    return total;
+}
+
+template <class Template>
+static PFGameCubeSearchHandle startGameCubeSearch(uint8_t method, bool unset, uint16_t tid, uint16_t sid, uint32_t game,
+                                                  uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
+                                                  const uint8_t ivMin[6], const uint8_t ivMax[6],
+                                                  const bool natures[25], const bool powers[16],
+                                                  const Template *tmpl)
 {
     Profile3 profile("-", static_cast<Game>(game), tid, sid, false);
     StateFilter filter = makeFilter(filterGender, filterAbility, filterShiny, ivMin, ivMax, natures, powers);
 
-    const ShadowTemplate *tmpl = Encounters3::getShadowTeam(shadowIndex);
-    if (!tmpl) { *outCount = 0; return nullptr; }
-
-    GameCubeSearcher searcher(static_cast<Method>(method), unset, profile, filter);
     std::array<u8, 6> min, max;
     std::copy(ivMin, ivMin + 6, min.begin());
     std::copy(ivMax, ivMax + 6, max.begin());
-    searcher.startSearch(min, max, tmpl);
+    u64 total = gameCubeSearchTotal(static_cast<Method>(method), min, max);
 
-    auto results = searcher.getResults();
+    auto *handle = new PFGameCubeSearch(static_cast<Method>(method), unset, profile, filter);
+    handle->searcher.setMaxProgress(total > 0 ? total : 1);
+    handle->thread = std::thread([handle, min, max, tmpl]() {
+        handle->searcher.startSearch(min, max, tmpl);
+        handle->done = true;
+    });
+    return handle;
+}
+
+extern "C" PFGameCubeSearchHandle pf_gamecubeSearchShadow_start(uint8_t method, bool unset,
+                                                                uint16_t tid, uint16_t sid, uint32_t game,
+                                                                uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
+                                                                const uint8_t ivMin[6], const uint8_t ivMax[6],
+                                                                const bool natures[25], const bool powers[16],
+                                                                int shadowIndex)
+{
+    // PokéFinder's getShadowTeam doesn't check the index.
+    int size = 0;
+    const ShadowTemplate *templates = Encounters3::getShadowTeams(&size);
+    if (!templates || shadowIndex < 0 || shadowIndex >= size) return nullptr;
+
+    return startGameCubeSearch(method, unset, tid, sid, game, filterGender, filterAbility, filterShiny,
+                               ivMin, ivMax, natures, powers, &templates[shadowIndex]);
+}
+
+extern "C" PFGameCubeSearchHandle pf_gamecubeSearchStatic_start(uint8_t method, bool unset,
+                                                                uint16_t tid, uint16_t sid, uint32_t game,
+                                                                uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
+                                                                const uint8_t ivMin[6], const uint8_t ivMax[6],
+                                                                const bool natures[25], const bool powers[16],
+                                                                int staticType, int staticIndex)
+{
+    // Nor does getStaticEncounter.
+    int size = 0;
+    const StaticTemplate3 *templates = staticType >= 0 ? Encounters3::getStaticEncounters(staticType, &size) : nullptr;
+    if (!templates || staticIndex < 0 || staticIndex >= size) return nullptr;
+
+    return startGameCubeSearch(method, unset, tid, sid, game, filterGender, filterAbility, filterShiny,
+                               ivMin, ivMax, natures, powers, &templates[staticIndex]);
+}
+
+extern "C" int pf_gamecubeSearch_progress(PFGameCubeSearchHandle h)
+{
+    return static_cast<PFGameCubeSearch *>(h)->searcher.getProgress();
+}
+
+extern "C" bool pf_gamecubeSearch_done(PFGameCubeSearchHandle h)
+{
+    return static_cast<PFGameCubeSearch *>(h)->done;
+}
+
+// The results found since the last call.
+extern "C" PFSearcherState *pf_gamecubeSearch_getResults(PFGameCubeSearchHandle h, int *outCount)
+{
+    auto results = static_cast<PFGameCubeSearch *>(h)->searcher.getResults();
     *outCount = static_cast<int>(results.size());
     if (results.empty()) return nullptr;
 
@@ -1810,37 +1891,15 @@ extern "C" PFSearcherState *pf_gamecubeSearchShadow(uint8_t method, bool unset,
     return out;
 }
 
-// MARK: - GameCube Searcher (Static)
-
-extern "C" PFSearcherState *pf_gamecubeSearchStatic(uint8_t method, bool unset,
-                                                      uint16_t tid, uint16_t sid, uint32_t game,
-                                                      uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
-                                                      const uint8_t ivMin[6], const uint8_t ivMax[6],
-                                                      const bool natures[25], const bool powers[16],
-                                                      int staticType, int staticIndex,
-                                                      int *outCount)
+extern "C" void pf_gamecubeSearch_cancel(PFGameCubeSearchHandle h)
 {
-    Profile3 profile("-", static_cast<Game>(game), tid, sid, false);
-    StateFilter filter = makeFilter(filterGender, filterAbility, filterShiny, ivMin, ivMax, natures, powers);
+    static_cast<PFGameCubeSearch *>(h)->searcher.cancelSearch();
+}
 
-    const StaticTemplate3 *tmpl = Encounters3::getStaticEncounter(staticType, staticIndex);
-    if (!tmpl) { *outCount = 0; return nullptr; }
-
-    GameCubeSearcher searcher(static_cast<Method>(method), unset, profile, filter);
-    std::array<u8, 6> min, max;
-    std::copy(ivMin, ivMin + 6, min.begin());
-    std::copy(ivMax, ivMax + 6, max.begin());
-    searcher.startSearch(min, max, tmpl);
-
-    auto results = searcher.getResults();
-    *outCount = static_cast<int>(results.size());
-    if (results.empty()) return nullptr;
-
-    auto *out = static_cast<PFSearcherState *>(malloc(sizeof(PFSearcherState) * results.size()));
-    for (size_t i = 0; i < results.size(); i++) {
-        out[i] = convertSearchState(results[i]);
-    }
-    return out;
+// Waits for the search's thread, so cancel first to stop early.
+extern "C" void pf_gamecubeSearch_free(PFGameCubeSearchHandle h)
+{
+    delete static_cast<PFGameCubeSearch *>(h);
 }
 
 // MARK: - PokeSpot Generator
