@@ -1,6 +1,6 @@
 # RNG tools fixes: plan
 
-Status: **PRs 1–4 merged** (2026-10-03/04); PR 5 built, PRs 6–12 planned
+Status: **PRs 1–5 merged** (2026-10-03/04); PR 6 built, PRs 7–12 planned
 (§7). From
 the RNG audit's 45 findings, and four found since (46–49). Findings 1–10
 are §2–§5, as four PRs; the rest are §7, as eight more. The owner took
@@ -280,6 +280,13 @@ settings and drifts. PRs 7–10 are correctness and data in the Finder and
 its tools. PRs 11 and 12 are the largest and need the owner's choices
 (§9).
 
+**Order changed (2026-10-04):** PR 11 goes next, after PR 6. A simulated
+run from search to calibration showed the gap: nothing in the app tells
+you which seed or delay you hit, so the Timer's Delay Hit and Frame Hit,
+and Variable Target's seed, have to come from somewhere else. The owner
+asked for a searcher for them, which is PR 11's "What You Hit" with a
+Gen 3 Trainer ID lookup (§7.7). PRs 7–10 and 12 follow.
+
 ### 7.1 PR 5: leads, methods and modes (11, 15, 16, 46)
 
 - **Sword/Shield (11):** PokéFinder's Gen 8 static, wild, egg and ID
@@ -332,35 +339,66 @@ its tools. PRs 11 and 12 are the largest and need the owner's choices
 
 ### 7.2 PR 6: the Timer (27–30, 32, 33)
 
-- **Settings are saved (27):** every generation's console, mode,
-  calibrations, targets, pre-timer and hits are stored (`@AppStorage`, or
-  one Codable value), so switching tools keeps them. A target handed off
-  from the Finder stays until another replaces it.
+- **Settings are saved (27):** the generation, console, framerate,
+  precision calibration, every generation's mode, targets, calibrations and
+  pre-timer, the Custom timer's phases, the beep settings and the last
+  Finder handoff's reminder are stored (`@AppStorage`), so switching tools
+  keeps them. The hit fields stay per visit.
 - **No drift (28):** each phase ends at the original start plus the phases
-  so far, on a monotonic clock (`ContinuousClock`), as EonTimer times them;
-  today each phase starts when a 16 ms tick notices the last one ended, so
-  the error adds up. The tick runs in the common run-loop mode, so it
-  doesn't stop while you scroll.
-- **Lead-in beeps (29):** a run of beeps that ends on each target, so you
-  press on the last one rather than reacting to a single beep (about
-  200 ms, 12 frames, late). A count and an interval, with EonTimer's
-  defaults (confirm from its source).
-- **A real sound (30):** a short tone (generated, so there's no asset to
-  license) through `AVAudioEngine` with a `.playback` audio session, so it
-  plays with the silent switch on and on the Mac. Preloaded, so the first
-  beep isn't late. Today it's iOS system sound 1057.
-- **Variable Target (32):** during the open phase, a Target Frame field;
-  entering it sets the rest of the phase from EonTimer's frame formula.
-  Today the phase never ends, so it's a stopwatch.
-- **The countdown stays in view (33):** while running, the countdown and
-  Stop are pinned above the settings (a safe-area inset), not at the top
-  of the scroll view.
-- **Tests:** the engine takes a clock, and with a fake one ten phases end
-  exactly at their sums; beeps are scheduled at the right offsets; settings
-  round-trip through storage; the variable phase matches EonTimer's
-  formula. On the simulator: a Gen 4 timer keeps running while scrolling,
-  and Finder → Timer keeps the settings. On the Mac, the player reports
-  playing (the owner listens).
+  before it, as EonTimer times them, on the host's monotonic clock (the one
+  audio is scheduled on). Before, each phase began when a 16 ms tick
+  noticed the last had ended, so the lateness added up. The display ticks
+  60 times a second in the common run-loop modes, so it keeps going while
+  you scroll, and the screen stays awake while it runs (as EonTimer's Keep
+  Awake).
+- **Lead-in beeps (29):** EonTimer's actions: 6 beeps 500 ms apart, the last
+  on each phase's end (`src/store/index.ts`'s defaults), adjustable in a
+  Beeps card with a Test Beep. Each phase's beeps are scheduled ahead when
+  it starts, not fired by the tick.
+- **A real sound (30):** a generated 60 ms, 1 kHz tone (no asset to
+  license) through `AVAudioEngine` (`RNGTimerSound.swift`), scheduled at
+  host times less the output's latency, with a `.playback` session on iOS,
+  so it plays with the silent switch on. The audio engine starts with the
+  timer, so the first beep isn't late, and reschedules if the output
+  changes. Before, it was iOS system sound 1057, fired late by the tick.
+- **Variable Target (32):** checked against a video of the process it's for
+  (JP Maddox, "FireRed/LeafGreen RNG Manipulation / Prediction") and a 2019
+  Smogon post (LeafGreen Mewtwo). It's for a seed you only learn in game:
+  you start the timer on the A press that sets the seed (pre-timer 0), or
+  let the pre-timer end on it; the timer counts from there while you find
+  your seed from your Trainer ID (or a Pokémon's IVs) and look up a target
+  frame; you enter the frame and press Set Target Frame (EonTimer's Update),
+  and it counts down to that frame, measured from the seed. While waiting it
+  shows the time since the seed (EonTimer shows the same). Each mode's use
+  is said under the Mode picker. Before, the open phase had no way to set
+  the frame, so it was a stopwatch, and a 0 pre-timer wouldn't start.
+- **The countdown stays in view (33):** while running, the countdown, Stop
+  and Variable Target's frame entry are pinned above the settings (a
+  safe-area inset), and the settings are locked, as in EonTimer.
+- **Found in the simulated runs:** the Timer stopped when you left it, as
+  RNG Tools rebuilds the selected tool, so Variable Target couldn't
+  survive the trip to the Finder to look up the frame. There's now one
+  timer for the app (`RNGTimerEngine.shared`), which only Stop ends, and a
+  bar above the other RNG tools shows it and goes back to it. A new target
+  from the Finder replaces a running timer. And Set Target Frame read the
+  old frame: a number field commits only when it loses focus, which
+  tapping a button doesn't do, so a frame typed and set straight away ran
+  as the old one (0 ms, so the timer just ended). The frame is now text,
+  read when you tap, and one that has already passed is refused with a
+  note, not run.
+- **Tests:** the engine takes a clock and a beeper, and with fakes ten
+  phases end at their sums despite late ticks; a tick inside a phase
+  doesn't report a phase change; the beeps land where
+  EonTimer's do; Variable Target resolves (with and without a pre-timer,
+  and when the frame has already passed); the Custom phases survive saving.
+  On the simulator, two recorded runs: Gen 4 Dialga from the Finder's
+  search through Seed to Time and the Timer to a simulated miss and its
+  calibration (Calibrated Delay 600 → 603 for a 750 hit on 746); and a
+  FireRed Squirtle by Variable Target, with the timer running through the
+  Finder's lookup of seed 2DA6 and then counting down to frame 9,591.
+  Also: settings survive Finder → Timer; the countdown keeps going during
+  a drag; a passed frame shows its note. The beep can't be heard from here
+  (simulator or the owner's Mac): the owner listens.
 
 ### 7.3 PR 7: Gen 3 targets (12, 13, 31, 39)
 
@@ -460,10 +498,18 @@ tables: generation, encounter type, location ID and settings.
 - **Verify Catch (14):** its "Delay Delta" compares the low bits of the
   wrong seeds (+29,179 for an exact hit). Reworked as "What You Hit" (§9):
   enter what you caught (stats, as Calibrate does), it finds that Pokémon's
-  frame and walks back to the initial seed. Gen 4: the delay and advance
-  hit, and a button that calibrates the Timer with them. Emerald (and a
-  dead-battery Ruby/Sapphire): the advance hit. Ruby/Sapphire clocks and
-  Gen 5 don't show it; FireRed/LeafGreen have Calibrate.
+  frame and walks back to the initial seed. Gen 4: the seed, delay and
+  advance hit (and the second), and a button that sets the Timer's Delay
+  Hit and calibrates it. Emerald (and a dead-battery Ruby/Sapphire): the
+  advance hit, for the Timer's Frame Hit. Ruby/Sapphire clocks and Gen 5
+  don't show it; FireRed/LeafGreen have Calibrate.
+- **Which seed you got (Gen 3 Variable Target):** the FireRed/LeafGreen
+  and Emerald new-game manips learn their seed from the Trainer ID (the
+  seed is the ID: 11686 is 2DA6), and others from a Pokémon's IVs
+  (IV→PID, then the 16-bit seed). The Generator gets a "Seed from Trainer
+  ID" entry and a "Seed from a Pokémon" lookup, so the seed comes from the
+  app, not a hex converter. Then a frame near the target that matches
+  what you caught gives the Frame Hit.
 - **IV→PID's nature (42):** a picker with names, not "Nature (0-24)".
 - **IV fields (43):** the Eggs parent IVs show blank capsules. They're
   `IVSliderRow8`, a stepped slider (20 uses); confirm on the simulator
@@ -471,7 +517,8 @@ tables: generation, encounter type, location ID and settings.
   field everywhere.
 - **Tests:** IVs from known stats in a Gen 3 and a Gen 6+ game differ where
   the base stats did; a generated Gen 4 target's catch reports its delay
-  and advance.
+  and advance; a Trainer ID gives its seed; a generated Gen 3 Pokémon's
+  IVs give back its seed and frame.
 
 ### 7.8 PR 12: Gen 5 profiles (17 Gen 5, 26, 34)
 

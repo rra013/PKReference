@@ -6,6 +6,7 @@
 //
 
 import Testing
+import Observation
 import Foundation
 @testable import PKReference
 
@@ -397,25 +398,144 @@ struct HiddenPowerEonTests {
 
 // MARK: - Timer Engine Tests
 
+@MainActor
 struct TimerEngineTests {
+    private final class Clock { var t = 100.0 }
+
+    private final class FakeBeeper: TimerBeeper {
+        var scheduled: [Double] = []
+        var cancelled = 0
+        func prepare() {}
+        func schedule(_ times: [Double]) { scheduled += times }
+        func cancelAll() { cancelled += 1 }
+    }
+
+    private func engine(_ clock: Clock, _ beeper: FakeBeeper? = nil) -> RNGTimerEngine {
+        RNGTimerEngine(now: { clock.t }, beeper: beeper ?? FakeBeeper())
+    }
+
     @Test func initialState() {
-        let engine = RNGTimerEngine()
+        let engine = engine(Clock())
         #expect(!engine.isRunning)
         #expect(engine.phases.isEmpty)
     }
 
     @Test func emptyPhases_doesNotStart() {
-        let engine = RNGTimerEngine()
+        let engine = engine(Clock())
         engine.start(phases: [])
         #expect(!engine.isRunning)
     }
 
     @Test func stop_resetsState() {
-        let engine = RNGTimerEngine()
+        let beeper = FakeBeeper()
+        let engine = engine(Clock(), beeper)
         engine.start(phases: [50000])
         engine.stop()
         #expect(!engine.isRunning)
         #expect(engine.remainingMs == 0)
+        #expect(beeper.cancelled > 0)
+    }
+
+    /// Each phase ends at the start plus the phases before it, whenever the
+    /// ticks come (they used to restart the clock each phase, so late ticks
+    /// added up).
+    @Test func phasesEndAtTheirSums() {
+        let clock = Clock()
+        let engine = engine(clock)
+        engine.start(phases: Array(repeating: 1000, count: 10))
+        for i in 0..<10 {
+            clock.t = 100 + Double(i) + 0.937   // a late tick in every phase
+            engine.tick()
+            #expect(engine.currentPhaseIndex == i)
+            #expect(engine.remainingMs == 63)
+        }
+        clock.t = 109.990
+        engine.tick()
+        #expect(engine.remainingMs == 10)
+        clock.t = 110.0
+        engine.tick()
+        #expect(!engine.isRunning)
+    }
+
+    /// EonTimer's actions: six beeps 500 ms apart, the last on each phase's
+    /// end, those after the phase's start.
+    @Test func beepsLeadUpToEachTarget() {
+        let clock = Clock()
+        let beeper = FakeBeeper()
+        engine(clock, beeper).start(phases: [1000, 2000])
+        #expect(beeper.scheduled == [100.5, 101, 101.5, 102, 102.5, 103])
+    }
+
+    /// Variable Target counts up until the frame is set, then ends that many
+    /// milliseconds after its phase began.
+    @Test func variableTarget() {
+        let clock = Clock()
+        let beeper = FakeBeeper()
+        let engine = engine(clock, beeper)
+        engine.start(phases: [5000, Int.max])
+        #expect(beeper.scheduled == [102.5, 103, 103.5, 104, 104.5, 105])
+        clock.t = 107
+        engine.tick()
+        #expect(engine.isWaitingForTarget)
+        #expect(engine.remainingMs == 2000)
+        engine.resolveOpenPhase(3000)
+        #expect(!engine.isWaitingForTarget)
+        #expect(beeper.scheduled.suffix(2) == [107.5, 108])
+        #expect(engine.remainingMs == 1000)
+        clock.t = 108
+        engine.tick()
+        #expect(!engine.isRunning)
+    }
+
+    /// With no pre-timer (started on the A press that sets the seed, as in
+    /// the FireRed/LeafGreen new-game manip), it counts from the start.
+    @Test func variableTargetWithNoPreTimer() {
+        let clock = Clock()
+        let engine = engine(clock)
+        engine.start(phases: [0, Int.max])
+        #expect(engine.isRunning)
+        #expect(engine.isWaitingForTarget)
+        clock.t = 112
+        engine.tick()
+        #expect(engine.remainingMs == 12_000)
+        engine.resolveOpenPhase(20_000)
+        #expect(engine.remainingMs == 8_000)
+    }
+
+    /// A tick inside a phase doesn't report a phase change, so only the
+    /// readout redraws each tick.
+    @Test func ticksReportOnlyPhaseChanges() {
+        final class Flag: @unchecked Sendable { var set = false }
+        let clock = Clock()
+        let engine = engine(clock)
+        engine.start(phases: [1000, 1000])
+        let changed = Flag()
+        withObservationTracking { _ = engine.currentPhaseIndex } onChange: { changed.set = true }
+        clock.t = 100.5
+        engine.tick()
+        #expect(!changed.set)
+        clock.t = 101.5
+        engine.tick()
+        #expect(changed.set)
+    }
+
+    /// A target already passed ends the timer.
+    @Test func variableTargetAlreadyPassed() {
+        let clock = Clock()
+        let engine = engine(clock)
+        engine.start(phases: [1000, Int.max])
+        clock.t = 103
+        engine.tick()
+        engine.resolveOpenPhase(1000)
+        #expect(!engine.isRunning)
+    }
+
+    /// The Custom timer's phases survive saving.
+    @Test func customPhasesRoundTrip() {
+        let phases = [CustomPhase(unit: .advances, target: 1234, calibration: -5),
+                      CustomPhase(unit: .milliseconds, target: 5000, calibration: 0)]
+        #expect(CustomPhase.decoded(CustomPhase.encoded(phases)) == phases)
+        #expect(CustomPhase.decoded(Data()) == CustomPhase.defaults)
     }
 }
 
