@@ -348,17 +348,31 @@ func calibrateGen5(_ settings: CalibratorSettings, mode: Gen5TimerMode,
 // MARK: - EonTimer Port: Custom Timer (from timers/customTimer.ts)
 // ============================================================================
 
-enum CustomTimerUnit: String, CaseIterable, Identifiable {
+enum CustomTimerUnit: String, CaseIterable, Identifiable, Codable {
     case milliseconds = "ms"
     case advances = "Advances"
     case hex = "Seed (Hex)"
     var id: String { rawValue }
 }
 
-struct CustomPhase {
+struct CustomPhase: Codable, Equatable {
     var unit: CustomTimerUnit
     var target: Int
     var calibration: Int
+
+    static let defaults = [CustomPhase(unit: .milliseconds, target: 5000, calibration: 0)]
+
+    /// The Custom timer's phases as saved; the default for none.
+    static func decoded(_ data: Data) -> [CustomPhase] {
+        guard let phases = try? JSONDecoder().decode([CustomPhase].self, from: data), !phases.isEmpty else {
+            return defaults
+        }
+        return phases
+    }
+
+    static func encoded(_ phases: [CustomPhase]) -> Data {
+        (try? JSONEncoder().encode(phases)) ?? Data()
+    }
 }
 
 func createCustomPhases(_ settings: CalibratorSettings, phases: [CustomPhase]) -> [Int] {
@@ -2572,77 +2586,148 @@ func calculateHiddenPowerBasePower(ivHP: Int, ivAtk: Int, ivDef: Int,
 // MARK: - Timer Engine
 // ============================================================================
 
+/// Runs the timer's phases as EonTimer does: from one start on a monotonic
+/// clock, each phase ending at the start plus the phases before it, so a
+/// late tick (or none, while scrolling) can't add up. Each phase ends with
+/// a run of beeps, scheduled ahead on the audio engine.
 @Observable
 final class RNGTimerEngine {
-    var phases: [Int] = []
-    var currentPhaseIndex: Int = 0
-    var remainingMs: Int = 0
-    var isRunning: Bool = false
+    /// The app's timer. It outlives the Timer screen (RNG Tools rebuilds the
+    /// selected tool), so it keeps running while you use the Finder, as
+    /// Variable Target needs; Stop is the only way to end it.
+    static let shared = RNGTimerEngine()
 
-    private var timer: Timer?
-    private var phaseStartDate: Date?
-    private var phaseTargetMs: Int = 0
+    private(set) var phases: [Int] = []
+    private(set) var currentPhaseIndex: Int = 0
+    /// What's left of the phase (ms); for an open phase (Variable Target),
+    /// how long it has run.
+    private(set) var remainingMs: Int = 0
+    private(set) var isRunning: Bool = false
+
+    /// EonTimer's actions: this many beeps, this far apart (ms), the last
+    /// on each phase's end.
+    var beepCount = 6
+    var beepInterval = 500
+
+    @ObservationIgnored private let now: () -> Double
+    @ObservationIgnored private let beeper: TimerBeeper?
+    @ObservationIgnored private var startTime = 0.0
+    @ObservationIgnored private var ticker: Timer?
+    @ObservationIgnored private var activity: NSObjectProtocol?
+
+    /// `now` is in seconds; tests pass a fake clock and beeper.
+    init(now: @escaping () -> Double = RNGTimerClock.now, beeper: TimerBeeper? = RNGTimerSound.shared) {
+        self.now = now
+        self.beeper = beeper
+    }
+
+    /// Variable Target's open phase, waiting for its frame.
+    var isWaitingForTarget: Bool {
+        isRunning && phases.indices.contains(currentPhaseIndex) && phases[currentPhaseIndex] == Int.max
+    }
 
     func start(phases: [Int]) {
-        let finite = phases.filter { $0 != Int.max && $0 > 0 }
-        guard !finite.isEmpty else { return }
+        // Variable Target with no pre-timer ([0, open]) starts on the A
+        // press that sets the seed, so an open phase is enough.
+        guard phases.contains(where: { $0 == Int.max || $0 > 0 }) else { return }
+        stop()
         self.phases = phases
-        currentPhaseIndex = 0
+        startTime = now()
         isRunning = true
-        beginPhase(index: 0)
+        beeper?.prepare()
+        scheduleBeeps(from: 0)
+        keepAwake(true)
+        let ticker = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tick() }
+        }
+        // The common modes keep it firing while a scroll view tracks.
+        RunLoop.main.add(ticker, forMode: .common)
+        self.ticker = ticker
+        tick()
     }
 
     func stop() {
-        timer?.invalidate()
-        timer = nil
-        isRunning = false
-        currentPhaseIndex = 0
-        remainingMs = 0
+        beeper?.cancelAll()
+        finish()
     }
 
-    private func beginPhase(index: Int) {
-        guard index < phases.count else {
-            playBeep(count: 3)
-            stop()
-            return
-        }
-        if phases[index] == Int.max {
-            // Variable target: just stay on this phase, user stops manually
-            currentPhaseIndex = index
-            remainingMs = 0
-            return
-        }
-        currentPhaseIndex = index
-        phaseTargetMs = phases[index]
-        remainingMs = phaseTargetMs
-        phaseStartDate = Date()
-
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { [weak self] _ in
-            self?.tick()
-        }
+    /// Variable Target's Set Target Frame: the open phase ends `ms` after it
+    /// began.
+    func resolveOpenPhase(_ ms: Int) {
+        guard isWaitingForTarget else { return }
+        phases[currentPhaseIndex] = ms
+        scheduleBeeps(from: currentPhaseIndex)
+        tick()
     }
 
-    private func tick() {
-        guard let start = phaseStartDate else { return }
-        let elapsed = Int(Date().timeIntervalSince(start) * 1000)
-        remainingMs = max(0, phaseTargetMs - elapsed)
-
-        if remainingMs <= 0 {
-            timer?.invalidate()
-            playBeep(count: 1)
-            beginPhase(index: currentPhaseIndex + 1)
+    /// Works out the phase and what's left of it from the clock alone.
+    func tick() {
+        guard isRunning else { return }
+        let t = now()
+        var phaseStart = startTime
+        for (i, phase) in phases.enumerated() {
+            // Only a new phase is reported, so views reading the phase (not
+            // the time) don't redraw on every tick.
+            if phase == Int.max {
+                if currentPhaseIndex != i { currentPhaseIndex = i }
+                remainingMs = Int(((t - phaseStart) * 1000).rounded())
+                return
+            }
+            let end = phaseStart + Double(max(0, phase)) / 1000
+            if t < end {
+                if currentPhaseIndex != i { currentPhaseIndex = i }
+                remainingMs = Int(((end - t) * 1000).rounded())
+                return
+            }
+            phaseStart = end
         }
+        // Done; the last beep is already on its way.
+        finish()
     }
 
     var totalPhases: Int { phases.count }
     var displaySeconds: Double { Double(remainingMs) / 1000.0 }
-}
 
-private func playBeep(count: Int) {
-    for i in 0..<count {
-        DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.15) {
-            AudioServicesPlaySystemSound(1057)
+    /// Each phase's beeps, from `index` up to an open phase: `beepCount` of
+    /// them ending on its end, those after its start (as EonTimer's).
+    private func scheduleBeeps(from index: Int) {
+        var phaseStart = startTime
+        for phase in phases[..<index] { phaseStart += Double(max(0, phase)) / 1000 }
+        var times: [Double] = []
+        for phase in phases[index...] {
+            if phase == Int.max { break }
+            let end = phaseStart + Double(max(0, phase)) / 1000
+            let earliest = max(phaseStart, now())
+            for j in (0..<max(0, beepCount)).reversed() {
+                let time = end - Double(j * beepInterval) / 1000
+                if time > earliest { times.append(time) }
+            }
+            phaseStart = end
+        }
+        if !times.isEmpty { beeper?.schedule(times) }
+    }
+
+    private func finish() {
+        ticker?.invalidate()
+        ticker = nil
+        isRunning = false
+        currentPhaseIndex = 0
+        remainingMs = 0
+        keepAwake(false)
+    }
+
+    /// A locked iPhone suspends the app, and App Nap slows a hidden Mac
+    /// window's timers.
+    private func keepAwake(_ on: Bool) {
+        #if os(iOS)
+        UIApplication.shared.isIdleTimerDisabled = on
+        #endif
+        if on, activity == nil {
+            activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical],
+                                                             reason: "The RNG Timer is running")
+        } else if !on, let activity {
+            ProcessInfo.processInfo.endActivity(activity)
+            self.activity = nil
         }
     }
 }
@@ -2725,6 +2810,10 @@ struct RNGToolsView: View {
                     }
                 }
 
+                if selectedTool != RNGToolTab.timer.rawValue {
+                    RunningTimerBar(engine: .shared) { selectedTool = RNGToolTab.timer.rawValue }
+                }
+
                 switch selectedTool {
                 case 0: RNGTimerView()
                 case 1: IVCalculatorView()
@@ -2758,50 +2847,126 @@ struct RNGToolsView: View {
     }
 }
 
+/// The running timer's time and phase. Its own view, so ticking redraws
+/// only this.
+struct RNGTimerReadout: View {
+    let engine: RNGTimerEngine
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Text(String(format: "%.3f", engine.displaySeconds))
+                .scaledFont(size: 64, weight: .bold, design: .monospaced, relativeTo: .largeTitle)
+                .lineLimit(1)
+                .minimumScaleFactor(0.4)
+                .foregroundStyle(engine.isRunning ? .primary : .secondary)
+                .contentTransition(.numericText())
+
+            if engine.isWaitingForTarget {
+                Text("Time since the seed was set. Once you know which seed you hit, enter its target frame and set it.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            } else if engine.isRunning && engine.totalPhases > 1 {
+                Text("Phase \(engine.currentPhaseIndex + 1) of \(engine.totalPhases)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// Shown above the other RNG tools while the timer runs: its time, and a way
+/// back to it (Variable Target is set in the Timer once the Finder has found
+/// the frame).
+struct RunningTimerBar: View {
+    let engine: RNGTimerEngine
+    let open: () -> Void
+
+    var body: some View {
+        if engine.isRunning {
+            Button(action: open) {
+                HStack(spacing: 8) {
+                    Image(systemName: "timer")
+                    Text(String(format: "%.3f", engine.displaySeconds))
+                        .font(.system(.body, design: .monospaced).bold())
+                    Text(engine.isWaitingForTarget ? "since the seed" :
+                            "phase \(engine.currentPhaseIndex + 1) of \(engine.totalPhases)")
+                        .font(.caption)
+                    Spacer()
+                    Text("Timer").font(.caption.bold())
+                    Image(systemName: "chevron.right").font(.caption)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .foregroundStyle(.white)
+                .background(Color.accentColor, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal)
+            .padding(.top, 6)
+        }
+    }
+}
+
 // ============================================================================
 // MARK: - RNG Timer View
 // ============================================================================
 
 struct RNGTimerView: View {
-    @State private var engine = RNGTimerEngine()
-    @State private var generation: TimerGeneration = .gen5
-    @State private var consoleType: RNGConsole = .ndsSlot1
-    @State private var customFramerate: Double = 60.0
-    @State private var precisionCalibration = false
+    private let engine = RNGTimerEngine.shared
+    // Saved, as EonTimer saves them: RNG Tools rebuilds the selected tool,
+    // so going to the Finder and back reset everything.
+    @AppStorage("timer_generation") private var generation: TimerGeneration = .gen5
+    @AppStorage("timer_console") private var consoleType: RNGConsole = .ndsSlot1
+    @AppStorage("timer_customFramerate") private var customFramerate: Double = 60.0
+    @AppStorage("timer_precisionCalibration") private var precisionCalibration = false
+    /// EonTimer's action count and interval (ms).
+    @AppStorage("timer_beepCount") private var beepCount = 6
+    @AppStorage("timer_beepInterval") private var beepInterval = 500
 
     // Gen 3
-    @State private var gen3Mode: Gen3TimerMode = .standard
-    @State private var gen3PreTimer = 5000
-    @State private var gen3TargetFrame = 1000
-    @State private var gen3Calibration = 0
+    @AppStorage("timer_gen3Mode") private var gen3Mode: Gen3TimerMode = .standard
+    @AppStorage("timer_gen3PreTimer") private var gen3PreTimer = 5000
+    @AppStorage("timer_gen3TargetFrame") private var gen3TargetFrame = 1000
+    @AppStorage("timer_gen3Calibration") private var gen3Calibration = 0
     @State private var gen3FrameHit = 0
 
     // Gen 4 (defaults from EonTimer store)
-    @State private var gen4TargetDelay = 600
-    @State private var gen4TargetSecond = 50
-    @State private var gen4CalibratedDelay = 500
-    @State private var gen4CalibratedSecond = 14
+    @AppStorage("timer_gen4TargetDelay") private var gen4TargetDelay = 600
+    @AppStorage("timer_gen4TargetSecond") private var gen4TargetSecond = 50
+    @AppStorage("timer_gen4CalibratedDelay") private var gen4CalibratedDelay = 500
+    @AppStorage("timer_gen4CalibratedSecond") private var gen4CalibratedSecond = 14
     @State private var gen4DelayHit = 0
 
     // Gen 5 (defaults from EonTimer store)
-    @State private var gen5Mode: Gen5TimerMode = .standard
-    @State private var gen5TargetDelay = 1200
-    @State private var gen5TargetSecond = 50
-    @State private var gen5TargetAdvances = 100
-    @State private var gen5Calibration = -95
-    @State private var gen5EntralinkCalibration = 256
-    @State private var gen5FrameCalibration = 0
+    @AppStorage("timer_gen5Mode") private var gen5Mode: Gen5TimerMode = .standard
+    @AppStorage("timer_gen5TargetDelay") private var gen5TargetDelay = 1200
+    @AppStorage("timer_gen5TargetSecond") private var gen5TargetSecond = 50
+    @AppStorage("timer_gen5TargetAdvances") private var gen5TargetAdvances = 100
+    @AppStorage("timer_gen5Calibration") private var gen5Calibration = -95
+    @AppStorage("timer_gen5EntralinkCalibration") private var gen5EntralinkCalibration = 256
+    @AppStorage("timer_gen5FrameCalibration") private var gen5FrameCalibration = 0
     @State private var gen5DelayHit: Int?
     @State private var gen5SecondHit: Int?
     @State private var gen5AdvancesHit: Int?
 
-    // Finder reminder
-    @State private var reminderText: String?
+    /// The target last handed off from the Finder; empty for none.
+    @AppStorage("timer_reminder") private var reminderText = ""
+
+    /// Variable Target's frame, as typed. Text, so Set Target Frame reads
+    /// what's in the field: a number field commits only when it loses focus,
+    /// which tapping a button doesn't do, so it used the old frame.
+    @State private var variableTargetText = ""
+    @State private var variableTargetNote: String?
+    @FocusState private var variableTargetFocused: Bool
 
     // Custom
-    @State private var customPhases: [CustomPhase] = [
-        CustomPhase(unit: .milliseconds, target: 5000, calibration: 0)
-    ]
+    @AppStorage("timer_customPhases") private var customPhasesData = Data()
+    private var customPhases: [CustomPhase] {
+        get { CustomPhase.decoded(customPhasesData) }
+        nonmutating set { customPhasesData = CustomPhase.encoded(newValue) }
+    }
 
     private var settings: CalibratorSettings {
         CalibratorSettings(console: consoleType, customFramerate: customFramerate,
@@ -2811,9 +2976,12 @@ struct RNGTimerView: View {
     var body: some View {
         ScrollView {
             CardStack {
-                timerDisplay
+                // While running, it's pinned above (`runningPanel`).
+                if !engine.isRunning {
+                    timerDisplay
+                }
 
-                if let reminderText {
+                if !reminderText.isEmpty {
                     HStack {
                         Image(systemName: "info.circle.fill")
                             .foregroundStyle(.blue)
@@ -2821,7 +2989,7 @@ struct RNGTimerView: View {
                             .font(.callout)
                         Spacer()
                         Button {
-                            self.reminderText = nil
+                            reminderText = ""
                         } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundStyle(.secondary)
@@ -2833,54 +3001,56 @@ struct RNGTimerView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
 
-                Picker("Generation", selection: $generation) {
-                    ForEach(TimerGeneration.allCases) { gen in
-                        Text(gen.rawValue).tag(gen)
+                // As EonTimer, the settings hold still while it runs; the
+                // running timer has its phases already.
+                Group {
+                    Picker("Generation", selection: $generation) {
+                        ForEach(TimerGeneration.allCases) { gen in
+                            Text(gen.rawValue).tag(gen)
+                        }
                     }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+
+                    // Console picker
+                    SectionCard(title: "Console", icon: "gamecontroller") {
+                        Picker("Console", selection: $consoleType) {
+                            ForEach(RNGConsole.allCases) { c in Text(c.rawValue).tag(c) }
+                        }
+                        if consoleType == .custom {
+                            RNGDoubleField(label: "Framerate", value: $customFramerate)
+                        }
+                        Toggle("Precision Calibration", isOn: $precisionCalibration)
+                    }
+
+                    SectionCard(title: "Settings", icon: "gearshape") {
+                        switch generation {
+                        case .gen3: gen3Settings
+                        case .gen4: gen4Settings
+                        case .gen5: gen5Settings
+                        case .custom: customSettings
+                        }
+                    }
+
+                    if generation != .custom {
+                        SectionCard(title: "Calibration", icon: "tuningfork") {
+                            calibrationSection
+                        }
+                    }
+
+                    beepSettings
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
                 .disabled(engine.isRunning)
 
-                // Console picker
-                SectionCard(title: "Console", icon: "gamecontroller") {
-                    Picker("Console", selection: $consoleType) {
-                        ForEach(RNGConsole.allCases) { c in Text(c.rawValue).tag(c) }
+                if !engine.isRunning {
+                    Button {
+                        startTimer()
+                    } label: {
+                        Label("Start Timer", systemImage: "play.fill")
                     }
-                    if consoleType == .custom {
-                        RNGDoubleField(label: "Framerate", value: $customFramerate)
-                    }
-                    Toggle("Precision Calibration", isOn: $precisionCalibration)
+                    .buttonStyle(.primaryAction)
+                    .disabled(computePhases().isEmpty)
                 }
-
-                SectionCard(title: "Settings", icon: "gearshape") {
-                    switch generation {
-                    case .gen3: gen3Settings
-                    case .gen4: gen4Settings
-                    case .gen5: gen5Settings
-                    case .custom: customSettings
-                    }
-                }
-
-                if generation != .custom {
-                    SectionCard(title: "Calibration", icon: "tuningfork") {
-                        calibrationSection
-                    }
-                }
-
-                Button {
-                    if engine.isRunning {
-                        engine.stop()
-                    } else {
-                        engine.start(phases: computePhases())
-                    }
-                } label: {
-                    Label(engine.isRunning ? "Stop" : "Start Timer",
-                          systemImage: engine.isRunning ? "stop.fill" : "play.fill")
-                }
-                .buttonStyle(.primaryAction)
-                .tint(engine.isRunning ? .red : nil)
-                .disabled(!engine.isRunning && computePhases().isEmpty)
 
                 // Phase preview
                 let phases = computePhases()
@@ -2891,7 +3061,7 @@ struct RNGTimerView: View {
                                 Text("Phase \(i + 1)")
                                 Spacer()
                                 if ms == Int.max {
-                                    Text("Variable (manual stop)")
+                                    Text("From the seed until you set the frame")
                                         .foregroundStyle(.secondary)
                                 } else {
                                     Text(String(format: "%.3fs", Double(ms) / 1000.0))
@@ -2904,9 +3074,22 @@ struct RNGTimerView: View {
             }
             .padding()
         }
+        // The countdown and Stop stay in view while it runs; Start is at the
+        // bottom, below the settings.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if engine.isRunning { runningPanel }
+        }
+        #if DEBUG && os(macOS)
+        // `-debugOpenSheet timerRunning` starts it, for a snapshot of the
+        // running panel (pass `-timer_beepCount 0` to keep it quiet).
+        .task { await DebugSnapshot.openSheet("timerRunning") { startTimer() } }
+        #endif
         .onAppear {
             let bridge = FinderTimerBridge.shared
             if let gen = bridge.pendingGen {
+                // A new target replaces the running timer, whose phases are
+                // the old target's.
+                engine.stop()
                 generation = gen
                 if gen == .gen3, let frame = bridge.pendingTargetFrame {
                     gen3TargetFrame = frame
@@ -2932,31 +3115,102 @@ struct RNGTimerView: View {
                 if let time = bridge.selectedTime {
                     let seed = bridge.selectedSeed ?? "?"
                     reminderText = "Seed \(seed) — \(time)"
+                } else {
+                    reminderText = ""
                 }
                 bridge.clear()
             }
         }
-        .leaveWarning(engine.isRunning ? "The running timer will stop." : nil)
+    }
+
+    private func startTimer() {
+        engine.beepCount = beepCount
+        engine.beepInterval = beepInterval
+        variableTargetText = ""
+        variableTargetNote = nil
+        engine.start(phases: computePhases())
+    }
+
+    /// Ends the open phase on the typed frame, measured from the seed. A
+    /// frame already passed is refused, not run (the timer would just end).
+    private func setVariableTarget() {
+        guard let frame = Int(variableTargetText.filter(\.isNumber)) else { return }
+        let ms = createFramePhase(settings, targetFrame: frame, calibration: gen3Calibration)
+        guard ms > engine.remainingMs else {
+            variableTargetNote = "Frame \(frame.formatted()) is \(String(format: "%.3f", Double(ms) / 1000)) s from the seed, which has passed."
+            return
+        }
+        variableTargetFocused = false
+        variableTargetNote = nil
+        gen3TargetFrame = frame
+        engine.resolveOpenPhase(ms)
+    }
+
+    /// Pinned above the settings while running.
+    private var runningPanel: some View {
+        VStack(spacing: 10) {
+            timerReadout
+            // EonTimer's Variable Target: the open phase runs until you've
+            // seen the frame and set it.
+            if engine.isWaitingForTarget && generation == .gen3 {
+                HStack {
+                    Text("Target Frame")
+                    Spacer()
+                    TextField("Frame", text: $variableTargetText)
+                        .textFieldStyle(.roundedBorder).scaledWidth(120)
+                        .multilineTextAlignment(.trailing)
+                        #if os(iOS)
+                        .keyboardType(.numberPad)
+                        #endif
+                        .focused($variableTargetFocused)
+                        .onSubmit(setVariableTarget)
+                }
+                Button("Set Target Frame", action: setVariableTarget)
+                    .buttonStyle(.bordered)
+                    .disabled(Int(variableTargetText.filter(\.isNumber)) == nil)
+                if let variableTargetNote {
+                    Text(variableTargetNote)
+                        .font(.caption).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Button {
+                engine.stop()
+            } label: {
+                Label("Stop", systemImage: "stop.fill")
+            }
+            .buttonStyle(.primaryAction)
+            .tint(.red)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .background(.bar)
+    }
+
+    private var beepSettings: some View {
+        SectionCard(title: "Beeps", icon: "speaker.wave.2") {
+            Text("A run of beeps ends on each target: press on the last one.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            RNGIntField(label: "Beeps", value: $beepCount, range: 0...20)
+            RNGIntField(label: "Interval (ms)", value: $beepInterval, range: 100...2000)
+            Button {
+                RNGTimerSound.shared.beepNow()
+            } label: {
+                Label("Test Beep", systemImage: "speaker.wave.2")
+            }
+        }
     }
 
     private var timerDisplay: some View {
-        VStack(spacing: 8) {
-            Text(String(format: "%.3f", engine.displaySeconds))
-                .scaledFont(size: 64, weight: .bold, design: .monospaced, relativeTo: .largeTitle)
-                .lineLimit(1)
-                .minimumScaleFactor(0.4)
-                .foregroundStyle(engine.isRunning ? .primary : .secondary)
-                .contentTransition(.numericText())
+        timerReadout
+            .padding(.vertical, 8)
+            .card()
+    }
 
-            if engine.isRunning && engine.totalPhases > 1 {
-                Text("Phase \(engine.currentPhaseIndex + 1) of \(engine.totalPhases)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .card()
+    private var timerReadout: some View {
+        RNGTimerReadout(engine: engine)
     }
 
     // MARK: Gen Settings
@@ -2966,6 +3220,11 @@ struct RNGTimerView: View {
             Picker("Mode", selection: $gen3Mode) {
                 ForEach(Gen3TimerMode.allCases) { m in Text(m.rawValue).tag(m) }
             }
+            Text(gen3Mode == .standard
+                 ? "For a seed you know in advance: the pre-timer, then the target frame."
+                 : "For a seed you only learn in game, from your Trainer ID or a Pokémon's IVs. The pre-timer ends on the A press that sets the seed (0 if you start the timer on that press); the timer then counts from it until you set the target frame.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             RNGIntField(label: "Pre-Timer (ms)", value: $gen3PreTimer)
             RNGIntField(label: "Target Frame", value: $gen3TargetFrame)
             RNGIntField(label: "Calibration (ms)", value: $gen3Calibration)

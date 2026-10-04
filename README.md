@@ -226,7 +226,7 @@ Objective-C++ bridge (`PFBridge.mm`).
 
 | Sub-tab | What it does |
 |---|---|
-| **Timer** | Precise multi-phase timers for Gen 3/4/5 and custom setups, with calibration and console-specific frame rates, ported from EonTimer. |
+| **Timer** | Precise multi-phase timers for Gen 3/4/5 and custom setups, with calibration, console-specific frame rates, Gen 3's Variable Target, and a run of lead-in beeps on each target that plays with the silent switch on. Settings are saved. Ported from EonTimer. |
 | **Finder** | Seed searching and generators, including Method 1 / 1R / 2 / 4, XD/Colo, Channel and Cute Charm. Also has Gen 4 Elm/Irwin calls, Chatot pitches and Pokétch coin flips, and Gen 5 keypresses and SHA-1 seeds. For FireRed and LeafGreen (GBA, mGBA and Switch), it narrows a search to targets reachable from a seed you can hit, by your sound, button mode and held buttons and the advances you can wait, with each seed's time, Teachy TV, and Send to Timer. After an attempt, Calibrate works out the IVs from the caught Pokémon's stats and nature, finds which seed and frame you hit, and corrects the timer. Ported from Ten Lines, with the community's farmed seed lists bundled and updatable. |
 | **Routes** | Wild encounter tables by game and location, with slot rates and levels. |
 | **Statics** | Static and gift encounters. |
@@ -474,7 +474,7 @@ project has no Swift package dependencies.
    later launches work offline, except for Tournaments. The Mac app is
    sandboxed, with outgoing network access.
 
-**Tests:** 1,212 tests written with Swift Testing. They cover the damage engines
+**Tests:** 1,219 tests written with Swift Testing. They cover the damage engines
 and the port, the battle engine by mechanic tier, the EV and two-hit solvers,
 speed tiers, paste parsing and import, Champions filters and legality, RNG
 tools, ML parity, the tournament import and data store, Team Search's parser,
