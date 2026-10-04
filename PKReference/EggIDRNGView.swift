@@ -385,7 +385,7 @@ struct EggRNGView: View {
         let shiny = shinyOnly
         var natArr = [Bool](repeating: selectedNatures.isEmpty, count: 25)
         for n in selectedNatures { natArr[Int(n)] = true }
-        let shinyFilter: UInt8 = shiny ? 1 : 255
+        let shinyFilter: UInt8 = pfShinyFilter(shiny)
 
         let eggMethod: PFMethod = (selectedGame == .emerald) ? .eBred : .rsFRLGBred
 

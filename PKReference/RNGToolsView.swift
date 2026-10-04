@@ -655,6 +655,13 @@ enum FinderLead: String, CaseIterable, Identifiable, Sendable {
     case arenaTrap = "Arena Trap"
     var id: String { rawValue }
 
+    /// The lead as PokéFinder's generators take it: Synchronize with
+    /// `syncNature`. (Searchers take `pfLead`, where it means any nature.)
+    nonisolated func pfGeneratorLead(syncNature: UInt8) -> PFLead {
+        self == .synchronize ? .synchronize(nature: syncNature) : pfLead
+    }
+
+    /// The lead as PokéFinder's searchers take it.
     nonisolated var pfLead: PFLead {
         switch self {
         case .none: return .none
@@ -687,6 +694,10 @@ enum FinderLead: String, CaseIterable, Identifiable, Sendable {
         }
     }
 }
+
+/// PokéFinder's shiny filter for a Shiny Only switch: star or square (1 | 2).
+/// The games show both the same way.
+nonisolated func pfShinyFilter(_ shinyOnly: Bool) -> UInt8 { shinyOnly ? 3 : 255 }
 
 nonisolated func finderMethodToPF(_ method: FinderMethod) -> PFMethod {
     switch method {
@@ -1015,7 +1026,7 @@ nonisolated func staticGenerateGen3Streaming(
     let pfMethod = finderMethodToPF(method)
     var natArr = [Bool](repeating: natures.isEmpty, count: 25)
     for n in natures { natArr[Int(n)] = true }
-    let shinyFilter: UInt8 = shinyOnly ? 1 : 255
+    let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
     // The encounter's template gives its gender; without one, every result
     // is genderless.
@@ -1093,7 +1104,7 @@ nonisolated func staticSearchGen3Streaming(
     let pfMethod = finderMethodToPF(method)
     var natArr = [Bool](repeating: natures.isEmpty, count: 25)
     for n in natures { natArr[Int(n)] = true }
-    let shinyFilter: UInt8 = shinyOnly ? 1 : 255
+    let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
     let ivMin = [minIVs.0, minIVs.1, minIVs.2, minIVs.3, minIVs.4, minIVs.5]
     let ivMax = [maxIVs.0, maxIVs.1, maxIVs.2, maxIVs.3, maxIVs.4, maxIVs.5]
 
@@ -1209,10 +1220,10 @@ nonisolated func staticGenerateGen4Streaming(
     onResult: (StaticSearchResult) -> Void
 ) {
     let pfMethod = finderMethodToPF(method)
-    let pfLead = lead.pfLead
+    let pfLead = lead.pfGeneratorLead(syncNature: syncNature)
     var natArr = [Bool](repeating: natures.isEmpty, count: 25)
     for n in natures { natArr[Int(n)] = true }
-    let shinyFilter: UInt8 = shinyOnly ? 1 : 255
+    let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
     let results = PFBridge.staticGenerate4(
         seed: seed, initialAdvances: initialAdvance, maxAdvances: maxAdvance,
@@ -1281,7 +1292,7 @@ nonisolated func staticSearchGen4Streaming(
     let pfMethod = finderMethodToPF(method)
     var natArr = [Bool](repeating: natures.isEmpty, count: 25)
     for n in natures { natArr[Int(n)] = true }
-    let shinyFilter: UInt8 = shinyOnly ? 1 : 255
+    let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
     let ivMin = [minIVs.0, minIVs.1, minIVs.2, minIVs.3, minIVs.4, minIVs.5]
     let ivMax = [maxIVs.0, maxIVs.1, maxIVs.2, maxIVs.3, maxIVs.4, maxIVs.5]
 
@@ -1321,6 +1332,7 @@ nonisolated func staticGenerateGen5Streaming(
     shinyOnly: Bool,
     method: FinderMethod,
     lead: FinderLead,
+    syncNature: UInt8 = 0,
     game: PFGame,
     mac: UInt64, keypresses: [Bool],
     vcount: UInt8, gxstat: UInt8, vframe: UInt8,
@@ -1333,10 +1345,10 @@ nonisolated func staticGenerateGen5Streaming(
     onResult: (StaticSearchResult) -> Void
 ) {
     let pfMethod = finderMethodToPF(method)
-    let pfLead = lead.pfLead
+    let pfLead = lead.pfGeneratorLead(syncNature: syncNature)
     var natArr = [Bool](repeating: natures.isEmpty, count: 25)
     for n in natures { natArr[Int(n)] = true }
-    let shinyFilter: UInt8 = shinyOnly ? 1 : 255
+    let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
     let results = PFBridge.staticGenerate5(
         seed: seed, initialAdvances: initialAdvance, maxAdvances: maxAdvance,
@@ -1374,6 +1386,7 @@ nonisolated func wildGenerateGen5Streaming(
     shinyOnly: Bool,
     method: FinderMethod,
     lead: FinderLead,
+    syncNature: UInt8 = 0,
     game: PFGame,
     encounter: PFEncounter, location: UInt8, season: UInt8,
     mac: UInt64, keypresses: [Bool],
@@ -1388,10 +1401,10 @@ nonisolated func wildGenerateGen5Streaming(
     onResult: (StaticSearchResult) -> Void
 ) {
     let pfMethod = finderMethodToPF(method)
-    let pfLead = lead.pfLead
+    let pfLead = lead.pfGeneratorLead(syncNature: syncNature)
     var natArr = [Bool](repeating: natures.isEmpty, count: 25)
     for n in natures { natArr[Int(n)] = true }
-    let shinyFilter: UInt8 = shinyOnly ? 1 : 255
+    let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
     let results = PFBridge.wildGenerate5(
         seed: seed, initialAdvances: initialAdvance, maxAdvances: maxAdvance,
@@ -1436,6 +1449,7 @@ nonisolated func staticGenerateGen8Streaming(
     sid: UInt16,
     shinyOnly: Bool,
     lead: FinderLead,
+    syncNature: UInt8 = 0,
     game: PFGame,
     shinyCharm: Bool,
     staticType: Int32 = 0, staticIndex: Int32 = 0,
@@ -1444,10 +1458,10 @@ nonisolated func staticGenerateGen8Streaming(
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
     onResult: (StaticSearchResult) -> Void
 ) {
-    let pfLead = lead.pfLead
+    let pfLead = lead.pfGeneratorLead(syncNature: syncNature)
     var natArr = [Bool](repeating: natures.isEmpty, count: 25)
     for n in natures { natArr[Int(n)] = true }
-    let shinyFilter: UInt8 = shinyOnly ? 1 : 255
+    let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
     let results = PFBridge.staticGenerate8(
         seed0: seed0, seed1: seed1,
@@ -1481,6 +1495,7 @@ nonisolated func wildGenerateGen8Streaming(
     sid: UInt16,
     shinyOnly: Bool,
     lead: FinderLead,
+    syncNature: UInt8 = 0,
     game: PFGame,
     shinyCharm: Bool,
     encounter: PFEncounter, location: UInt8,
@@ -1490,10 +1505,10 @@ nonisolated func wildGenerateGen8Streaming(
     encounterSlots: [Bool] = Array(repeating: true, count: 12),
     onResult: (StaticSearchResult) -> Void
 ) {
-    let pfLead = lead.pfLead
+    let pfLead = lead.pfGeneratorLead(syncNature: syncNature)
     var natArr = [Bool](repeating: natures.isEmpty, count: 25)
     for n in natures { natArr[Int(n)] = true }
-    let shinyFilter: UInt8 = shinyOnly ? 1 : 255
+    let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
     let results = PFBridge.wildGenerate8(
         seed0: seed0, seed1: seed1,
@@ -1546,7 +1561,7 @@ nonisolated func eggGenerateGen8Streaming(
 ) {
     var natArr = [Bool](repeating: natures.isEmpty, count: 25)
     for n in natures { natArr[Int(n)] = true }
-    let shinyFilter: UInt8 = shinyOnly ? 1 : 255
+    let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
     let results = PFBridge.eggGenerate8(
         seed0: seed0, seed1: seed1,
@@ -1629,7 +1644,7 @@ nonisolated func raidGenerateGen8Streaming(
 ) {
     var natArr = [Bool](repeating: natures.isEmpty, count: 25)
     for n in natures { natArr[Int(n)] = true }
-    let shinyFilter: UInt8 = shinyOnly ? 1 : 255
+    let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
     let results = PFBridge.raidGenerate8(
         seed: seed,
@@ -1667,6 +1682,7 @@ nonisolated func undergroundGenerateGen8Streaming(
     tid: UInt16, sid: UInt16,
     shinyOnly: Bool,
     lead: FinderLead,
+    syncNature: UInt8 = 0,
     game: PFGame,
     shinyCharm: Bool,
     diglett: Bool, storyFlag: Int32,
@@ -1674,10 +1690,10 @@ nonisolated func undergroundGenerateGen8Streaming(
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
     onResult: (StaticSearchResult) -> Void
 ) {
-    let pfLead = lead.pfLead
+    let pfLead = lead.pfGeneratorLead(syncNature: syncNature)
     var natArr = [Bool](repeating: natures.isEmpty, count: 25)
     for n in natures { natArr[Int(n)] = true }
-    let shinyFilter: UInt8 = shinyOnly ? 1 : 255
+    let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
     let results = PFBridge.undergroundGenerate8(
         seed0: seed0, seed1: seed1,
@@ -1718,6 +1734,7 @@ nonisolated func staticSearchGen5Streaming(
     shinyOnly: Bool,
     method: FinderMethod,
     lead: FinderLead,
+    syncNature: UInt8 = 0,
     game: PFGame,
     staticType: Int32 = 0, staticIndex: Int32 = 0,
     mac: UInt64, keypresses: [Bool],
@@ -1733,10 +1750,10 @@ nonisolated func staticSearchGen5Streaming(
     onProgress: (Double) -> Void
 ) {
     let pfMethod = finderMethodToPF(method)
-    let pfLead = lead.pfLead
+    let pfLead = lead.pfGeneratorLead(syncNature: syncNature)
     var natArr = [Bool](repeating: natures.isEmpty, count: 25)
     for n in natures { natArr[Int(n)] = true }
-    let shinyFilter: UInt8 = shinyOnly ? 1 : 255
+    let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
     guard let handle = PFBridge.staticSearch5Start(
         initialAdvances: initialAdvance, maxAdvances: maxAdvance,
@@ -1813,6 +1830,7 @@ nonisolated func wildSearchGen5Streaming(
     shinyOnly: Bool,
     method: FinderMethod,
     lead: FinderLead,
+    syncNature: UInt8 = 0,
     game: PFGame,
     encounter: PFEncounter, location: UInt8, season: UInt8,
     mac: UInt64, keypresses: [Bool],
@@ -1829,10 +1847,10 @@ nonisolated func wildSearchGen5Streaming(
     onProgress: (Double) -> Void
 ) {
     let pfMethod = finderMethodToPF(method)
-    let pfLead = lead.pfLead
+    let pfLead = lead.pfGeneratorLead(syncNature: syncNature)
     var natArr = [Bool](repeating: natures.isEmpty, count: 25)
     for n in natures { natArr[Int(n)] = true }
-    let shinyFilter: UInt8 = shinyOnly ? 1 : 255
+    let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
     guard let handle = PFBridge.wildSearch5Start(
         initialAdvances: initialAdvance, maxAdvances: maxAdvance,
@@ -1919,7 +1937,7 @@ nonisolated func runWildSearch(
     minDelay: UInt32, maxDelay: UInt32,
     pfGame: PFGame, pfEnc: PFEncounter, locationID: UInt8,
     slotSpecies: [UInt16],
-    speciesFilter: UInt16, lead: FinderLead, isEmerald: Bool,
+    speciesFilter: UInt16, lead: FinderLead, syncNature: UInt8 = 0, isEmerald: Bool,
     filterGender: UInt8 = 255, filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
     onResult: @Sendable (StaticSearchResult) -> Void,
@@ -1935,7 +1953,7 @@ nonisolated func runWildSearch(
     }
     let ivMin: [UInt8] = [minIVs.0, minIVs.1, minIVs.2, minIVs.3, minIVs.4, minIVs.5]
     let ivMax: [UInt8] = [maxIVs.0, maxIVs.1, maxIVs.2, maxIVs.3, maxIVs.4, maxIVs.5]
-    let shinyFilter: UInt8 = shinyOnly ? 1 : 255
+    let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
     var encounterSlots = [Bool](repeating: true, count: 12)
     if speciesFilter != 0 {
@@ -1946,7 +1964,8 @@ nonisolated func runWildSearch(
 
     let pfMethod = finderMethodToPF(method)
 
-    let pfLead = lead.pfLead
+    // Generators take Synchronize's nature; searchers take any.
+    let pfLead = mode == .generator ? lead.pfGeneratorLead(syncNature: syncNature) : lead.pfLead
     let deadBattery = isEmerald
 
     if mode == .generator {
@@ -1966,7 +1985,7 @@ nonisolated func runWildSearch(
                 encounterSlots: encounterSlots
             ).map { r in
                 StaticSearchResult(
-                    seed: r.seed, pid: r.pid,
+                    seed: seed, pid: r.pid,
                     ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
                     ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
                     nature: r.nature, ability: r.ability,
@@ -1989,7 +2008,7 @@ nonisolated func runWildSearch(
                 encounterSlots: encounterSlots
             ).map { r in
                 StaticSearchResult(
-                    seed: r.seed, pid: r.pid,
+                    seed: seed, pid: r.pid,
                     ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
                     ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
                     nature: r.nature, ability: r.ability,
@@ -3782,12 +3801,6 @@ struct FinderRootView: View {
                             Text(m.rawValue).tag(m)
                         }
                     }
-
-                    Picker("Lead Ability", selection: $lead) {
-                        ForEach(FinderLead.leads(for: generation, encounterMode: encounterMode == .wild)) { l in
-                            Text(l.rawValue).tag(l)
-                        }
-                    }
                     .onChange(of: generation) {
                         let available = FinderLead.leads(for: generation, encounterMode: encounterMode == .wild)
                         if !available.contains(lead) { lead = .none }
@@ -3797,10 +3810,26 @@ struct FinderRootView: View {
                         if !available.contains(lead) { lead = .none }
                     }
 
-                    if lead == .synchronize {
-                        Picker("Sync Nature", selection: $syncNature) {
-                            ForEach(0..<25, id: \.self) { i in
-                                Text(pfNatureNames[i]).tag(UInt8(i))
+                    // PokéFinder's Gen 3 static generator and searcher take no
+                    // lead.
+                    if leadApplies {
+                        Picker("Lead Ability", selection: $lead) {
+                            ForEach(FinderLead.leads(for: generation, encounterMode: encounterMode == .wild)) { l in
+                                Text(l.rawValue).tag(l)
+                            }
+                        }
+                    }
+
+                    if leadApplies, lead == .synchronize {
+                        if searchesAnySyncNature {
+                            Text("Searches every Synchronize nature: choose the natures you want under Nature Filter.")
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else {
+                            Picker("Sync Nature", selection: $syncNature) {
+                                ForEach(0..<25, id: \.self) { i in
+                                    Text(pfNatureNames[i]).tag(UInt8(i))
+                                }
                             }
                         }
                     }
@@ -3957,6 +3986,15 @@ struct FinderRootView: View {
     }
 
     // MARK: Encounter Helpers
+
+    private var leadApplies: Bool { !(generation == .gen3 && encounterMode == .static_) }
+
+    /// Gen 3 and 4's searchers take Synchronize with any nature; everything
+    /// else runs PokéFinder's generators (Gen 5's searches too), which take
+    /// the Synchronize nature.
+    private var searchesAnySyncNature: Bool {
+        mode == .searcher && (generation == .gen3 || generation == .gen4)
+    }
 
     private func autoSelectMethod() {
         switch generation {
@@ -4965,7 +5003,7 @@ struct FinderRootView: View {
                     seed0: g8Seed0, seed1: g8Seed1,
                     initialAdvance: initAdv, maxAdvance: maxAdv,
                     natures: natFilter, tid: tID, sid: sID,
-                    shinyOnly: shiny, lead: ld, game: pfGameVal,
+                    shinyOnly: shiny, lead: ld, syncNature: sNat, game: pfGameVal,
                     shinyCharm: g8ShinyCharm,
                     diglett: g8Diglett, storyFlag: g8StoryFlag,
                     filterGender: genderFilter, filterAbility: abilityFilter,
@@ -4978,7 +5016,7 @@ struct FinderRootView: View {
                         initialAdvance: srcMinAdv, maxAdvance: srcMaxAdv,
                         ivInitialAdvance: g5IVMinAdv, ivMaxAdvance: g5IVMaxAdv,
                         natures: natFilter, tid: tID, sid: sID, shinyOnly: shiny,
-                        method: meth, lead: ld, game: pfGameVal,
+                        method: meth, lead: ld, syncNature: sNat, game: pfGameVal,
                         encounter: pfEncVal, location: locationIDVal, season: g5Season,
                         mac: g5Mac, keypresses: g5Keys,
                         vcount: g5VCount, gxstat: g5GxStat, vframe: g5VFrame,
@@ -4995,7 +5033,7 @@ struct FinderRootView: View {
                     wildGenerateGen5Streaming(
                         seed: seedVal64, initialAdvance: initAdv, maxAdvance: maxAdv,
                         natures: natFilter, tid: tID, sid: sID, shinyOnly: shiny,
-                        method: meth, lead: ld, game: pfGameVal,
+                        method: meth, lead: ld, syncNature: sNat, game: pfGameVal,
                         encounter: pfEncVal, location: locationIDVal, season: g5Season,
                         mac: g5Mac, keypresses: g5Keys,
                         vcount: g5VCount, gxstat: g5GxStat, vframe: g5VFrame,
@@ -5011,7 +5049,7 @@ struct FinderRootView: View {
                         seed0: g8Seed0, seed1: g8Seed1,
                         initialAdvance: initAdv, maxAdvance: maxAdv,
                         natures: natFilter, tid: tID, sid: sID,
-                        shinyOnly: shiny, lead: ld, game: pfGameVal,
+                        shinyOnly: shiny, lead: ld, syncNature: sNat, game: pfGameVal,
                         shinyCharm: g8ShinyCharm,
                         encounter: pfEncVal, location: locationIDVal,
                         filterGender: genderFilter, filterAbility: abilityFilter,
@@ -5031,7 +5069,7 @@ struct FinderRootView: View {
                                   locationID: locationIDVal,
                                   slotSpecies: slotSpecies,
                                   speciesFilter: speciesFilter,
-                                  lead: ld, isEmerald: isDeadBattery,
+                                  lead: ld, syncNature: sNat, isEmerald: isDeadBattery,
                                   filterGender: genderFilter, filterAbility: abilityFilter,
                                   hiddenPowers: hpFilter,
                                   onResult: { continuation.yield(.result($0)) },
@@ -5043,7 +5081,7 @@ struct FinderRootView: View {
                         initialAdvance: srcMinAdv, maxAdvance: srcMaxAdv,
                         ivInitialAdvance: g5IVMinAdv, ivMaxAdvance: g5IVMaxAdv,
                         natures: natFilter, tid: tID, sid: sID, shinyOnly: shiny,
-                        method: meth, lead: ld, game: pfGameVal,
+                        method: meth, lead: ld, syncNature: sNat, game: pfGameVal,
                         mac: g5Mac, keypresses: g5Keys,
                         vcount: g5VCount, gxstat: g5GxStat, vframe: g5VFrame,
                         skipLR: g5SkipLR, timer0Min: g5Timer0Min, timer0Max: g5Timer0Max,
@@ -5094,7 +5132,7 @@ struct FinderRootView: View {
                     staticGenerateGen5Streaming(
                         seed: seedVal64, initialAdvance: initAdv, maxAdvance: maxAdv,
                         natures: natFilter, tid: tID, sid: sID, shinyOnly: shiny,
-                        method: meth, lead: ld, game: pfGameVal,
+                        method: meth, lead: ld, syncNature: sNat, game: pfGameVal,
                         mac: g5Mac, keypresses: g5Keys,
                         vcount: g5VCount, gxstat: g5GxStat, vframe: g5VFrame,
                         skipLR: g5SkipLR, timer0Min: g5Timer0Min, timer0Max: g5Timer0Max,
@@ -5108,7 +5146,7 @@ struct FinderRootView: View {
                         seed0: g8Seed0, seed1: g8Seed1,
                         initialAdvance: initAdv, maxAdvance: maxAdv,
                         natures: natFilter, tid: tID, sid: sID,
-                        shinyOnly: shiny, lead: ld, game: pfGameVal,
+                        shinyOnly: shiny, lead: ld, syncNature: sNat, game: pfGameVal,
                         shinyCharm: g8ShinyCharm,
                         filterGender: genderFilter, filterAbility: abilityFilter,
                         hiddenPowers: hpFilter

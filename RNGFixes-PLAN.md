@@ -1,7 +1,7 @@
 # RNG tools fixes: plan
 
-Status: **PR 1 built** (2026-10-03); PRs 2–4 planned. From the RNG audit's
-45 findings. This plan covers findings 1–10 in detail (§2–§5), as four PRs,
+Status: **PRs 1 and 2 built** (2026-10-03/04); PRs 3 and 4 planned. From
+the RNG audit's 45 findings, and one found since (46). This plan covers findings 1–10 in detail (§2–§5), as four PRs,
 and groups the rest for later (§7). The owner took every recommendation in
 §8.
 
@@ -110,19 +110,25 @@ natures and Hidden Powers are ignored in every wild Generator and Searcher
 
 - Compute `skip` the way the static `makeFilter` does: only when nothing at
   all is filtered (IVs, natures, Hidden Powers, slots, gender, ability,
-  shiny).
+  shiny). All three filter builders share `filtersNothing` now.
 - Treat an all-false nature or Hidden Power list as "any", as `makeFilter`
-  does.
-- The same for the Underground filter (PFBridge.mm ~2862).
-- **Tests:** Emerald Route 101, six 31s and Adamant, returns only those
-  (today all 1,001 advances); Platinum Method J likewise; a wild Searcher
-  with a nature filter returns only that nature.
+  does (`allowedOrAll`).
+- The same for the Underground filter. **Found while building it:** that
+  filter also checks the species against a list the bridge left empty, so
+  any filter (a gender or shiny one, before) rejected every result. It gets
+  every species the areas hold.
+- **Also found:** a Gen 3 or 4 wild Generator result showed "Seed:
+  00000000", PokéFinder's wild states having no seed, and its Seed to Time
+  was for seed 0. It takes the Generator's seed now.
+- **Tests:** Emerald Route 101 with a nature filter, or an HP 31 filter,
+  returns only those (it gave all 1,001 advances); Platinum Method J
+  likewise; a wild Searcher with nature and IV filters returns only those;
+  Underground with a nature or gender filter returns only those.
 
 ### 3.2 Shiny Only misses squares (8)
 
-- One helper, `pfShinyFilter(shinyOnly:)`, returning 3 (star or square)
-  instead of 1 (star), used at all 17 call sites (Finder Gen 3/4/5/8,
-  GameCube). §8 asks whether to add Ten Lines' Star/Square choice instead.
+- One helper, `pfShinyFilter(_:)`, returning 3 (star or square) instead of
+  1 (star), used at all 18 call sites (Finder Gen 3/4/5/8, GameCube, Eggs).
 - **Tests:** all 57 square shinies in seed 0's first 3M advances (TID/SID 0)
   are found, as well as the 344 stars.
 
@@ -131,15 +137,17 @@ natures and Hidden Powers are ignored in every wild Generator and Searcher
 PokéFinder's generators read Synchronize as `Lead(nature)` (0–24), and its
 searchers read `Lead::Synchronize` (0) as "any Synchronize nature".
 
-- Generators: when the lead is Synchronize, pass `PFLead(rawValue:
-  syncNature)`. Thread `syncNature` to the Gen 3/4/5/8 wild generators and
-  the Gen 4/5/8 static generators (today only Gen 4 static takes it, and
-  drops it).
-- Searchers keep sending 0. The Sync Nature picker shows only in Generator
-  mode.
+- `PFLead` was an enum with cases only for leads 0 and 24, so it couldn't
+  carry a nature; it's a struct now, with `.synchronize(nature:)`.
+- Generators get `FinderLead.pfGeneratorLead(syncNature:)`. `syncNature` is
+  threaded to the Gen 3/4/5/8 wild generators, the Gen 4/5/8 static
+  generators and BDSP Underground. Gen 5's searches run PokéFinder's
+  generators on each seed, so they take it too.
+- Gen 3 and 4's searchers keep sending 0 (any nature). There the Sync
+  Nature picker gives way to a note to choose natures in the Nature Filter.
 - Gen 3 static has no lead (PokéFinder ignores it), so its Lead picker goes.
-- **Tests:** Gen 4 Method J with Synchronize Timid gives about half Timid
-  (today 41 of 2,001); Emerald wild likewise.
+- **Tests:** Gen 4 Method J with Synchronize Timid gives over a third Timid
+  (it gave 41 of 2,001); Emerald wild likewise; BDSP static is all Timid.
 
 ---
 
@@ -246,6 +254,13 @@ Grouped by area; each group could be a PR. Numbers are the audit's.
   empty-results message, stale results, second-tolerant coin flips, Dead
   Battery, TID/SID labels, IV→PID's nature picker, the Eggs IV controls,
   and dead code.
+
+**Found since**
+- 46: BDSP Underground's Story Progress. PokéFinder's story flag runs 1–6
+  and indexes `flagRates[storyFlag - 1]`. The Finder offers 0
+  ("Pre-National Dex"), which reads `flagRates[-1]` (the slot rates come
+  out wrong), and 1 ("Post-National Dex"), which is the earliest stage.
+  Offer PokéFinder's six stages, with their names.
 
 ---
 

@@ -1554,6 +1554,122 @@ struct EggGeneratorTests {
     }
 }
 
+// MARK: - Filter and Lead Tests
+
+/// RNG fixes PR 2: the wild filters work, Shiny Only finds square shinies,
+/// and the generators take Synchronize's nature.
+struct RNGFilterAndLeadTests {
+    private let route101 = findLocationID(pfGame: .emerald, pfEnc: .grass, isGen3: true, locationName: "Route 101")
+
+    private func wild(gen: FinderGeneration, mode: FinderRootView.FinderMode, method: FinderMethod, game: PFGame,
+                      location: UInt8, seed: UInt32 = 0, maxAdvance: UInt32 = 1_000, natures: Set<UInt8> = [],
+                      minIVs: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0),
+                      maxIVs: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (31, 31, 31, 31, 31, 31),
+                      lead: FinderLead = .none, syncNature: UInt8 = 0) -> [StaticSearchResult] {
+        let box = ResultCollector()
+        runWildSearch(gen: gen, mode: mode, method: method, natures: natures, tid: 0, sid: 0, shinyOnly: false,
+                      minIVs: minIVs, maxIVs: maxIVs, seed: seed, initAdv: 0, maxAdv: maxAdvance,
+                      searcherMinAdv: 0, searcherMaxAdv: 20, minDelay: 600, maxDelay: 620,
+                      pfGame: game, pfEnc: .grass, locationID: location, slotSpecies: [], speciesFilter: 0,
+                      lead: lead, syncNature: syncNature, isEmerald: false, onResult: { box.append($0) })
+        return box.results
+    }
+
+    /// The wild generators used to pass PokéFinder's "skip filters" flag
+    /// whenever gender, ability and shiny were Any, so IVs and natures were
+    /// ignored: all 1,001 advances came back.
+    @Test func wildGeneratorFilters() {
+        let all = wild(gen: .gen3, mode: .generator, method: .method1, game: .emerald, location: route101)
+        #expect(all.count == 1_001)
+        let adamant = wild(gen: .gen3, mode: .generator, method: .method1, game: .emerald, location: route101, natures: [3])
+        #expect(!adamant.isEmpty && adamant.count < all.count / 10 && adamant.allSatisfy { $0.nature == 3 })
+        let hp31 = wild(gen: .gen3, mode: .generator, method: .method1, game: .emerald, location: route101,
+                        minIVs: (31, 0, 0, 0, 0, 0))
+        #expect(!hp31.isEmpty && hp31.count < all.count / 10 && hp31.allSatisfy { $0.ivHP == 31 })
+        let platinum = findLocationID(pfGame: .platinum, pfEnc: .grass, isGen3: false, locationName: "Route 201")
+        let jolly = wild(gen: .gen4, mode: .generator, method: .methodJ, game: .platinum, location: platinum,
+                         seed: 0x0C12_0353, natures: [13])
+        #expect(!jolly.isEmpty && jolly.allSatisfy { $0.nature == 13 })
+    }
+
+    /// A wild Generator result carries the seed it came from, so its Seed to
+    /// Time is the right one (it showed seed 0).
+    @Test func wildGeneratorKeepsTheSeed() {
+        let results = wild(gen: .gen3, mode: .generator, method: .method1, game: .emerald, location: route101,
+                           seed: 0x0C12_0353, maxAdvance: 5)
+        #expect(results.count == 6 && results.allSatisfy { $0.seed == 0x0C12_0353 })
+        let platinum = findLocationID(pfGame: .platinum, pfEnc: .grass, isGen3: false, locationName: "Route 201")
+        let gen4 = wild(gen: .gen4, mode: .generator, method: .methodJ, game: .platinum, location: platinum,
+                        seed: 0x0C12_0353, maxAdvance: 5)
+        #expect(!gen4.isEmpty && gen4.allSatisfy { $0.seed == 0x0C12_0353 })
+    }
+
+    @Test func wildSearcherFilters() {
+        let found = wild(gen: .gen3, mode: .searcher, method: .method1, game: .emerald, location: route101, natures: [10],
+                         minIVs: (31, 31, 31, 0, 0, 0))
+        #expect(!found.isEmpty && found.allSatisfy { $0.nature == 10 && $0.ivHP == 31 && $0.ivDef == 31 })
+    }
+
+    /// BDSP's Grand Underground: its filter also checks the species, which
+    /// had no list, so any filter rejected everything.
+    @Test func undergroundFilters() {
+        func generate(natures: Set<UInt8>, gender: UInt8 = 255) -> [StaticSearchResult] {
+            var results: [StaticSearchResult] = []
+            undergroundGenerateGen8Streaming(seed0: 0x1234_5678_9ABC_DEF0, seed1: 0x0FED_CBA9_8765_4321,
+                                             initialAdvance: 0, maxAdvance: 300, natures: natures, tid: 0, sid: 0,
+                                             shinyOnly: false, lead: .none, game: .bd, shinyCharm: false,
+                                             diglett: false, storyFlag: 6, filterGender: gender) { results.append($0) }
+            return results
+        }
+        let all = generate(natures: [])
+        let modest = generate(natures: [15])
+        #expect(!all.isEmpty)
+        #expect(!modest.isEmpty && modest.count < all.count && modest.allSatisfy { $0.nature == 15 })
+        let female = generate(natures: [], gender: 1)
+        #expect(!female.isEmpty && female.allSatisfy { $0.gender == 1 })
+    }
+
+    /// Seed 0's first 3 million advances (TID/SID 0) have 344 star shinies
+    /// and 57 square ones; Shiny Only used to find only the stars.
+    @Test func shinyOnlyFindsSquares() {
+        let shinies = staticGenerateGen3(seed: 0, initialAdvance: 0, maxAdvance: 3_000_000, natures: [],
+                                         tid: 0, sid: 0, shinyOnly: true, method: .method1)
+        #expect(shinies.count == 344 + 57)
+        #expect(pfShinyFilter(true) == 3 && pfShinyFilter(false) == 255)
+    }
+
+    /// The generators read Synchronize's nature from the lead; the old
+    /// code always sent Hardy's.
+    @Test func generatorsTakeSyncNature() {
+        let timid: UInt8 = 10
+        let gen4 = staticGenerateGen4(seed: 0x1234_5678, initialAdvance: 0, maxAdvance: 2_000, natures: [],
+                                      tid: 0, sid: 0, shinyOnly: false, method: .methodJ,
+                                      lead: .synchronize, syncNature: timid)
+        let gen4Timid = gen4.filter { $0.nature == timid }.count
+        #expect(gen4Timid > gen4.count / 3)
+        #expect(gen4.filter { $0.nature == 0 }.count < gen4.count / 10)
+        let emerald = wild(gen: .gen3, mode: .generator, method: .method1, game: .emerald, location: route101,
+                           lead: .synchronize, syncNature: timid)
+        #expect(emerald.filter { $0.nature == timid }.count > emerald.count / 3)
+        // BDSP's Synchronize always works.
+        var bdsp: [StaticSearchResult] = []
+        staticGenerateGen8Streaming(seed0: 1, seed1: 2, initialAdvance: 0, maxAdvance: 200, natures: [], tid: 0, sid: 0,
+                                    shinyOnly: false, lead: .synchronize, syncNature: timid, game: .bd,
+                                    shinyCharm: false) { bdsp.append($0) }
+        #expect(!bdsp.isEmpty && bdsp.allSatisfy { $0.nature == timid })
+        #expect(FinderLead.synchronize.pfLead == .synchronize)
+        #expect(FinderLead.synchronize.pfGeneratorLead(syncNature: timid).rawValue == timid)
+        #expect(FinderLead.pressure.pfGeneratorLead(syncNature: timid) == .pressure)
+    }
+}
+
+nonisolated final class ResultCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [StaticSearchResult] = []
+    func append(_ result: StaticSearchResult) { lock.lock(); storage.append(result); lock.unlock() }
+    var results: [StaticSearchResult] { lock.lock(); defer { lock.unlock() }; return storage }
+}
+
 // MARK: - Number Field Tests
 
 struct RNGFieldRangeTests {
