@@ -499,25 +499,18 @@ struct FinderGen3GeneratorTests {
 // MARK: - PokeFinder: Gen 3 Generator Additional Tests
 
 struct FinderGen3AdditionalTests {
-    @Test func method2_staticGenerator_matchesMethod1() {
-        // PokeFinder's StaticGenerator3 only handles the Method 2 VBlank skip for
-        // wild encounters (WildGenerator3), not static encounters. For static
-        // generation, Method 1 and 2 produce identical results.
-        // The Method 2 distinction matters in PIDToIVCalculator / reverse lookups.
-        let m1 = staticGenerateGen3(
-            seed: 0, initialAdvance: 0, maxAdvance: 5,
-            natures: Set<UInt8>(), tid: 12345, sid: 54321,
-            shinyOnly: false, method: .method1
-        )
-        let m2 = staticGenerateGen3(
-            seed: 0, initialAdvance: 0, maxAdvance: 5,
-            natures: Set<UInt8>(), tid: 12345, sid: 54321,
-            shinyOnly: false, method: .method2
-        )
-        #expect(m1.count == m2.count)
-        for (a, b) in zip(m1, m2) {
-            #expect(a.pid == b.pid)
-            #expect(a.ivHP == b.ivHP)
+    /// PokéFinder's static Generator has Methods 1 and 4 (its Method 2 is
+    /// Method 1), so statics offer those, and a Method 4 Searcher result's
+    /// seed generates it.
+    @Test func method4_searcherResultRegenerates() {
+        let found = staticSearchGen3(minIVs: (31, 31, 31, 31, 0, 0), maxIVs: (31, 31, 31, 31, 31, 31),
+                                     natures: [], tid: 0, sid: 0, shinyOnly: false, method: .method4)
+        #expect(!found.isEmpty)
+        for r in found.prefix(20) {
+            let generated = staticGenerateGen3(seed: r.seed, initialAdvance: 0, maxAdvance: 0,
+                                               natures: [], tid: 0, sid: 0, shinyOnly: false, method: .method4)
+            #expect(generated.first?.pid == r.pid)
+            #expect(generated.first?.ivSummary == r.ivSummary)
         }
     }
 
@@ -784,12 +777,8 @@ struct FinderTimerBridgeTests {
 
 struct FinderTypesTests {
     @Test func finderMethod_gen3Methods() {
-        let methods = FinderMethod.methods(for: .gen3)
-        #expect(methods.contains(.method1))
-        #expect(methods.contains(.method2))
-        #expect(methods.contains(.method4))
-        #expect(!methods.contains(.methodJ))
-        #expect(!methods.contains(.methodK))
+        #expect(FinderMethod.methods(for: .gen3) == [.method1, .method2, .method4])
+        #expect(FinderMethod.methods(for: .gen3, staticEncounter: true) == [.method1, .method4])
     }
 
     @Test func finderMethod_gen4Methods() {
@@ -1176,12 +1165,72 @@ struct EncounterDataTests {
         }
     }
 
-    @Test func finderLead_filtersForGeneration() {
-        let gen3Leads = FinderLead.leads(for: .gen3, encounterMode: false)
-        let gen4Leads = FinderLead.leads(for: .gen4, encounterMode: false)
-        #expect(gen3Leads.contains(.none))
-        #expect(gen4Leads.contains(.none))
-        #expect(gen4Leads.contains(.synchronize))
+    /// Each list is the leads PokéFinder's generator for that encounter
+    /// reads (from its Gen 3/4/5/8 generators); it ignores any other.
+    @Test func finderLead_followsPokeFinder() {
+        let charm: [FinderLead] = [.cuteCharmF, .cuteCharmM]
+        // Of Gen 3, only Emerald's wild encounters have lead effects.
+        for game in [FinderGameVersion.ruby, .sapphire, .fireRed, .leafGreen] {
+            #expect(FinderLead.leads(for: .gen3, mode: .wild, game: game) == [.none], "\(game.rawValue)")
+        }
+        #expect(FinderLead.leads(for: .gen3, mode: .wild, game: .emerald)
+                == [.none, .synchronize] + charm + [.magnetPull, .staticLead, .pressure])
+        #expect(FinderLead.leads(for: .gen3, mode: .static_, game: .emerald) == [.none])
+        #expect(FinderLead.leads(for: .gen4, mode: .wild, game: .diamond)
+                == [.none, .synchronize] + charm + [.magnetPull, .staticLead, .pressure, .suctionCups, .compoundEyes, .arenaTrap])
+        #expect(FinderLead.leads(for: .gen5, mode: .wild, game: .black)
+                == [.none, .synchronize] + charm + [.magnetPull, .staticLead, .pressure, .suctionCups, .compoundEyes])
+        #expect(FinderLead.leads(for: .gen8, mode: .wild, game: .brilliantDiamond)
+                == [.none, .synchronize] + charm + [.magnetPull, .staticLead, .harvest, .flashFire, .stormDrain, .pressure, .compoundEyes])
+        // Gen 4, 5 and BDSP statics read Synchronize and Cute Charm.
+        for (gen, game) in [(FinderGeneration.gen4, FinderGameVersion.diamond), (.gen5, .black), (.gen8, .brilliantDiamond)] {
+            #expect(FinderLead.leads(for: gen, mode: .static_, game: game) == [.none, .synchronize] + charm)
+        }
+        #expect(FinderLead.leads(for: .gen8, mode: .underground, game: .brilliantDiamond)
+                == [.none, .synchronize] + charm + [.pressure, .compoundEyes])
+        for mode in [FinderRootView.EncounterMode.egg, .raid, .id] {
+            #expect(FinderLead.leads(for: .gen8, mode: mode, game: .brilliantDiamond) == [.none])
+        }
+        #expect(FinderLead.pressure.name == "Pressure / Hustle / Vital Spirit")
+    }
+
+    /// Emerald's Cute Charm, newly offered, works: behind a female lead,
+    /// two thirds of Route 101's Pokémon are male.
+    @Test func emeraldCuteCharm() throws {
+        let area = try #require(PFBridge.getEncounters3(encounter: .grass, game: .emerald).first)
+        func males(_ lead: PFLead) -> Int {
+            PFBridge.wildGenerate3(seed: 0x1234_5678, initialAdvances: 0, maxAdvances: 2_000, method: .method1,
+                                   lead: lead, tid: 0, sid: 0, game: .emerald, encounter: .grass,
+                                   location: area.location).filter { $0.gender == 0 }.count
+        }
+        #expect(males(.cuteCharmF) > males(.none) + 300)
+    }
+
+    /// PokéFinder's Gen 8 static, wild, egg and ID generators are BDSP's.
+    @Test func swordShieldOffersOnlyRaids() {
+        #expect(FinderRootView.EncounterMode.modes(for: .gen8, game: .sword) == [.raid])
+        #expect(FinderRootView.EncounterMode.modes(for: .gen8, game: .shield) == [.raid])
+        #expect(FinderRootView.EncounterMode.modes(for: .gen8, game: .brilliantDiamond)
+                == [.static_, .wild, .egg, .underground, .id])
+    }
+
+    /// PokéFinder's six story stages change which Pokémon the Underground
+    /// has, and its level flags their levels. Stage 0, which it reads as
+    /// `flagRates[-1]`, is stage 1.
+    @Test func undergroundStagesAndLevels() {
+        func results(stage: Int32 = 6, levelFlag: UInt8 = 0) -> [PFBridge.Gen8UndergroundResult] {
+            PFBridge.undergroundGenerate8(seed0: 0x1234_5678_9ABC_DEF0, seed1: 0x0FED_CBA9_8765_4321,
+                                          initialAdvances: 0, maxAdvances: 300, levelFlag: levelFlag,
+                                          tid: 0, sid: 0, game: .bd, storyFlag: stage)
+        }
+        let first = Set(results(stage: 1).map(\.specie))
+        let last = Set(results(stage: 6).map(\.specie))
+        #expect(!first.isEmpty && !last.isEmpty)
+        #expect(first != last)
+        #expect(Set(results(stage: 0).map(\.specie)) == first)
+        #expect(Set(results(levelFlag: 0).map(\.level)) != Set(results(levelFlag: 8).map(\.level)))
+        #expect(UndergroundProgress.stories.count == 6)
+        #expect(UndergroundProgress.levels.count == 9)
     }
 }
 

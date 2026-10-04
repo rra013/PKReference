@@ -3017,6 +3017,9 @@ extern "C" PFUndergroundState *pf_undergroundGenerate8(uint64_t seed0, uint64_t 
     auto natArr = allowedOrAll<25>(natures);
     auto powArr = allowedOrAll<16>(powers);
 
+    // PokéFinder reads the story stage's rates at flagRates[storyFlag - 1],
+    // for stages 1–6.
+    storyFlag = std::clamp(storyFlag, 1, 6);
     auto undergroundAreas = Encounters8::getUndergroundEncounters(storyFlag, diglett, &profile);
     if (undergroundAreas.empty()) { *outCount = 0; return nullptr; }
 
