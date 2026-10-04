@@ -1160,13 +1160,12 @@ struct EncounterDataTests {
     }
 
     @Test func staticEncounterData_startersExist() {
-        let starters = StaticEncounterData.gen3Starters
-        #expect(!starters.isEmpty)
-        #expect(starters.allSatisfy { $0.category == .starters })
-        #expect(starters.allSatisfy { $0.level == 5 })
-        // Treecko, Torchic, Mudkip for RSE
-        let rseStarters = starters.filter { $0.gameVersions.contains(.emerald) }
-        #expect(rseStarters.count == 3)
+        let starters = StaticEncounterData.encounters(for: .emerald, category: .starters)
+        #expect(starters.allSatisfy { $0.category == .starters && $0.level == 5 })
+        // Treecko, Torchic and Mudkip, and in Emerald the Johto ones from
+        // Professor Birch after the Hall of Fame.
+        #expect(Set(starters.map(\.species)) == [252, 255, 258, 152, 155, 158])
+        #expect(Set(StaticEncounterData.encounters(for: .ruby, category: .starters).map(\.species)) == [252, 255, 258])
     }
 
     @Test func pfGame_mappingCoversAll() {
@@ -1668,6 +1667,140 @@ nonisolated final class ResultCollector: @unchecked Sendable {
     private var storage: [StaticSearchResult] = []
     func append(_ result: StaticSearchResult) { lock.lock(); storage.append(result); lock.unlock() }
     var results: [StaticSearchResult] { lock.lock(); defer { lock.unlock() }; return storage }
+}
+
+// MARK: - Static Encounter Template Tests
+
+/// RNG fixes PR 3: the static encounters are PokéFinder's, and every static
+/// search and generator takes the chosen one's template.
+@MainActor
+struct StaticEncounterTemplateTests {
+    private func encounter(_ game: FinderGameVersion, _ category: StaticEncounterCategory,
+                           _ species: UInt16) throws -> StaticEncounter {
+        try #require(StaticEncounterData.encounters(for: game, category: category).first { $0.species == species },
+                     "\(species) in \(game.rawValue)")
+    }
+
+    /// Every PokéFinder template is offered, once, and nothing else is but
+    /// FireRed and LeafGreen's Mew.
+    @Test func everyTemplateIsOffered() {
+        var expected = 0
+        for generation in FinderGeneration.allCases {
+            for category in StaticEncounterCategory.allCases {
+                guard let type = category.pfType(generation) else { continue }
+                let count = switch generation {
+                case .gen3: PFBridge.getStaticEncounters3(type: type).count
+                case .gen4: PFBridge.getStaticEncounters4(type: type).count
+                case .gen5: PFBridge.getStaticEncounters5(type: type).count
+                case .gen8: PFBridge.getStaticEncounters8(type: type).count
+                }
+                expected += count
+            }
+        }
+        #expect(StaticEncounterData.all.count == expected + 1)
+        #expect(Set(StaticEncounterData.all.map(\.id)).count == StaticEncounterData.all.count)
+        // Gen 5 and BDSP have them now.
+        #expect(!StaticEncounterData.categories(for: .black2).isEmpty)
+        #expect(!StaticEncounterData.categories(for: .brilliantDiamond).isEmpty)
+        // PokéFinder's Gen 8 statics are BDSP's only.
+        #expect(StaticEncounterData.categories(for: .sword).isEmpty)
+    }
+
+    @Test func gen4MethodsAndGames() throws {
+        #expect(try encounter(.diamond, .legends, 483).method == .methodJ)
+        #expect(try encounter(.heartGold, .legends, 249).method == .methodK)
+        #expect(try encounter(.diamond, .gifts, 133).method == .method1)
+        // HeartGold has Kyogre and SoulSilver Groudon; the old list swapped them.
+        #expect(try encounter(.heartGold, .legends, 382).isIn(.heartGold))
+        #expect(StaticEncounterData.encounters(for: .heartGold, category: .legends).allSatisfy { $0.species != 383 })
+        #expect(try encounter(.soulSilver, .legends, 383).isIn(.soulSilver))
+        // Forms are named.
+        #expect(try encounter(.fireRed, .events, 386).speciesName == "Deoxys (Attack)")
+    }
+
+    @Test func gen4GenderFollowsTheTemplate() throws {
+        let eevee = try encounter(.diamond, .gifts, 133)
+        let genders = Set(staticGenerateGen4(seed: 0x0C12_0353, initialAdvance: 0, maxAdvance: 200, natures: [],
+                                             tid: 0, sid: 0, shinyOnly: false, method: .method1, lead: .none,
+                                             game: .diamond, template: eevee.template).map(\.gender))
+        #expect(genders == [0, 1])
+        let standIn = Set(staticGenerateGen4(seed: 0x0C12_0353, initialAdvance: 0, maxAdvance: 200, natures: [],
+                                             tid: 0, sid: 0, shinyOnly: false, method: .method1, lead: .none).map(\.gender))
+        #expect(standIn == [2])
+    }
+
+    /// The Gen 4 searcher streams, with the template's gender, and cancels.
+    @Test func gen4SearcherStreams() async throws {
+        let eevee = try encounter(.diamond, .gifts, 133)
+        var progress: [Double] = []
+        var results: [StaticSearchResult] = []
+        staticSearchGen4Streaming(minIVs: (31, 31, 31, 0, 0, 0), maxIVs: (31, 31, 31, 31, 31, 31), natures: [],
+                                  tid: 0, sid: 0, shinyOnly: false, method: .method1, game: .diamond,
+                                  template: eevee.template, minAdvance: 0, maxAdvance: 20, minDelay: 600, maxDelay: 640,
+                                  filterGender: 1, onProgress: { progress.append($0) }) { results.append($0) }
+        #expect(!results.isEmpty && results.allSatisfy { $0.gender == 1 && $0.ivHP == 31 })
+        #expect(progress.last == 100)
+        let started = ContinuousClock.now
+        let task = Task.detached {
+            staticSearchGen4Streaming(minIVs: (0, 0, 0, 0, 0, 0), maxIVs: (31, 31, 31, 31, 31, 31), natures: [],
+                                      tid: 0, sid: 0, shinyOnly: true, method: .methodJ, minAdvance: 0, maxAdvance: 50,
+                                      minDelay: 0, maxDelay: 5_000) { _ in }
+        }
+        try? await Task.sleep(for: .milliseconds(300))
+        task.cancel()
+        _ = await task.value
+        #expect(ContinuousClock.now - started < .seconds(3))
+    }
+
+    /// Reshiram is shiny-locked, so a Shiny Only generation finds none; an
+    /// unlocked encounter's does.
+    @Test func gen5ShinyLock() throws {
+        let reshiram = try encounter(.black, .legends, 643)
+        #expect(reshiram.shinyLocked)
+        let volcarona = try #require(StaticEncounterData.encounters(for: .black, category: .stationary)
+            .first { !$0.shinyLocked })
+        func shinies(_ encounter: StaticEncounter) -> Int {
+            var count = 0
+            staticGenerateGen5Streaming(seed: 0x1234_5678_9ABC_DEF0, initialAdvance: 0, maxAdvance: 100_000,
+                                        ivInitialAdvance: 0, ivMaxAdvance: 0, natures: [],
+                                        tid: 0, sid: 0, shinyOnly: true, method: .method5, lead: .none, game: .black,
+                                        mac: 0, keypresses: [true] + Array(repeating: false, count: 8),
+                                        vcount: 0, gxstat: 0, vframe: 0, skipLR: false, timer0Min: 0, timer0Max: 0,
+                                        memoryLink: false, shinyCharm: false, dsType: 0, language: 0,
+                                        staticType: encounter.type, staticIndex: encounter.index) { _ in count += 1 }
+            return count
+        }
+        #expect(shinies(reshiram) == 0)
+        #expect(shinies(volcarona) > 0)
+    }
+
+    /// PokéFinder's Gen 5 generators pair each PID advance with each IV
+    /// advance; the PID range used to be the IV range too, (n + 1)² results.
+    @Test func gen5IVRange() throws {
+        let snivy = try encounter(.black, .starters, 495)
+        var count = 0
+        staticGenerateGen5Streaming(seed: 0x1234_5678_9ABC_DEF0, initialAdvance: 0, maxAdvance: 99,
+                                    ivInitialAdvance: 0, ivMaxAdvance: 2, natures: [],
+                                    tid: 0, sid: 0, shinyOnly: false, method: .method5, lead: .none, game: .black,
+                                    mac: 0, keypresses: [true] + Array(repeating: false, count: 8),
+                                    vcount: 0, gxstat: 0, vframe: 0, skipLR: false, timer0Min: 0, timer0Max: 0,
+                                    memoryLink: false, shinyCharm: false, dsType: 0, language: 0,
+                                    staticType: snivy.type, staticIndex: snivy.index) { _ in count += 1 }
+        #expect(count == 100 * 3)
+    }
+
+    /// BDSP's Dialga has three IVs fixed at 31.
+    @Test func gen8FixedIVs() throws {
+        let dialga = try encounter(.brilliantDiamond, .legends, 483)
+        #expect(dialga.fixedIVs == 3)
+        #expect(dialga.method == nil)
+        var results: [StaticSearchResult] = []
+        staticGenerateGen8Streaming(seed0: 1, seed1: 2, initialAdvance: 0, maxAdvance: 200, natures: [], tid: 0, sid: 0,
+                                    shinyOnly: false, lead: .none, game: .bd, shinyCharm: false,
+                                    staticType: dialga.type, staticIndex: dialga.index) { results.append($0) }
+        #expect(!results.isEmpty)
+        #expect(results.allSatisfy { r in [r.ivHP, r.ivAtk, r.ivDef, r.ivSpA, r.ivSpD, r.ivSpe].filter { $0 == 31 }.count >= 3 })
+    }
 }
 
 // MARK: - Number Field Tests

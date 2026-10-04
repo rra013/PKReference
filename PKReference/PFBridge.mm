@@ -740,14 +740,25 @@ extern "C" void pf_staticSearch3_free(PFStaticSearch3Handle h)
 
 // MARK: - Gen 4 Static Generator
 
+// A Gen 4 static encounter's template (staticType 0–7), or, without one
+// (-1), a stand-in with no game, whose results are genderless.
+static StaticTemplate4 staticTemplate4(int staticType, int staticIndex, Method method)
+{
+    int size = 0;
+    const StaticTemplate4 *templates = staticType >= 0 ? Encounters4::getStaticEncounters(staticType, &size) : nullptr;
+    if (templates && staticIndex >= 0 && staticIndex < size) return templates[staticIndex];
+    return StaticTemplate4(Game::None, 0, 0, Shiny::Random, 1, method);
+}
+
 extern "C" PFGeneratorState4 *pf_staticGenerate4(uint32_t seed,
                                                     uint32_t initialAdvances,
                                                     uint32_t maxAdvances,
                                                     uint32_t offset,
                                                     uint8_t method,
                                                     uint8_t lead,
+                                                    int staticType, int staticIndex,
                                                     uint16_t tid, uint16_t sid,
-                                                    uint8_t game,
+                                                    uint32_t game,
                                                     uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
                                                     const uint8_t ivMin[6], const uint8_t ivMax[6],
                                                     const bool natures[25], const bool powers[16],
@@ -756,7 +767,7 @@ extern "C" PFGeneratorState4 *pf_staticGenerate4(uint32_t seed,
     Profile4 profile("-", static_cast<Game>(game), tid, sid, false);
     StateFilter filter = makeFilter(filterGender, filterAbility, filterShiny, ivMin, ivMax, natures, powers);
 
-    StaticTemplate4 tmpl(static_cast<Game>(game), 0, 0, Shiny::Random, 1, static_cast<Method>(method));
+    StaticTemplate4 tmpl = staticTemplate4(staticType, staticIndex, static_cast<Method>(method));
 
     StaticGenerator4 generator(initialAdvances, maxAdvances, offset,
                                 static_cast<Method>(method), static_cast<Lead>(lead),
@@ -773,35 +784,73 @@ extern "C" PFGeneratorState4 *pf_staticGenerate4(uint32_t seed,
     return out;
 }
 
-// MARK: - Gen 4 Static Searcher
+// MARK: - Gen 4 Static Searcher (Async)
 
-extern "C" PFSearcherState4 *pf_staticSearch4(uint32_t minAdvance, uint32_t maxAdvance,
-                                                uint32_t minDelay, uint32_t maxDelay,
-                                                uint8_t method,
-                                                uint8_t lead,
-                                                uint16_t tid, uint16_t sid,
-                                                uint8_t game,
-                                                uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
-                                                const uint8_t ivMin[6], const uint8_t ivMax[6],
-                                                const bool natures[25], const bool powers[16],
-                                                int *outCount)
+// PokéFinder's searcher on its own thread, as pf_staticSearch3_start's: read
+// results and progress as it goes, until done.
+struct PFStaticSearch4 {
+    StaticTemplate4 tmpl;
+    StaticSearcher4 searcher;
+    std::thread thread;
+    std::atomic<bool> done { false };
+
+    PFStaticSearch4(const StaticTemplate4 &tmpl, u32 minAdvance, u32 maxAdvance, u32 minDelay, u32 maxDelay,
+                    Method method, Lead lead, const Profile4 &profile, const StateFilter &filter) :
+        tmpl(tmpl), searcher(minAdvance, maxAdvance, minDelay, maxDelay, method, lead, profile, filter)
+    {
+    }
+
+    ~PFStaticSearch4()
+    {
+        if (thread.joinable()) thread.join();
+    }
+};
+
+extern "C" PFStaticSearch4Handle pf_staticSearch4_start(uint32_t minAdvance, uint32_t maxAdvance,
+                                                         uint32_t minDelay, uint32_t maxDelay,
+                                                         uint8_t method, uint8_t lead,
+                                                         int staticType, int staticIndex,
+                                                         uint16_t tid, uint16_t sid, uint32_t game,
+                                                         uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
+                                                         const uint8_t ivMin[6], const uint8_t ivMax[6],
+                                                         const bool natures[25], const bool powers[16])
 {
     Profile4 profile("-", static_cast<Game>(game), tid, sid, false);
     StateFilter filter = makeFilter(filterGender, filterAbility, filterShiny, ivMin, ivMax, natures, powers);
-
-    StaticTemplate4 tmpl(static_cast<Game>(game), 0, 0, Shiny::Random, 1, static_cast<Method>(method));
-
-    StaticSearcher4 searcher(minAdvance, maxAdvance, minDelay, maxDelay,
-                              static_cast<Method>(method), static_cast<Lead>(lead),
-                              profile, filter);
+    StaticTemplate4 tmpl = staticTemplate4(staticType, staticIndex, static_cast<Method>(method));
 
     std::array<u8, 6> min, max;
     std::copy(ivMin, ivMin + 6, min.begin());
     std::copy(ivMax, ivMax + 6, max.begin());
 
-    searcher.startSearch(min, max, &tmpl);
+    // Each IV combination it tries, as pf_staticSearch3_start counts.
+    u64 total = 1;
+    for (int i = 0; i < 6; i++) total *= min[i] <= max[i] ? static_cast<u64>(max[i] - min[i] + 1) : 0;
 
-    auto results = searcher.getResults();
+    auto *handle = new PFStaticSearch4(tmpl, minAdvance, maxAdvance, minDelay, maxDelay,
+                                       static_cast<Method>(method), static_cast<Lead>(lead), profile, filter);
+    handle->searcher.setMaxProgress(total > 0 ? total : 1);
+    handle->thread = std::thread([handle, min, max]() {
+        handle->searcher.startSearch(min, max, &handle->tmpl);
+        handle->done = true;
+    });
+    return handle;
+}
+
+extern "C" int pf_staticSearch4_progress(PFStaticSearch4Handle h)
+{
+    return static_cast<PFStaticSearch4 *>(h)->searcher.getProgress();
+}
+
+extern "C" bool pf_staticSearch4_done(PFStaticSearch4Handle h)
+{
+    return static_cast<PFStaticSearch4 *>(h)->done;
+}
+
+// The results found since the last call.
+extern "C" PFSearcherState4 *pf_staticSearch4_getResults(PFStaticSearch4Handle h, int *outCount)
+{
+    auto results = static_cast<PFStaticSearch4 *>(h)->searcher.getResults();
     *outCount = static_cast<int>(results.size());
     if (results.empty()) return nullptr;
 
@@ -810,6 +859,17 @@ extern "C" PFSearcherState4 *pf_staticSearch4(uint32_t minAdvance, uint32_t maxA
         out[i] = convertSearchState4(results[i]);
     }
     return out;
+}
+
+extern "C" void pf_staticSearch4_cancel(PFStaticSearch4Handle h)
+{
+    static_cast<PFStaticSearch4 *>(h)->searcher.cancelSearch();
+}
+
+// Waits for the search's thread, so cancel first to stop early.
+extern "C" void pf_staticSearch4_free(PFStaticSearch4Handle h)
+{
+    delete static_cast<PFStaticSearch4 *>(h);
 }
 
 // MARK: - Translator
@@ -829,6 +889,11 @@ static char *copyString(const std::string &s)
 extern "C" char *pf_getSpecieName(uint16_t specie)
 {
     return copyString(Translator::getSpecie(specie));
+}
+
+extern "C" char *pf_getFormName(uint16_t specie, uint8_t form)
+{
+    return copyString(Translator::getForm(specie, form));
 }
 
 extern "C" char *pf_getAbilityName(uint16_t ability)
@@ -961,6 +1026,8 @@ extern "C" PFStaticTemplate *pf_getStaticEncounters3(int type, int *outCount)
         out[i].ability = templates[i].getAbility();
         out[i].gender = templates[i].getGender();
         out[i].level = templates[i].getLevel();
+        out[i].method = 0;
+        out[i].ivCount = templates[i].getIVCount();
     }
     return out;
 }
@@ -981,6 +1048,8 @@ extern "C" PFStaticTemplate *pf_getStaticEncounters4(int type, int *outCount)
         out[i].ability = templates[i].getAbility();
         out[i].gender = templates[i].getGender();
         out[i].level = templates[i].getLevel();
+        out[i].method = static_cast<uint8_t>(templates[i].getMethod());
+        out[i].ivCount = templates[i].getIVCount();
     }
     return out;
 }
@@ -2118,6 +2187,7 @@ extern "C" PFGeneratorState5 *pf_staticGenerate5(uint64_t seed,
                                                     uint32_t initialAdvances,
                                                     uint32_t maxAdvances,
                                                     uint32_t offset,
+                                                    uint32_t ivInitialAdvances, uint32_t ivMaxAdvances,
                                                     uint8_t method,
                                                     uint8_t lead,
                                                     uint16_t tid, uint16_t sid,
@@ -2146,7 +2216,9 @@ extern "C" PFGeneratorState5 *pf_staticGenerate5(uint64_t seed,
                                 static_cast<Method>(method), static_cast<Lead>(lead),
                                 0, *tmpl, profile, filter);
 
-    auto results = generator.generate(seed, initialAdvances, maxAdvances);
+    // PokéFinder pairs each PID advance with each IV advance, so the IVs
+    // get their own range; the PID range there made (n + 1)² results.
+    auto results = generator.generate(seed, ivInitialAdvances, ivMaxAdvances);
     *outCount = static_cast<int>(results.size());
     if (results.empty()) return nullptr;
 
@@ -2163,6 +2235,7 @@ extern "C" PFWildGeneratorState5 *pf_wildGenerate5(uint64_t seed,
                                                       uint32_t initialAdvances,
                                                       uint32_t maxAdvances,
                                                       uint32_t offset,
+                                                      uint32_t ivInitialAdvances, uint32_t ivMaxAdvances,
                                                       uint8_t method,
                                                       uint8_t lead,
                                                       uint16_t tid, uint16_t sid,
@@ -2194,7 +2267,8 @@ extern "C" PFWildGeneratorState5 *pf_wildGenerate5(uint64_t seed,
                               static_cast<Method>(method), static_cast<Lead>(lead),
                               0, area, profile, filter);
 
-    auto results = generator.generate(seed, initialAdvances, maxAdvances);
+    // Each PID advance pairs with each IV advance, as the static one.
+    auto results = generator.generate(seed, ivInitialAdvances, ivMaxAdvances);
     *outCount = static_cast<int>(results.size());
     if (results.empty()) return nullptr;
 
@@ -2249,6 +2323,8 @@ extern "C" PFStaticTemplate *pf_getStaticEncounters5(int type, int *outCount)
         out[i].ability = templates[i].getAbility();
         out[i].gender = templates[i].getGender();
         out[i].level = templates[i].getLevel();
+        out[i].method = 0;
+        out[i].ivCount = templates[i].getIVCount();
     }
     return out;
 }
@@ -2978,6 +3054,8 @@ extern "C" PFStaticTemplate *pf_getStaticEncounters8(int type, int *outCount)
         out[i].ability = templates[i].getAbility();
         out[i].gender = templates[i].getGender();
         out[i].level = templates[i].getLevel();
+        out[i].method = 0;
+        out[i].ivCount = templates[i].getIVCount();
     }
     return out;
 }

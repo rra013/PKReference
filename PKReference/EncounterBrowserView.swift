@@ -188,76 +188,59 @@ struct EncounterAreaCard: View {
 }
 
 struct StaticEncounterBrowserView: View {
-    @State private var generation: StaticBrowserGen = .gen3
-    @State private var category: Int32 = 5
+    @State private var generation: FinderGeneration = .gen3
+    @State private var category: StaticEncounterCategory = .legends
 
-    enum StaticBrowserGen: String, CaseIterable, Identifiable {
-        case gen3 = "Gen 3"
-        case gen4 = "Gen 4"
-        case gen5 = "Gen 5"
-        var id: String { rawValue }
-    }
-
-    private var categoryNames: [(Int32, String)] {
-        switch generation {
-        case .gen3:
-            return [(0, "Starters"), (1, "Fossils"), (2, "Gifts"), (3, "Game Corner"),
-                    (4, "Stationary"), (5, "Legends"), (6, "Events"), (7, "Roamers"),
-                    (8, "XD/Colo"), (9, "Channel")]
-        case .gen4:
-            return [(0, "Starters"), (1, "Fossils"), (2, "Gifts"), (3, "Game Corner"),
-                    (4, "Stationary"), (5, "Legends"), (6, "Events"), (7, "Roamers")]
-        case .gen5:
-            return [(0, "Starters"), (1, "Fossils"), (2, "Gifts"),
-                    (3, "Stationary"), (4, "Legends"), (5, "Events"), (6, "Roamers")]
+    /// The same list the Finder offers: PokéFinder's tables.
+    private var categories: [StaticEncounterCategory] {
+        StaticEncounterCategory.allCases.filter { category in
+            StaticEncounterData.all.contains { $0.generation == generation && $0.category == category }
         }
     }
 
-    private var templates: [PFStaticTemplateSwift] {
-        switch generation {
-        case .gen3: return PFBridge.getStaticEncounters3(type: category)
-        case .gen4: return PFBridge.getStaticEncounters4(type: category)
-        case .gen5: return PFBridge.getStaticEncounters5(type: category)
-        }
+    private var encounters: [StaticEncounter] {
+        StaticEncounterData.all.filter { $0.generation == generation && $0.category == category }
     }
 
     var body: some View {
         ScrollView {
             CardStack {
                 Picker("Generation", selection: $generation) {
-                    ForEach(StaticBrowserGen.allCases) { g in Text(g.rawValue).tag(g) }
+                    ForEach(FinderGeneration.allCases) { g in Text(g.rawValue).tag(g) }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .onChange(of: generation) {
-                    let cats = categoryNames
-                    if !cats.contains(where: { $0.0 == category }) {
-                        category = cats.first?.0 ?? 0
-                    }
+                    if !categories.contains(category) { category = categories.first ?? .starters }
                 }
 
                 Picker("Category", selection: $category) {
-                    ForEach(categoryNames, id: \.0) { cat in
-                        Text(cat.1).tag(cat.0)
+                    ForEach(categories) { cat in
+                        Text(cat.rawValue).tag(cat)
                     }
                 }
 
-                let list = templates
+                let list = encounters
                 if list.isEmpty {
                     ContentUnavailableView("No Encounters",
                                            systemImage: "sparkles",
                                            description: Text("No static encounters for this category."))
                 } else {
                     LazyVStack(spacing: 6) {
-                        ForEach(list) { tmpl in
+                        ForEach(list) { encounter in
                             HStack {
-                                Text(tmpl.specieName)
+                                Text(encounter.speciesName)
                                     .font(.body)
+                                if encounter.shinyLocked {
+                                    Image(systemName: "lock.fill")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                        .accessibilityLabel("Shiny-locked")
+                                }
                                 Spacer()
-                                Text("Lv. \(tmpl.level)")
+                                Text("Lv. \(encounter.level)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                Text(gameLabel(tmpl.game))
+                                Text(gameLabel(encounter.games))
                                     .font(.caption2)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
@@ -283,6 +266,7 @@ struct StaticEncounterBrowserView: View {
             (1024, "HG"), (2048, "SS"), (3072, "HGSS"),
             (4096, "B"), (8192, "W"), (12288, "BW"),
             (16384, "B2"), (32768, "W2"), (49152, "B2W2"),
+            (67108864, "BD"), (134217728, "SP"), (201326592, "BDSP"),
         ]
         for (val, name) in mapping {
             if game == val { return name }
@@ -293,6 +277,7 @@ struct StaticEncounterBrowserView: View {
         if game & 3072 != 0 { return "HGSS" }
         if game & 12288 != 0 { return "BW" }
         if game & 49152 != 0 { return "B2W2" }
+        if game & 201326592 != 0 { return "BDSP" }
         return String(format: "0x%X", game)
     }
 }

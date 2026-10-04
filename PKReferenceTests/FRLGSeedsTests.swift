@@ -390,14 +390,14 @@ struct FRLGSeedsTests {
         #expect(PFBridge.staticTemplate3(species: 131, game: .leafGreen) != nil)
         // Treecko is a Hoenn starter.
         #expect(PFBridge.staticTemplate3(species: 252, game: .fireRed) == nil)
-        // Every FireRed and LeafGreen encounter the Finder offers, but Mew:
-        // PokéFinder has it only on Emerald's Faraway Island.
+        // Every FireRed and LeafGreen encounter the Finder offers is a
+        // template of that species, Mew too (Emerald's, PokéFinder having
+        // none for FireRed and LeafGreen).
         let all = StaticEncounterCategory.allCases.flatMap { StaticEncounterData.encounters(for: .fireRed, category: $0) }
-        #expect(!all.isEmpty)
-        for encounter in all where encounter.species != 151 {
-            #expect(PFBridge.staticTemplate3(species: encounter.species, game: .fireRed,
-                                             preferring: encounter.category.pfStaticType3) != nil,
-                    "\(encounter.speciesName)")
+        #expect(all.contains { $0.species == 151 })
+        for encounter in all {
+            let template = PFBridge.getStaticEncounters3(type: encounter.type)[Int(encounter.index)]
+            #expect(template.specie == encounter.species, "\(encounter.speciesName)")
         }
     }
 
