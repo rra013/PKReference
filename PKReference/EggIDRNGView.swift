@@ -459,6 +459,11 @@ struct EggRNGView: View {
 // MARK: - ID RNG View
 
 struct IDRNGView: View {
+    /// Gen 3 and 4. Gen 8's IDs are the Finder's TID/SID mode (the same
+    /// BDSP generator), and Gen 5's need the profile work (RNG fixes PR 12):
+    /// both tabs ran Gen 4's generator.
+    static let generations: [FinderGeneration] = [.gen3, .gen4]
+
     @State private var generation: FinderGeneration = .gen3
     @State private var selectedGame: FinderGameVersion = .emerald
 
@@ -505,7 +510,7 @@ struct IDRNGView: View {
         ScrollView {
             CardStack {
                 Picker("Generation", selection: $generation) {
-                    ForEach(FinderGeneration.allCases) { g in Text(g.rawValue).tag(g) }
+                    ForEach(Self.generations) { g in Text(g.rawValue).tag(g) }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -592,7 +597,7 @@ struct IDRNGView: View {
     /// every ID).
     private var setFilterNames: [String] {
         guard generation == .gen4 else { return [] }
-        return [("TID", gen4FilterTID), ("SID", gen4FilterSID), ("TSV", gen4FilterTSV && gen4Mode == 1)]
+        return [("TID", gen4FilterTID), ("SID", gen4FilterSID), ("TSV", gen4FilterTSV)]
             .filter(\.1).map(\.0)
     }
 
@@ -650,7 +655,7 @@ struct IDRNGView: View {
 
     private var gen4GeneratorInputs: some View {
         SectionCard(title: "Gen 4 ID Generator", icon: "number") {
-            Text("Set the DS date/time and delay range to generate possible TID/SID combinations.")
+            Text("Set the DS date/time and delay range to generate possible TID/SID combinations. The delays are the ones to hit on a DS set to that year.")
                 .font(.caption).foregroundStyle(.secondary)
 
             RNGIntField(label: "Min Delay", value: $gen4MinDelay, range: RNGFieldRange.word)
@@ -692,7 +697,7 @@ struct IDRNGView: View {
 
     private var gen4SearcherInputs: some View {
         SectionCard(title: "Gen 4 ID Searcher", icon: "magnifyingglass") {
-            Text("Exhaustively search all possible seeds for a target TID/SID. Set at least one filter to narrow results.")
+            Text("Exhaustively search all possible seeds for a target TID/SID. Set at least one filter to narrow results. The delays are the ones to hit on a DS set to the year.")
                 .font(.caption).foregroundStyle(.secondary)
 
             HStack {
@@ -995,6 +1000,7 @@ struct IDRNGView: View {
         let hr = UInt8(clamping: gen4Hour), mn = UInt8(clamping: gen4Minute)
         let targetTID = gen4TargetTID, fTID = gen4FilterTID
         let targetSID = gen4TargetSID, fSID = gen4FilterSID
+        let targetTSV = gen4TargetTSV, fTSV = gen4FilterTSV
 
         selectedResult = nil
         searchTask?.cancel()
@@ -1030,7 +1036,8 @@ struct IDRNGView: View {
                     year: yr, month: mo, day: dy,
                     hour: hr, minute: mn,
                     targetTID: targetTID, filterTID: fTID,
-                    targetSID: targetSID, filterSID: fSID)
+                    targetSID: targetSID, filterSID: fSID,
+                    targetTSV: targetTSV, filterTSV: fTSV)
                 await MainActor.run {
                     guard !Task.isCancelled else { return }
                     results4 = r

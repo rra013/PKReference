@@ -28,13 +28,13 @@ says what changed and what was checked.
 | [#57](https://github.com/rra013/PKReference/pull/57)–[#59](https://github.com/rra013/PKReference/pull/59) | Siri, Spotlight and Shortcuts, Phase 2: Compare Speed, Check Legality, saved sets and teams (in Spotlight too), the system's in-app search, and search sentences read into a damage calc. See [Feature notes](#siri-spotlight-and-shortcuts). |
 | [#60](https://github.com/rra013/PKReference/pull/60)–[#67](https://github.com/rra013/PKReference/pull/67), [#69](https://github.com/rra013/PKReference/pull/69) | The Problem Solver: the solver and its tab, field options, grouping by Pokémon, two hits, an ability filter, usage ranking, Siri's Find Counters, and Sturdy, Focus Sash and Disguise taking a hit in the calc. See [Feature notes](#problem-solver). |
 | [#68](https://github.com/rra013/PKReference/pull/68), [#85](https://github.com/rra013/PKReference/pull/85) | Champions data: Dragoninite in every regulation; the 15 items M-B added, which M-B and M-C lacked; and the game's names for Golisopite and Baxcalibrite. Sets saved with the old names still load (`HeldItem.renamed`). |
-| [#70](https://github.com/rra013/PKReference/pull/70)–[#83](https://github.com/rra013/PKReference/pull/83) | RNG tools: FireRed/LeafGreen initial seeds and calibration from Ten Lines (#70–#72), a Mac crash opening Calibrate (#73), then the RNG fixes' PRs 1–8, 11 and 11b from the 2026-10-03 audit (#74–#83), and PR 9, wild areas from PokéFinder's tables. See [`RNGFixes-PLAN.md`](RNGFixes-PLAN.md). |
+| [#70](https://github.com/rra013/PKReference/pull/70)–[#83](https://github.com/rra013/PKReference/pull/83) | RNG tools: FireRed/LeafGreen initial seeds and calibration from Ten Lines (#70–#72), a Mac crash opening Calibrate (#73), then the RNG fixes' PRs 1–8, 11 and 11b from the 2026-10-03 audit (#74–#83), and PRs 9 and 10, wild areas from PokéFinder's tables and the Gen 4 tools' year. See [`RNGFixes-PLAN.md`](RNGFixes-PLAN.md). |
 | [#84](https://github.com/rra013/PKReference/pull/84), [#85](https://github.com/rra013/PKReference/pull/85) | An optional backend in `backend/`: Limitless tournaments through Kafka into usage counts served over REST, with hand-typed names standardized. The app doesn't use it yet. |
 
 Before that, #23–#56 were the UI pass, game data into JSON, iPad fixes, the
 Mac app, Siri Phase 1 and the rename to PK Reference.
 
-Full suite on 2026-10-05, with the RNG fixes' PR 9: 1,253 tests, all passing
+Full suite on 2026-10-05, with the RNG fixes' PR 10: 1,260 tests, all passing
 on the iPhone 17 Pro Max simulator. The iOS and Mac builds had no warnings.
 
 ---
@@ -473,15 +473,11 @@ From the recent PRs, each also noted in its description:
 Roughly in order of value for effort. Only open work is listed; what's done
 is in [Recent work](#recent-work) and the README.
 
-1. **The RNG fixes' last two PRs**, in
-   [`RNGFixes-PLAN.md`](RNGFixes-PLAN.md) §6–§7, with the owner's choices in
-   its §10. (PR 9, wild areas from PokéFinder's tables, is §5.)
-   - PR 10 fixes the Gen 4 tools: Seed to Time's year, TID/SID's delays and
-     TSV filter, and removes TID/SID's Gen 8 tab.
-   - PR 12 adds Gen 5 profiles, a calibrator, Gen 5 IDs and Gen 5's Send to
-     Timer.
-
-   When PR 12 merges, the plan's leftovers come here and the file goes.
+1. **The RNG fixes' last PR**, PR 12, in
+   [`RNGFixes-PLAN.md`](RNGFixes-PLAN.md) §7, with the owner's choices in its
+   §10: Gen 5 profiles, a calibrator, Gen 5 IDs (TID/SID's Gen 5 tab returns
+   with it) and Gen 5's Send to Timer. When it merges, the plan's leftovers
+   come here and the file goes.
 2. **The items M-B added that sets can't hold.** #85 made M-B's 15 items
    legal, but 11 have no `HeldItem`: Wide Lens, Muscle Band, Wise Glasses,
    Zoom Lens, Iron Ball, Shed Shell, Big Root and the four weather rocks.
@@ -573,7 +569,7 @@ is in [Recent work](#recent-work) and the README.
 | [`PKReference/Core/MODIFICATIONS.md`](PKReference/Core/MODIFICATIONS.md) | Changes made to PokéFinder's code (required by its GPL) |
 | [`PKReference/ShowdownPort-NOTES.md`](PKReference/ShowdownPort-NOTES.md) | Scope and wiring of the `@smogon/calc` port |
 | [`PKReference/AbilityReference.md`](PKReference/AbilityReference.md) | Which abilities the legacy damage engine models (matchups the port can't take) |
-| [`RNGFixes-PLAN.md`](RNGFixes-PLAN.md) | Fixes from the 2026-10-03 RNG tools audit: PRs 1–9, 11 and 11b done; 10 and 12 planned |
+| [`RNGFixes-PLAN.md`](RNGFixes-PLAN.md) | Fixes from the 2026-10-03 RNG tools audit: PRs 1–11 and 11b done; 12 planned |
 | [`RNGRewrite-PLAN.md`](RNGRewrite-PLAN.md) | Plan for an independent RNG core (on hold) |
 | [`tools/README.md`](tools/README.md) | Adding a Champions regulation, and the scripts that regenerate the bundled data |
 | [`backend/README.md`](backend/README.md) | Running and testing the optional backend |

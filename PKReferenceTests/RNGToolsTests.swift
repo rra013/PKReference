@@ -2720,3 +2720,85 @@ struct WildAreaTests {
         #expect(!results.isEmpty && results.allSatisfy { $0.specie == nightOnly })
     }
 }
+
+// MARK: - Gen 4 Tools Tests
+
+/// RNG fixes PR 10: the DS year in Seed to Time and the TID/SID tool, the
+/// Generator's TSV filter, and TID/SID's generations.
+struct Gen4ToolsTests {
+    /// A later year takes one off the delay for each year after 2000, and
+    /// the clock time with that year and delay gives back the seed.
+    @Test func seedToTimeYear() {
+        let seed: UInt32 = 0x0510_0320
+        let in2000 = seedToTimeGen4(seed: seed)
+        let in2010 = seedToTimeGen4(seed: seed, year: 2010)
+        #expect(!in2010.isEmpty && in2010.allSatisfy { $0.delay == 800 - 10 && $0.year == 2010 })
+        #expect(in2000.allSatisfy { $0.delay == 800 })
+        for time in in2010.prefix(20) {
+            let clock = Gen4SeedTime(year: time.year, month: time.month, day: time.day, hour: Int(time.hour),
+                                     minute: time.minute, second: time.second, delay: Int(time.delay))
+            #expect(clock.seed == seed)
+        }
+        #expect(in2010.first?.displayTime.hasPrefix("2010/") == true)
+    }
+
+    /// A year that would need a negative delay gives nothing.
+    @Test func seedToTimeYearTooLate() {
+        let seed: UInt32 = 0x0510_0005
+        #expect(seedToTimeGen4LatestYear(seed: seed) == 2005)
+        #expect(!seedToTimeGen4(seed: seed, year: 2005).isEmpty)
+        #expect(seedToTimeGen4(seed: seed, year: 2006).isEmpty)
+        // Hours past 23 carry 0x10000 delays each.
+        #expect(seedToTimeGen4LatestYear(seed: 0x0019_0000) == 2000 + 2 * 0x10000)
+    }
+
+    /// TID/SID's Generator shows the delays entered for the year: the
+    /// seed's low bits are the delay plus the years since 2000, so a 2010
+    /// delay is the 2000 one less 10.
+    @Test func idGeneratorYear() throws {
+        let in2010 = PFBridge.idGenerate4(minDelay: 600, maxDelay: 605, year: 2010, month: 1, day: 1, hour: 0, minute: 0)
+        #expect(in2010.count == 6 * 60)
+        #expect(in2010.allSatisfy { (600...605).contains($0.delay) && $0.seed & 0xFFFF == $0.delay + 10 })
+        let in2000 = PFBridge.idGenerate4(minDelay: 610, maxDelay: 610, year: 2000, month: 1, day: 1, hour: 0, minute: 0)
+        let sameSeed = try #require(in2000.first)
+        let match = try #require(in2010.first { $0.seed == sameSeed.seed })
+        #expect(match.delay == 600 && match.tid == sameSeed.tid && match.sid == sameSeed.sid)
+    }
+
+    /// The Generator's TSV filter is passed (only the Searcher's was).
+    @Test func idGeneratorTSV() throws {
+        let all = PFBridge.idGenerate4(minDelay: 500, maxDelay: 1_500, year: 2000, month: 1, day: 1, hour: 0, minute: 0)
+        let tsv = try #require(all.first).tsv
+        let filtered = PFBridge.idGenerate4(minDelay: 500, maxDelay: 1_500, year: 2000, month: 1, day: 1, hour: 0, minute: 0,
+                                            targetTSV: tsv, filterTSV: true)
+        #expect(!filtered.isEmpty && filtered.count < all.count && filtered.allSatisfy { $0.tsv == tsv })
+    }
+
+    /// The Searcher shows the delays entered for the year too.
+    @Test func idSearcherYear() async {
+        let handle = PFBridge.idSearch4Start(infinite: false, year: 2010, minDelay: 600, maxDelay: 601)
+        while !PFBridge.idSearch4Done(handle) { try? await Task.sleep(for: .milliseconds(20)) }
+        let results = PFBridge.idSearch4GetResults(handle)
+        PFBridge.idSearch4Free(handle)
+        #expect(results.count == 2 * 256 * 24)
+        #expect(results.allSatisfy { (600...601).contains($0.delay) && $0.seed & 0xFFFF == $0.delay + 10 })
+    }
+
+    /// Checking around a bare seed (the Finder's Generator) gives delays for
+    /// the same year as Seed to Time, so the Timer's hit and target agree.
+    @Test func seedCheckYear() throws {
+        let seed: UInt32 = 0x2C11_02EA
+        let in2010 = Gen4SeedCheck.candidates(aroundSeed: seed, delays: 2, seconds: 0, year: 2010)
+        let exact = try #require(in2010.first { $0.delayOffset == 0 })
+        #expect(exact.seed == seed && exact.delay == 0x02EA - 10)
+        let target = try #require(seedToTimeGen4(seed: seed, year: 2010).first)
+        #expect(Int(target.delay) == exact.delay)
+    }
+
+    /// TID/SID offers Gen 3 and 4: its Gen 5 and 8 tabs ran Gen 4's
+    /// generator.
+    @MainActor
+    @Test func idToolGenerations() {
+        #expect(IDRNGView.generations == [.gen3, .gen4])
+    }
+}

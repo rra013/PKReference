@@ -1003,6 +1003,7 @@ struct SeedToTimeResult4: Identifiable, Hashable {
     let id = UUID()
     let seed: UInt32
     let delay: UInt32
+    var year = 2000
     let hour: UInt8
     let month: Int
     let day: Int
@@ -1010,7 +1011,7 @@ struct SeedToTimeResult4: Identifiable, Hashable {
     let second: Int
 
     var displayTime: String {
-        String(format: "%02d/%02d %02d:%02d:%02d  (delay %d)", month, day, hour, minute, second, delay)
+        String(format: "%04d/%02d/%02d %02d:%02d:%02d  (delay %d)", year, month, day, hour, minute, second, delay)
     }
 }
 
@@ -1298,14 +1299,27 @@ nonisolated func seedToTimeGen3(seed: UInt32) -> (originSeed: UInt16, advances: 
 /// Convert a 32-bit seed to date/time combinations (Gen 4).
 /// Seed format: ab|cd|efgh where ab = hash, cd = hour, efgh = delay.
 /// Ported from PokeFinder's SeedToTimeCalculator4.
-nonisolated func seedToTimeGen4(seed: UInt32) -> [SeedToTimeResult4] {
-    let bridgeResults = PFBridge.seedToTime4(seed: seed, year: 2000)
+///
+/// On a DS set to `year` the delay is `efgh` less the years since 2000, so a
+/// later year shortens it. A year past `seedToTimeGen4LatestYear(seed:)`
+/// would need a negative delay, and gives nothing.
+nonisolated func seedToTimeGen4(seed: UInt32, year: Int = 2000) -> [SeedToTimeResult4] {
+    guard year <= seedToTimeGen4LatestYear(seed: seed) else { return [] }
+    let bridgeResults = PFBridge.seedToTime4(seed: seed, year: UInt16(clamping: year))
     return bridgeResults.prefix(300).map { r in
-        SeedToTimeResult4(seed: seed, delay: UInt32(r.delay),
+        SeedToTimeResult4(seed: seed, delay: UInt32(r.delay), year: year,
                           hour: UInt8(r.dateTime.hour),
                           month: r.dateTime.month, day: r.dateTime.day,
                           minute: r.dateTime.minute, second: r.dateTime.second)
     }
+}
+
+/// The last year whose delay for `seed` isn't negative: 2000 plus its
+/// delay in 2000 (PokéFinder's `efgh`, and the hours past 23 it carries).
+nonisolated func seedToTimeGen4LatestYear(seed: UInt32) -> Int {
+    let hour = Int((seed >> 16) & 0xFF)
+    let delay2000 = Int(seed & 0xFFFF) + max(0, hour - 23) * 0x10000
+    return 2000 + delay2000
 }
 
 // ============================================================================
@@ -3652,6 +3666,8 @@ struct FinderRootView: View {
     @AppStorage("finder_wildWaterBlocks") private var wildWaterBlocks: Int = 0
     /// HeartGold and SoulSilver's fishing modifier, as PokéFinder offers it.
     @AppStorage("finder_wildHappiness") private var wildHappiness: Int = 0
+    /// Seed to Time's DS year, for the seed check's delays.
+    @AppStorage("finder_gen4SeedYear") private var gen4SeedYear: Int = 2000
 
     enum EncounterMode: String, CaseIterable, Identifiable {
         case static_ = "Static"
@@ -4286,6 +4302,7 @@ struct FinderRootView: View {
         .sheet(isPresented: $checkingSeed) {
             NavigationStack {
                 Gen4SeedCheckView(target: Gen4SeedTime(), bareSeed: UInt32(genSeedText, radix: 16) ?? 0,
+                                  year: gen4SeedYear.clamped(to: 2000...2099),
                                   heartGoldSoulSilver: selectedGame == .heartGold || selectedGame == .soulSilver) { candidate in
                     let bridge = FinderTimerBridge.shared
                     bridge.pendingHit = TimerHit(generation: .gen4, delay: candidate.delay,
@@ -5753,6 +5770,9 @@ struct SeedToTimeView: View {
 
     @State private var timeResults3: [SeedToTimeResult3] = []
     @State private var timeResults4: [SeedToTimeResult4] = []
+    /// Gen 4: the year the DS is set to. A later year takes one off the
+    /// delay for each year after 2000 (PokéFinder's Seed to Time takes it).
+    @AppStorage("finder_gen4SeedYear") private var gen4Year: Int = 2000
     /// Gen 3 (not FireRed and LeafGreen's seed list): where the target's
     /// frames count from.
     @State private var gen3Start: Gen3TargetStart?
@@ -5862,6 +5882,10 @@ struct SeedToTimeView: View {
             gen3TimeSection
         }
 
+        if generation == .gen4 {
+            gen4YearCard
+        }
+
         if generation == .gen4 && !timeResults4.isEmpty {
             gen4TimeSection
         }
@@ -5869,6 +5893,11 @@ struct SeedToTimeView: View {
         if generation == .gen5 {
             Text("Seed-to-time is not applicable for Gen 5.")
                 .foregroundStyle(.secondary)
+        } else if !isComputing && generation == .gen4 && timeResults4.isEmpty
+                    && gen4Year > seedToTimeGen4LatestYear(seed: result.seed) {
+            Text("This seed's delay is \(seedToTimeGen4LatestYear(seed: result.seed) - 2000) on a DS set to 2000, so a year after \(seedToTimeGen4LatestYear(seed: result.seed)) would need a negative delay. Choose an earlier year.")
+                .font(.caption).foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
         } else if !isComputing && (
             (generation == .gen3 && gen3Start?.kind == .clock && timeResults3.isEmpty) ||
             (generation == .gen4 && timeResults4.isEmpty)
@@ -5876,6 +5905,24 @@ struct SeedToTimeView: View {
             Text("No date/time combos found for this seed.")
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// The DS's year, which sets the delay.
+    private var gen4YearCard: some View {
+        SectionCard(title: "DS Year", icon: "calendar") {
+            HStack {
+                Text("Year")
+                Spacer()
+                LiveIntField("2000", value: $gen4Year, range: 2000...2099, grouping: false)
+                    .clamping($gen4Year, to: 2000...2099)
+                    .textFieldStyle(.roundedBorder).scaledWidth(80)
+                    .multilineTextAlignment(.trailing)
+            }
+            Text("Set your DS to this year. Each year after 2000 takes one off the delay, so a later year can make a long delay shorter.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .onChange(of: gen4Year) { Task { await computeTimes() } }
     }
 
     /// What tells you what you hit: Gen 3 from the catch, Gen 4 from the
@@ -5995,8 +6042,9 @@ struct SeedToTimeView: View {
                 }.value
             }
         } else {
+            let year = gen4Year.clamped(to: 2000...2099)
             let r = await Task.detached {
-                return seedToTimeGen4(seed: seedVal)
+                return seedToTimeGen4(seed: seedVal, year: year)
             }.value
             timeResults4 = r
         }
@@ -6030,7 +6078,7 @@ struct SeedToTimeView: View {
         bridge.pendingGen = .gen4
         bridge.pendingTargetDelay = Int(time.delay)
         bridge.pendingTargetSecond = time.second
-        bridge.pendingSeedTime = Gen4SeedTime(month: time.month, day: time.day, hour: Int(time.hour),
+        bridge.pendingSeedTime = Gen4SeedTime(year: time.year, month: time.month, day: time.day, hour: Int(time.hour),
                                               minute: time.minute, second: time.second, delay: Int(time.delay))
         bridge.pendingHGSS = game == .heartGold || game == .soulSilver
         bridge.selectedTime = time.displayTime
