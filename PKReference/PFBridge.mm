@@ -2,6 +2,8 @@
 
 #include <Core/Util/IVToPIDCalculator.hpp>
 #include <Core/Util/IVChecker.hpp>
+#include <Core/Parents/PersonalLoader.hpp>
+#include <Core/Parents/PersonalInfo.hpp>
 #include <Core/Gen3/Tools/PIDToIVCalculator.hpp>
 #include <Core/Gen3/Tools/SeedToTimeCalculator3.hpp>
 #include <Core/Gen4/Tools/SeedToTimeCalculator4.hpp>
@@ -21,6 +23,7 @@
 #include <Core/Gen3/States/PIDToIVState.hpp>
 #include <Core/Gen4/States/State4.hpp>
 #include <Core/Gen4/SeedTime4.hpp>
+#include <Core/Gen4/HGSSRoamer.hpp>
 #include <Core/Util/DateTime.hpp>
 #include <Core/Enum/Method.hpp>
 #include <Core/Enum/Lead.hpp>
@@ -2168,6 +2171,79 @@ extern "C" char *pf_getCalls(uint32_t seed, uint8_t skips)
 {
     std::string result = Utilities4::getCalls(seed, skips);
     return copyString(result);
+}
+
+extern "C" uint8_t pf_hgssRoamer(uint32_t seed, const bool roamers[3], const uint8_t routes[3], uint8_t outRoutes[3])
+{
+    HGSSRoamer roamer(seed, { roamers[0], roamers[1], roamers[2] }, { routes[0], routes[1], routes[2] });
+    // HGSSRoamer's route string is the only way to its routes: "R: 32 E: 36 L: 9".
+    outRoutes[0] = outRoutes[1] = outRoutes[2] = 0;
+    std::string text = roamer.getRouteString();
+    for (size_t i = 0; i + 2 < text.size(); i++)
+    {
+        int index = text[i] == 'R' ? 0 : text[i] == 'E' ? 1 : text[i] == 'L' ? 2 : -1;
+        if (index < 0 || text[i + 1] != ':') continue;
+        outRoutes[index] = static_cast<uint8_t>(std::atoi(text.c_str() + i + 2));
+    }
+    return roamer.getSkips();
+}
+
+extern "C" uint32_t pf_lcrngDistance(uint32_t from, uint32_t to)
+{
+    return PokeRNG::distance(from, to);
+}
+
+// The newest Pokémon each game's personal table has, so a lookup stays in it.
+static u16 maxSpecie(Game game)
+{
+    if ((game & Game::Gen3) != Game::None) return 386;
+    if ((game & (Game::Gen4 | Game::BDSP)) != Game::None) return 493;
+    if ((game & Game::Gen5) != Game::None) return 649;
+    if ((game & Game::SwSh) != Game::None) return 898;
+    return 0;
+}
+
+static const PersonalInfo *personal(uint32_t game, uint16_t specie, uint8_t form)
+{
+    Game version = static_cast<Game>(game);
+    if (specie == 0 || specie > maxSpecie(version)) return nullptr;
+    const PersonalInfo *info = PersonalLoader::getPersonal(version, specie, form);
+    // A form the table doesn't have reads as all-zero stats.
+    if (!info) return nullptr;
+    auto stats = info->getStats();
+    return std::any_of(stats.begin(), stats.end(), [](u8 stat) { return stat != 0; }) ? info : nullptr;
+}
+
+extern "C" bool pf_baseStats(uint32_t game, uint16_t specie, uint8_t form, uint8_t out[6])
+{
+    const PersonalInfo *info = personal(game, specie, form);
+    if (!info) return false;
+    auto stats = info->getStats();
+    std::copy(stats.begin(), stats.end(), out);
+    return true;
+}
+
+extern "C" bool pf_calcIVs(uint32_t game, uint16_t specie, uint8_t form,
+                           const uint8_t *levels, const uint16_t *stats, int count,
+                           uint8_t nature, uint8_t characteristic, uint8_t hiddenPower,
+                           uint32_t outMasks[6])
+{
+    const PersonalInfo *info = personal(game, specie, form);
+    if (!info || count <= 0) return false;
+
+    std::vector<u8> parsedLevels;
+    std::vector<std::array<u16, 6>> parsedStats;
+    for (int i = 0; i < count; i++) {
+        parsedLevels.push_back(levels[i]);
+        parsedStats.push_back({ stats[i * 6], stats[i * 6 + 1], stats[i * 6 + 2],
+                                stats[i * 6 + 3], stats[i * 6 + 4], stats[i * 6 + 5] });
+    }
+    auto possible = IVChecker::calculateIVRange(info->getStats(), parsedStats, parsedLevels, nature, characteristic, hiddenPower);
+    for (int i = 0; i < 6; i++) {
+        outMasks[i] = 0;
+        for (u8 iv : possible[i]) if (iv < 32) outMasks[i] |= 1u << iv;
+    }
+    return true;
 }
 
 // MARK: - Gen 5 Helpers

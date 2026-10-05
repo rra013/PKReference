@@ -1,7 +1,7 @@
 # RNG tools fixes: plan
 
-Status: **PRs 1–5 merged** (2026-10-03/04); PR 6 built, PRs 7–12 planned
-(§7). From
+Status: **PRs 1–6 merged** (2026-10-03/04); PR 11 built, PRs 7–10, 11b
+and 12 planned (§7). From
 the RNG audit's 45 findings, and four found since (46–49). Findings 1–10
 are §2–§5, as four PRs; the rest are §7, as eight more. The owner took
 every recommendation in §8, and in §9 for PRs 5–12.
@@ -270,8 +270,9 @@ reported to the owner.
 | 7 | 12, 13, 31, 39 | Gen 3 targets: Ruby/Sapphire days, Emerald, Dead Battery |
 | 8 | 36, 37, 48 | Finder results: generators in chunks, empty and stale results |
 | 9 | 19, 20, 24, 25, 44, 49 | Wild areas from PokéFinder's tables |
-| 10 | 17 (Gen 8), 35, 38, 40 | Gen 4 tools: years, delays, TSV, seconds |
-| 11 | 14, 21, 42, 43 | Checking a catch: IVs from each game's stats |
+| 10 | 17 (Gen 8), 35, 40 | Gen 4 tools: years, delays, TSV |
+| 11 | 14 (and 38) | What you hit: Gen 4's seed check, Gen 3's frame and seed |
+| 11b | 21, 42, 43 | IV Calc with each game's base stats, IV fields |
 | 12 | 17 (Gen 5), 26, 34 | Gen 5 profiles, calibrator, IDs and Timer |
 
 PR 5 is small and fixes results that are wrong today, so it goes first.
@@ -469,7 +470,7 @@ tables: generation, encounter type, location ID and settings.
   Parks search different tables; winter Route 7 has Cubchoo; a Gen 4
   night route differs from morning; every label set sums to 100.
 
-### 7.6 PR 10: Gen 4 tools (17 Gen 8, 35, 38, 40)
+### 7.6 PR 10: Gen 4 tools (17 Gen 8, 35, 40)
 
 - **Seed to Time year (35):** a year choice (default 2000) with a note to
   set the DS to it. PokéFinder takes the year; a later one shortens the
@@ -478,47 +479,92 @@ tables: generation, encounter type, location ID and settings.
   seed's low 16 bits and reports `efgh + 2000 - year`, so the bridge turns
   the entered delays into those bits for the year; the Generator's Filter
   TSV is passed (today only the Searcher's is).
-- **Coin flips and calls (38):** also try neighbouring seconds (the seed's
-  top byte), with a ± seconds field, as PokéFinder's Seed to Time does.
+- **Coin flips and calls (38):** done in PR 11 (its seed check tries
+  neighbouring seconds).
 - **TID/SID's Gen 8 tab (17):** removed; the Finder's Gen 8 TID/SID mode is
   the same BDSP generator (§9). Gen 5's tab hides until PR 12.
 - **Tests:** for 2010, the delays shown are the ones entered; the TSV
   filter keeps only matches; a coin flip one second off is found; a 2010
   delay is the 2000 one less 10.
 
-### 7.7 PR 11: checking a catch (14, 21, 42, 43)
+### 7.7 PR 11: what you hit (14), and PR 11b: IV Calc (21, 42, 43)
 
-- **Bridge:** PokéFinder's `IVChecker::calculateIVRange` with that game's
-  base stats (`PersonalLoader::getPersonal`), characteristic, Hidden Power
-  and several stat lines (levels).
+PR 11 is split, so the part the owner asked for comes first.
+
+**PR 11, built (2026-10-04): what you hit.** A simulated run showed nothing
+in the app tells you which seed, delay or frame you hit, so the Timer's
+Delay Hit and Frame Hit had to come from elsewhere.
+
+- **Gen 4: Check Your Seed.** The owner's point: Gen 4 calibrates by
+  checking the seed right after loading, by the Pokétch's coin flips
+  (Diamond, Pearl and Platinum), or the roamers and Elm's or Irwin's calls
+  (HeartGold and SoulSilver). This is what PokéFinder's and RNG Reporter's
+  Seed to Time calibration does (`SeedToTimeCalculator4::calibrate`, and
+  Smogon's DPP/HGSS guide part 2, "Delay / Seed Verification").
+  - It lists the seeds some delays (default ±20) and seconds (±1) either
+    side of the target, with each one's flips, roamer routes and calls.
+    You enter what the game shows, and they narrow to the seed you hit.
+    "Use Delay N as Delay Hit" sets the Timer's, ready for Update
+    Calibration.
+  - The Finder's Seed to Time now hands the Timer the target's whole
+    clock time (not just its delay and second), so the check knows the
+    seeds around it. The roamers come from PokéFinder's `HGSSRoamer`,
+    bridged (`pf_hgssRoamer`: their PRNG skips and new routes).
+  - When you hit an odd delay for an even target, or the reverse, it says
+    so, with the guide's fix: change the DS year by 1, or put a GBA game in
+    Slot 2.
+  - The Finder's Gen 4 Generator opens the same check around its seed,
+    replacing the old Coin Flip and Elm/Irwin finders. Those scanned seeds
+    numerically, so a second off was never found (finding 38, done here).
+- **Gen 3: What You Hit.** On a Gen 3 static target's page (not FireRed
+  and LeafGreen's farmed seeds, which have Calibrate), you enter what you
+  caught: nature, gender, shininess, and IVs from its stats. It lists the
+  frames near the target, from the game's initial seed, that make it.
+  - The initial seed is Emerald's 0000, a dead battery's 05A0, otherwise
+    the seed before the target's, and editable.
+  - A Searcher's target frame is the PRNG distance from the initial seed
+    (`pf_lcrngDistance`).
+  - "Use as Frame Hit" gives the Timer the frames you were off by, added to
+    its own target frame.
+- **Gen 3: your seed (Variable Target).** The Generator gets "From
+  Trainer ID" (a new game's seed is the Trainer ID: 11686 is 2DA6) and
+  "From a Pokémon You Caught". The second walks IV→PID's matches back to
+  the 16-bit seed and frame; it tries up to 64 IV combinations, so narrow
+  ones work.
+- **Verify Catch (14)** is gone. Its "Delay Delta" compared the low bits of
+  the wrong seeds.
+- **Also:** a DS target handed to the Timer moves its console off GBA.
+- **Tests:** the coin flips and calls are PokéFinder's; every Seed to Time
+  clock time gives back its seed; the clock rolls over (31 December, a leap
+  day); ten flips find a seed 4 delays and a second late among 123; the
+  roamers take their skips, land on routes they roam, and with the calls
+  find the seed; a bare seed's neighbours move by the second and the
+  delay; a Searcher target's frame from seed 0 generates it; a Squirtle
+  caught 4 frames late is found 4 late; a caught Pokémon leads back to a
+  seed and frame that make it; a Trainer ID gives its seed.
+- **On the simulator, recorded:** Gen 4 Dialga's target through Seed to
+  Time to the Timer; Check Your Seed with ten flips finds delay 750 (+4)
+  alone among 123 seeds, and calibrates 600 → 603. Then FireRed's Trainer
+  ID 11686 gives seed 2DA6; a HP 19 / Attack 31 Docile is frame 9,613,
+  4 late; Frame Hit 9,595 calibrates 0 → −67 ms.
+
+**PR 11b, planned: IV Calc and the IV fields (21, 42, 43).**
+
+- **Bridge:** PokéFinder's `IVChecker::calculateIVRange` for any species,
+  with that game's base stats (`pf_calcIVs`, `pf_baseStats`, built in PR 11
+  and tested there).
 - **IV Calc (21):** a game choice. Gen 3–5 and BDSP games use PokéFinder's
   base stats and checker (a fresh catch has no EVs); today's games keep
   the current stats and EV inputs (§9). Dozens of species' stats changed
   in Gen 6.
-- **Verify Catch (14):** its "Delay Delta" compares the low bits of the
-  wrong seeds (+29,179 for an exact hit). Reworked as "What You Hit" (§9):
-  enter what you caught (stats, as Calibrate does), it finds that Pokémon's
-  frame and walks back to the initial seed. Gen 4: the seed, delay and
-  advance hit (and the second), and a button that sets the Timer's Delay
-  Hit and calibrates it. Emerald (and a dead-battery Ruby/Sapphire): the
-  advance hit, for the Timer's Frame Hit. Ruby/Sapphire clocks and Gen 5
-  don't show it; FireRed/LeafGreen have Calibrate.
-- **Which seed you got (Gen 3 Variable Target):** the FireRed/LeafGreen
-  and Emerald new-game manips learn their seed from the Trainer ID (the
-  seed is the ID: 11686 is 2DA6), and others from a Pokémon's IVs
-  (IV→PID, then the 16-bit seed). The Generator gets a "Seed from Trainer
-  ID" entry and a "Seed from a Pokémon" lookup, so the seed comes from the
-  app, not a hex converter. Then a frame near the target that matches
-  what you caught gives the Frame Hit.
 - **IV→PID's nature (42):** a picker with names, not "Nature (0-24)".
 - **IV fields (43):** the Eggs parent IVs show blank capsules. They're
   `IVSliderRow8`, a stepped slider (20 uses); confirm on the simulator
   that it's the slider's tick marks, then replace it with a 0–31 number
-  field everywhere.
+  field everywhere. The number fields have no way to dismiss the keyboard
+  on iOS (seen in PR 11's run); add one.
 - **Tests:** IVs from known stats in a Gen 3 and a Gen 6+ game differ where
-  the base stats did; a generated Gen 4 target's catch reports its delay
-  and advance; a Trainer ID gives its seed; a generated Gen 3 Pokémon's
-  IVs give back its seed and frame.
+  the base stats did.
 
 ### 7.8 PR 12: Gen 5 profiles (17 Gen 5, 26, 34)
 

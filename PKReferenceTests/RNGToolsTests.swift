@@ -834,37 +834,86 @@ struct FinderGen4AdditionalTests {
     }
 }
 
-// MARK: - PokeFinder: Seed Verification Tests
+// MARK: - Gen 3 What You Hit Tests
 
-struct SeedVerificationTests {
-    @Test func verifySeed_usingGeneratorResult() {
-        // Use a known generator result (seed 0, advance 0) and verify its IVs
-        let results = staticGenerateGen3(
-            seed: 0, initialAdvance: 0, maxAdvance: 0,
-            natures: Set<UInt8>(), tid: 12345, sid: 54321,
-            shinyOnly: false, method: .method1
-        )
-        let result = results[0]
-
-        let verification = verifySeedFromIVs(
-            caughtHP: result.ivHP, caughtAtk: result.ivAtk, caughtDef: result.ivDef,
-            caughtSpA: result.ivSpA, caughtSpD: result.ivSpD, caughtSpe: result.ivSpe,
-            caughtNature: result.nature, tid: 12345,
-            targetSeed: result.seed, method: .method1
-        )
-        #expect(verification != nil)
+@MainActor
+struct Gen3WhatYouHitTests {
+    private func squirtle() throws -> StaticEncounter {
+        try #require(StaticEncounterData.encounters(for: .fireRed, category: .starters).first { $0.species == 7 })
     }
 
-    @Test func verifySeed_wrongIVs_returnsNilOrDifferentSeed() {
-        let verification = verifySeedFromIVs(
-            caughtHP: 0, caughtAtk: 0, caughtDef: 0,
-            caughtSpA: 0, caughtSpD: 0, caughtSpe: 0,
-            caughtNature: 0, tid: 12345,
-            targetSeed: 0x12345678, method: .method1
-        )
-        if let v = verification {
-            #expect(v.delayDelta != 0 || v.actualSeed != v.targetSeed)
+    private func exactly(_ ivs: [UInt8], nature: UInt8) -> FRLGCatch {
+        FRLGCatch(nature: nature, ivMin: ivs, ivMax: ivs)
+    }
+
+    /// A Searcher's target is a seed; its frame from the game's initial
+    /// seed (Emerald's 0) is the distance to it, and generates it.
+    @Test func searcherTargetsFrameFromTheInitialSeed() throws {
+        let rayquaza = try #require(StaticEncounterData.encounters(for: .emerald, category: .legends).first { $0.species == 384 })
+        let targets = staticSearchGen3(minIVs: (31, 31, 31, 31, 31, 0), maxIVs: (31, 31, 31, 31, 31, 31),
+                                       natures: [], tid: 0, sid: 0, shinyOnly: false, method: .method1)
+        #expect(!targets.isEmpty)
+        for target in targets.prefix(3) {
+            let frame = PFBridge.lcrngDistance(from: 0, to: target.seed)
+            let generated = PFBridge.staticTemplateGenerate3(seed: 0, initialAdvances: frame, maxAdvances: 0,
+                                                             method: .method1, template: rayquaza.template,
+                                                             tid: 0, sid: 0, game: .emerald)
+            #expect(generated.first?.pid == target.pid)
+            #expect(generated.first?.ivs == [target.ivHP, target.ivAtk, target.ivDef, target.ivSpA, target.ivSpD, target.ivSpe])
         }
+    }
+
+    /// A Squirtle caught 4 frames late is found 4 late.
+    @Test func findsTheFrameHit() throws {
+        let squirtle = try squirtle()
+        let frames = PFBridge.staticTemplateGenerate3(seed: 0x2DA6, initialAdvances: 9613, maxAdvances: 0,
+                                                      method: .method1, template: squirtle.template,
+                                                      tid: 11686, sid: 0, game: .fireRed)
+        let caught = try #require(frames.first)
+        let hits = Gen3HitSearch.search(initialSeed: 0x2DA6, targetFrame: 9609, framesEitherSide: 200,
+                                        method: .method1, template: squirtle.template, game: .fireRed,
+                                        tid: 11686, sid: 0, caught: exactly(caught.ivs, nature: caught.nature))
+        let first = try #require(hits.first)
+        #expect(first.frame == 9613 && first.offset == 4)
+        #expect(hits.allSatisfy { $0.ivs == caught.ivs && $0.nature == caught.nature })
+    }
+
+    /// Each game's base stats: Pikachu's Defense and Sp. Def rose in Gen 6,
+    /// so the same stats give different IVs in Emerald and Sword.
+    @Test func baseStatsAndIVsByGame() throws {
+        #expect(PFBridge.baseStats(game: .emerald, specie: 25) == [UInt8]([35, 55, 30, 50, 40, 90]))
+        #expect(PFBridge.baseStats(game: .sword, specie: 25) == [UInt8]([35, 55, 40, 50, 50, 90]))
+        #expect(PFBridge.baseStats(game: .emerald, specie: 493) == nil)   // no Arceus in Gen 3
+        // Level 50 Hardy, every IV 15: Emerald's stats.
+        let lines: [(level: UInt8, stats: [UInt16])] = [(50, [102, 67, 42, 62, 52, 102])]
+        let emerald = try #require(PFBridge.calcIVs(game: .emerald, specie: 25, lines: lines, nature: 0))
+        #expect(emerald.allSatisfy { $0.contains(15) })
+        let sword = try #require(PFBridge.calcIVs(game: .sword, specie: 25, lines: lines, nature: 0))
+        #expect(sword[0] == emerald[0])
+        #expect(sword[2].isEmpty && sword[4].isEmpty)   // Defense and Sp. Def can't be that low in Sword
+    }
+
+    /// A caught Pokémon's IVs lead back to a 16-bit seed and frame that
+    /// generate it; a new game's seed is its Trainer ID.
+    @Test func seedFromAPokemon() throws {
+        let squirtle = try squirtle()
+        let caught = try #require(PFBridge.staticTemplateGenerate3(seed: 0x2DA6, initialAdvances: 4266, maxAdvances: 0,
+                                                                   method: .method1, template: squirtle.template,
+                                                                   tid: 11686, sid: 0, game: .fireRed).first)
+        let origins = try #require(Gen3SeedFinder.origins(ivMin: caught.ivs, ivMax: caught.ivs, nature: caught.nature,
+                                                          method: .method1, tid: 11686))
+        #expect(!origins.isEmpty)
+        #expect(origins.contains { $0.pid == caught.pid })
+        for origin in origins where origin.pid == caught.pid {
+            let again = PFBridge.staticTemplateGenerate3(seed: UInt32(origin.seed), initialAdvances: origin.frame, maxAdvances: 0,
+                                                         method: .method1, template: squirtle.template,
+                                                         tid: 11686, sid: 0, game: .fireRed)
+            #expect(again.first?.pid == caught.pid)
+        }
+        #expect(Gen3SeedFinder.seed(trainerID: 11686) == "2DA6")
+        // Wide ranges are refused rather than tried.
+        #expect(Gen3SeedFinder.origins(ivMin: [0, 0, 0, 0, 0, 0], ivMax: [31, 31, 31, 31, 31, 31], nature: 0,
+                                       method: .method1, tid: 0) == nil)
     }
 }
 
@@ -951,115 +1000,94 @@ func pfComputeStatPublic(baseStat: UInt16, iv: UInt8, nature: UInt8, level: UInt
     return UInt16(Float(stat + 5) * modifiers[Int(nature)][Int(index) - 1])
 }
 
-// MARK: - Coin Flip Matching Tests
+// MARK: - Gen 4 Seed Check Tests
 
-struct CoinFlipMatchTests {
-    @Test func knownSeed_matchesExpectedFlips() {
-        // Seed 0 with MT19937: first output determines H/T
-        // matchesCoinFlips checks (mt.next() & 1) != 0 for each flip
-        let seed: UInt32 = 0x05100320
-        let flipsStr = PFBridge.coinFlips(seed)
-        let expected = flipsStr.split(separator: ", ").map { $0 == "H" }
-        #expect(matchesCoinFlips(seed: seed, observed: expected))
+struct Gen4SeedCheckTests {
+    /// PokéFinder's "H, T, ..." and "E, K, ..." strings as values.
+    private func flips(_ text: String) -> [Bool] { text.split(separator: ", ").map { $0 == "H" } }
+    private func calls(_ text: String) -> [UInt8] {
+        // With skips, PokéFinder writes "(E, K skipped)  P, ...".
+        let rest = text.components(separatedBy: "skipped)").last ?? text
+        return rest.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            .map { $0 == "E" ? 0 : $0 == "K" ? 1 : 2 }
     }
 
-    @Test func wrongFlips_doesNotMatch() {
-        let seed: UInt32 = 0x05100320
-        let flipsStr = PFBridge.coinFlips(seed)
-        var flips = flipsStr.split(separator: ", ").map { $0 == "H" }
-        // Invert the first flip
-        flips[0].toggle()
-        #expect(!matchesCoinFlips(seed: seed, observed: flips))
-    }
-
-    @Test func emptyObserved_alwaysMatches() {
-        #expect(matchesCoinFlips(seed: 0, observed: []))
-        #expect(matchesCoinFlips(seed: 0xDEADBEEF, observed: []))
-    }
-
-    @Test func singleFlip_matchesOrNot() {
-        let seed: UInt32 = 0
-        let firstFlipStr = PFBridge.coinFlips(seed).split(separator: ", ").first!
-        let isHeads = firstFlipStr == "H"
-        #expect(matchesCoinFlips(seed: seed, observed: [isHeads]))
-        #expect(!matchesCoinFlips(seed: seed, observed: [!isHeads]))
-    }
-
-    @Test func differentSeeds_produceDifferentFlips() {
-        let flips1 = PFBridge.coinFlips(0x00000001)
-        let flips2 = PFBridge.coinFlips(0x00000002)
-        #expect(flips1 != flips2)
-    }
-}
-
-// MARK: - Call Matching Tests
-
-struct CallMatchTests {
-    @Test func knownSeed_matchesExpectedCalls() {
-        let seed: UInt32 = 0x05100320
-        let callsStr = PFBridge.getCalls(seed)
-        // Parse "E, K, P, ..." into [UInt8] where E=0, K=1, P=2
-        let expected: [UInt8] = callsStr.split(separator: ", ").prefix(5).map { c in
-            switch c {
-            case "E": return 0
-            case "K": return 1
-            default: return 2
-            }
+    @Test func coinFlipsAreThePokétchs() {
+        for seed: UInt32 in [0, 1, 0x0510_0320, 0x2C11_02EA, 0xDEAD_BEEF] {
+            #expect(Gen4SeedCheck.coinFlips(seed: seed, count: 20) == flips(PFBridge.coinFlips(seed)))
         }
-        #expect(matchesCalls(seed: seed, observed: expected, skips: 0))
     }
 
-    @Test func wrongCalls_doesNotMatch() {
-        let seed: UInt32 = 0x05100320
-        let callsStr = PFBridge.getCalls(seed)
-        var calls: [UInt8] = callsStr.split(separator: ", ").prefix(5).map { c in
-            switch c {
-            case "E": return 0
-            case "K": return 1
-            default: return 2
-            }
+    @Test func callsAreElmsAndIrwins() {
+        for seed: UInt32 in [0, 0x0510_0320, 0x2C11_02EA] {
+            #expect(Gen4SeedCheck.calls(seed: seed, skips: 0, count: 20) == calls(PFBridge.getCalls(seed)))
+            #expect(Gen4SeedCheck.calls(seed: seed, skips: 2, count: 20) == calls(PFBridge.getCalls(seed, skips: 2)))
         }
-        // Change first call to something different
-        calls[0] = (calls[0] + 1) % 3
-        #expect(!matchesCalls(seed: seed, observed: calls, skips: 0))
     }
 
-    @Test func emptyObserved_alwaysMatches() {
-        #expect(matchesCalls(seed: 0, observed: [], skips: 0))
-        #expect(matchesCalls(seed: 0, observed: [], skips: 3))
+    /// The seed of each of Seed to Time's clock times is the seed asked for.
+    @Test func seedFromClockTime() {
+        let seed: UInt32 = 0x2C11_02EA
+        let times = seedToTimeGen4(seed: seed)
+        #expect(!times.isEmpty)
+        for time in times.prefix(20) {
+            let target = Gen4SeedTime(month: time.month, day: time.day, hour: Int(time.hour),
+                                      minute: time.minute, second: time.second, delay: Int(time.delay))
+            #expect(target.seed == seed)
+        }
     }
 
-    @Test func roamerSkips_offsetsCalls() {
-        let seed: UInt32 = 0x05100320
-        // With 0 skips, get the calls starting from advance 1
-        let calls0 = PFBridge.getCalls(seed, skips: 0)
-        let calls2 = PFBridge.getCalls(seed, skips: 2)
-        // Skips should shift the sequence
-        #expect(calls0 != calls2)
-
-        // Parse calls with 2 skips and verify matchesCalls agrees
-        // The format with skips includes "(X skipped)" prefix, parse after it
-        let parsed: [UInt8] = calls2
-            .replacingOccurrences(of: "(", with: "")
-            .split(separator: ")").last!
-            .trimmingCharacters(in: .whitespaces)
-            .split(separator: ", ").prefix(5).map { c in
-                switch c.trimmingCharacters(in: .whitespaces) {
-                case "E": return 0
-                case "K": return 1
-                default: return 2
-                }
-            }
-        #expect(matchesCalls(seed: seed, observed: parsed, skips: 2))
+    /// A second later rolls the clock over, as the DS does.
+    @Test func secondsRollOver() {
+        let target = Gen4SeedTime(month: 12, day: 31, hour: 23, minute: 59, second: 59, delay: 600)
+        let next = target.adding(seconds: 1)
+        #expect(next.year == 2001 && next.month == 1 && next.day == 1 && next.hour == 0 && next.minute == 0 && next.second == 0)
+        let back = Gen4SeedTime(month: 3, day: 1, hour: 0, minute: 0, second: 0, delay: 600).adding(seconds: -1)
+        #expect(back.month == 2 && back.day == 29 && back.hour == 23 && back.second == 59) // 2000 is a leap year
     }
 
-    @Test func matchesCalls_usesLCRNG() {
-        // Manually verify the LCRNG: seed * 0x41C64E6D + 0x6073
-        let seed: UInt32 = 1
-        var state = seed
-        state = state &* 0x41C64E6D &+ 0x6073
-        let call = UInt8((state >> 16) % 3)
-        #expect(matchesCalls(seed: seed, observed: [call], skips: 0))
+    /// Ten coin flips pick out the seed hit, 4 delays and a second late.
+    @Test func coinFlipsFindTheSeedHit() throws {
+        let target = Gen4SeedTime(month: 7, day: 28, hour: 17, minute: 54, second: 23, delay: 4357)
+        let candidates = Gen4SeedCheck.candidates(around: target, delays: 20, seconds: 1)
+        #expect(candidates.count == 41 * 3)
+        #expect(candidates.first?.delayOffset == 0 && candidates.first?.secondOffset == 0)
+        var hit = target.adding(seconds: 1)
+        hit.delay = 4361
+        let seen = Gen4SeedCheck.coinFlips(seed: hit.seed, count: 10)
+        let matches = Gen4SeedCheck.matches(candidates, flips: seen)
+        let found = try #require(matches.first { $0.seed == hit.seed })
+        #expect(found.delay == 4361 && found.delayOffset == 4 && found.secondOffset == 1)
+        #expect(matches.count <= 3)
+    }
+
+    /// HeartGold/SoulSilver: each active roamer takes at least one advance
+    /// before the calls, and lands on a route it roams; the calls and
+    /// routes find the seed.
+    @Test func roamersAndCalls() throws {
+        let target = Gen4SeedTime(month: 4, day: 2, hour: 9, minute: 30, second: 10, delay: 700)
+        let roamers = [true, true, true]
+        let candidates = Gen4SeedCheck.candidates(around: target, delays: 10, seconds: 1, roamers: roamers)
+        for candidate in candidates {
+            #expect(candidate.skips >= 3)
+            #expect(Gen4SeedCheck.johtoRoutes.contains(candidate.roamerRoutes[0]))
+            #expect(Gen4SeedCheck.johtoRoutes.contains(candidate.roamerRoutes[1]))
+            #expect(Gen4SeedCheck.kantoRoutes.contains(candidate.roamerRoutes[2]))
+            #expect(candidate.calls == calls(PFBridge.getCalls(candidate.seed, skips: candidate.skips)))
+        }
+        let hit = try #require(candidates.first { $0.delayOffset == -3 })
+        let matches = Gen4SeedCheck.matches(candidates, calls: Array(hit.calls.prefix(8)),
+                                            routes: hit.roamerRoutes.map { Optional($0) })
+        #expect(matches.contains(hit))
+        #expect(matches.count <= 2)
+    }
+
+    /// Around a bare seed, a second moves its first byte.
+    @Test func aroundABareSeed() {
+        let candidates = Gen4SeedCheck.candidates(aroundSeed: 0x2C11_02EA, delays: 2, seconds: 1)
+        #expect(candidates.count == 5 * 3)
+        #expect(candidates.contains { $0.seed == 0x2D11_02EC && $0.delayOffset == 2 && $0.secondOffset == 1 })
+        #expect(candidates.contains { $0.seed == 0x2B11_02E8 && $0.delay == 0x02E8 })
     }
 }
 

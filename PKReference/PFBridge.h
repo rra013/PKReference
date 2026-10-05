@@ -695,6 +695,30 @@ void pf_idSearch4_free(PFIDSearch4Handle handle);
 char *pf_coinFlips(uint32_t seed);
 char *pf_getCalls(uint32_t seed, uint8_t skips);
 
+/// HeartGold/SoulSilver's roamers on loading a game from `seed`: each
+/// active one (Raikou, Entei, Latias/Latios) moves to a new route, rolling
+/// again while it's the route it was on (`routes`, 0 for unknown). Returns
+/// the PRNG advances that takes, which come before Elm and Irwin's calls;
+/// `outRoutes` gets each one's new route (0 when inactive).
+uint8_t pf_hgssRoamer(uint32_t seed, const bool roamers[3], const uint8_t routes[3], uint8_t outRoutes[3]);
+
+/// Gen 3's PRNG (PokéRNG): the advances from `from` to `to`.
+uint32_t pf_lcrngDistance(uint32_t from, uint32_t to);
+
+/// PokéFinder's IV checker for any species: the IVs its stats at each
+/// level allow, with `game`'s base stats (fresh catches have no EVs).
+/// `outMasks[i]` has bit n set when IV n fits stat i. `characteristic` and
+/// `hiddenPower` narrow it (255 for none). False if `specie` isn't in the
+/// game.
+bool pf_calcIVs(uint32_t game, uint16_t specie, uint8_t form,
+                const uint8_t *levels, const uint16_t *stats, int count,
+                uint8_t nature, uint8_t characteristic, uint8_t hiddenPower,
+                uint32_t outMasks[6]);
+
+/// `game`'s base stats for `specie` (HP, Atk, Def, SpA, SpD, Spe); false if
+/// it isn't in the game.
+bool pf_baseStats(uint32_t game, uint16_t specie, uint8_t form, uint8_t out[6]);
+
 // MARK: - Gen 5 Generator State
 
 typedef struct {

@@ -2035,6 +2035,41 @@ nonisolated enum PFBridge {
         return result
     }
 
+    /// HeartGold/SoulSilver's roamers (Raikou, Entei, Latias/Latios) on
+    /// loading from `seed`: the PRNG advances they take, which come before
+    /// Elm and Irwin's calls, and each active one's new route (0 when
+    /// inactive). `previousRoutes` are where they were (0 for unknown).
+    static func hgssRoamers(seed: UInt32, active: [Bool], previousRoutes: [UInt8] = [0, 0, 0])
+        -> (skips: UInt8, routes: [UInt8]) {
+        var routes: [UInt8] = [0, 0, 0]
+        let skips = pf_hgssRoamer(seed, active, previousRoutes, &routes)
+        return (skips, routes)
+    }
+
+    /// Gen 3's PRNG: the advances from `from` to `to`.
+    static func lcrngDistance(from: UInt32, to: UInt32) -> UInt32 {
+        pf_lcrngDistance(from, to)
+    }
+
+    /// PokéFinder's IV checker with `game`'s base stats for `specie`: per
+    /// stat, every IV its stats at each level allow (empty when none does).
+    /// Nil when the species isn't in the game.
+    static func calcIVs(game: PFGame, specie: UInt16, form: UInt8 = 0,
+                        lines: [(level: UInt8, stats: [UInt16])], nature: UInt8,
+                        characteristic: UInt8 = 255, hiddenPower: UInt8 = 255) -> [[UInt8]]? {
+        guard !lines.isEmpty, lines.allSatisfy({ $0.stats.count == 6 }) else { return nil }
+        var masks = [UInt32](repeating: 0, count: 6)
+        guard pf_calcIVs(game.rawValue, specie, form, lines.map(\.level), lines.flatMap(\.stats), Int32(lines.count),
+                         nature, characteristic, hiddenPower, &masks) else { return nil }
+        return masks.map { mask in (0..<32).compactMap { mask & (1 << $0) != 0 ? UInt8($0) : nil } }
+    }
+
+    /// `game`'s base stats for `specie` (HP, Atk, Def, SpA, SpD, Spe).
+    static func baseStats(game: PFGame, specie: UInt16, form: UInt8 = 0) -> [UInt8]? {
+        var out = [UInt8](repeating: 0, count: 6)
+        return pf_baseStats(game.rawValue, specie, form, &out) ? out : nil
+    }
+
     // MARK: - Gen 8 Result Types
 
     struct Gen8StaticResult: Identifiable {
