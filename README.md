@@ -519,6 +519,7 @@ xcodebuild test -project PKReference.xcodeproj -scheme PKReference -destination 
 | `LICENSE` | The GNU General Public License, version 3 |
 | `THIRD_PARTY_NOTICES.md` | Every third-party component, its copyright and its license |
 | `HANDOFF.md` | Notes for contributors: where the code lives, conventions, known limitations and what's next |
+| `backend/` | Optional Kafka + Spring Boot service that ingests Limitless tournaments and serves team usage stats (see `backend/README.md`) |
 | `tools/` | Regulation scrapers, the Showdown data generator, and vendored upstream sources |
 
 ---

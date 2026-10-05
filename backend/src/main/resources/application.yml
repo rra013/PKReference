@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: pkreference-backend
+  datasource:
+    url: jdbc:h2:file:./data/pkref;AUTO_SERVER=TRUE   # swap for Postgres in prod (driver already on classpath)
+  jpa:
+    hibernate:
+      ddl-auto: update
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        enable.idempotence: true
+        max.request.size: 5242880        # full decklists for large events
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.pkreference.backend.model
+        max.partition.fetch.bytes: 5242880
+        fetch.max.bytes: 52428800
+
+pkref:
+  limitless:
+    game: ${LIMITLESS_GAME:VGC}      # check GET /games for the right id
+    format: ${LIMITLESS_FORMAT:}
+    ingest-enabled: true
+    poll-interval: 30m
