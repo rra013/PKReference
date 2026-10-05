@@ -1073,12 +1073,27 @@ struct FinderTypesTests {
     }
 
     @Test func finderMethod_gen4Methods() {
-        let methods = FinderMethod.methods(for: .gen4)
-        #expect(methods.contains(.method1))
-        #expect(methods.contains(.methodJ))
-        #expect(methods.contains(.methodK))
-        #expect(!methods.contains(.method2))
-        #expect(!methods.contains(.method4))
+        let methods = FinderMethod.methods(for: .gen4, staticEncounter: true, game: .diamond)
+        #expect(methods == [.method1, .methodJ, .methodK])
+    }
+
+    /// PokéFinder's Gen 4 wild generator has Method J (Diamond, Pearl,
+    /// Platinum) and Method K (HeartGold, SoulSilver) only: Method 1 gave
+    /// nothing, and each game's method is its own (finding 56).
+    @MainActor
+    @Test func finderMethod_gen4WildFollowsTheGame() throws {
+        for game in [FinderGameVersion.diamond, .pearl, .platinum] {
+            #expect(FinderMethod.methods(for: .gen4, game: game) == [.methodJ])
+        }
+        for game in [FinderGameVersion.heartGold, .soulSilver] {
+            #expect(FinderMethod.methods(for: .gen4, game: game) == [.methodK])
+        }
+        let route201 = try #require(WildAreaData.locations(for: .platinum).first { $0.name == "Route 201" })
+        let method1 = PFBridge.wildGenerate4(seed: 0x0C12_0353, initialAdvances: 0, maxAdvances: 100, method: .method1,
+                                             tid: 0, sid: 0, game: .platinum, encounter: .grass, location: route201.id)
+        let methodJ = PFBridge.wildGenerate4(seed: 0x0C12_0353, initialAdvances: 0, maxAdvances: 100, method: .methodJ,
+                                             tid: 0, sid: 0, game: .platinum, encounter: .grass, location: route201.id)
+        #expect(method1.isEmpty && !methodJ.isEmpty)
     }
 
     @Test func pfNatureNames_has25Entries() {
@@ -1489,9 +1504,11 @@ struct EncounterDataTests {
     /// `flagRates[-1]`, is stage 1.
     @Test func undergroundStagesAndLevels() {
         func results(stage: Int32 = 6, levelFlag: UInt8 = 0) -> [PFBridge.Gen8UndergroundResult] {
-            PFBridge.undergroundGenerate8(seed0: 0x1234_5678_9ABC_DEF0, seed1: 0x0FED_CBA9_8765_4321,
-                                          initialAdvances: 0, maxAdvances: 300, levelFlag: levelFlag,
-                                          tid: 0, sid: 0, game: .bd, storyFlag: stage)
+            PFBridge.undergroundAreas8(storyFlag: stage, game: .bd).flatMap { area in
+                PFBridge.undergroundGenerate8(seed0: 0x1234_5678_9ABC_DEF0, seed1: 0x0FED_CBA9_8765_4321,
+                                              initialAdvances: 0, maxAdvances: 300, levelFlag: levelFlag,
+                                              tid: 0, sid: 0, game: .bd, storyFlag: stage, location: area.location)
+            }
         }
         let first = Set(results(stage: 1).map(\.specie))
         let last = Set(results(stage: 6).map(\.specie))
@@ -2003,8 +2020,10 @@ struct EggGeneratorTests {
 
 /// RNG fixes PR 2: the wild filters work, Shiny Only finds square shinies,
 /// and the generators take Synchronize's nature.
+@MainActor
 struct RNGFilterAndLeadTests {
-    private let route101 = findLocationID(pfGame: .emerald, pfEnc: .grass, isGen3: true, locationName: "Route 101")
+    private let route101 = WildAreaData.locations(for: .emerald).first { $0.name == "Route 101" }!.id
+    private let route201 = WildAreaData.locations(for: .platinum).first { $0.name == "Route 201" }!.id
 
     private func wild(gen: FinderGeneration, mode: FinderRootView.FinderMode, method: FinderMethod, game: PFGame,
                       location: UInt8, seed: UInt32 = 0, maxAdvance: UInt32 = 1_000, natures: Set<UInt8> = [],
@@ -2015,7 +2034,7 @@ struct RNGFilterAndLeadTests {
         runWildSearch(gen: gen, mode: mode, method: method, natures: natures, tid: 0, sid: 0, shinyOnly: false,
                       minIVs: minIVs, maxIVs: maxIVs, seed: seed, initAdv: 0, maxAdv: maxAdvance,
                       searcherMinAdv: 0, searcherMaxAdv: 20, minDelay: 600, maxDelay: 620,
-                      pfGame: game, pfEnc: .grass, locationID: location, slotSpecies: [], speciesFilter: 0,
+                      pfGame: game, pfEnc: .grass, locationID: location,
                       lead: lead, syncNature: syncNature, deadBattery: false, onResult: { box.append($0) })
         return box.results
     }
@@ -2031,8 +2050,7 @@ struct RNGFilterAndLeadTests {
         let hp31 = wild(gen: .gen3, mode: .generator, method: .method1, game: .emerald, location: route101,
                         minIVs: (31, 0, 0, 0, 0, 0))
         #expect(!hp31.isEmpty && hp31.count < all.count / 10 && hp31.allSatisfy { $0.ivHP == 31 })
-        let platinum = findLocationID(pfGame: .platinum, pfEnc: .grass, isGen3: false, locationName: "Route 201")
-        let jolly = wild(gen: .gen4, mode: .generator, method: .methodJ, game: .platinum, location: platinum,
+        let jolly = wild(gen: .gen4, mode: .generator, method: .methodJ, game: .platinum, location: route201,
                          seed: 0x0C12_0353, natures: [13])
         #expect(!jolly.isEmpty && jolly.allSatisfy { $0.nature == 13 })
     }
@@ -2043,8 +2061,7 @@ struct RNGFilterAndLeadTests {
         let results = wild(gen: .gen3, mode: .generator, method: .method1, game: .emerald, location: route101,
                            seed: 0x0C12_0353, maxAdvance: 5)
         #expect(results.count == 6 && results.allSatisfy { $0.seed == 0x0C12_0353 })
-        let platinum = findLocationID(pfGame: .platinum, pfEnc: .grass, isGen3: false, locationName: "Route 201")
-        let gen4 = wild(gen: .gen4, mode: .generator, method: .methodJ, game: .platinum, location: platinum,
+        let gen4 = wild(gen: .gen4, mode: .generator, method: .methodJ, game: .platinum, location: route201,
                         seed: 0x0C12_0353, maxAdvance: 5)
         #expect(!gen4.isEmpty && gen4.allSatisfy { $0.seed == 0x0C12_0353 })
     }
@@ -2057,13 +2074,15 @@ struct RNGFilterAndLeadTests {
 
     /// BDSP's Grand Underground: its filter also checks the species, which
     /// had no list, so any filter rejected everything.
-    @Test func undergroundFilters() {
+    @Test func undergroundFilters() throws {
+        let area = try #require(PFBridge.undergroundAreas8(storyFlag: 6, game: .bd).first).location
         func generate(natures: Set<UInt8>, gender: UInt8 = 255) -> [StaticSearchResult] {
             var results: [StaticSearchResult] = []
             undergroundGenerateGen8Streaming(seed0: 0x1234_5678_9ABC_DEF0, seed1: 0x0FED_CBA9_8765_4321,
                                              initialAdvance: 0, maxAdvance: 300, natures: natures, tid: 0, sid: 0,
                                              shinyOnly: false, lead: .none, game: .bd, shinyCharm: false,
-                                             diglett: false, storyFlag: 6, filterGender: gender) { results.append($0) }
+                                             diglett: false, storyFlag: 6, location: area,
+                                             filterGender: gender) { results.append($0) }
             return results
         }
         let all = generate(natures: [])
@@ -2473,5 +2492,231 @@ struct GeneratorChunkTests {
         #expect(noResultsText(filters: [], widen: "the advances") == "Nothing found. Widen the advances.")
         #expect(noResultsText(filters: ["IVs", "natures", "Shiny Only"], widen: "the advances")
                 == "Nothing found with IVs, natures, and Shiny Only set. Loosen one, or widen the advances.")
+    }
+}
+
+// MARK: - Wild Area Tests
+
+/// RNG fixes PR 9: a wild area is a reference into PokéFinder's tables, by
+/// location ID, with the settings that change its slots.
+@MainActor
+struct WildAreaTests {
+    private func location(_ game: FinderGameVersion, _ name: String) throws -> UInt8 {
+        try #require(WildAreaData.locations(for: game).first { $0.name == name }, "\(game.rawValue) \(name)").id
+    }
+
+    /// Every area PokéFinder lists is offered once, by its ID, for every
+    /// game and encounter type; every location once, with its own name.
+    @Test func everyAreaOnceByID() {
+        for game in FinderGameVersion.allCases where !game.isSwSh {
+            for type in EncounterType.types(for: game.generation) {
+                let ids = WildAreaData.areas(for: game, type: type).map(\.location)
+                let raw: [UInt8] = switch game.generation {
+                case .gen3: PFBridge.getEncounters3(encounter: type.pfEncounter, game: game.pfGame).map(\.location)
+                case .gen4: PFBridge.getEncounters4(encounter: type.pfEncounter, game: game.pfGame).map(\.location)
+                case .gen5: PFBridge.getEncounters5(encounter: type.pfEncounter, game: game.pfGame).map(\.location)
+                case .gen8: PFBridge.getEncounters8(encounter: type.pfEncounter, game: game.pfGame).map(\.location)
+                }
+                #expect(ids == raw, "\(game.rawValue) \(type.rawValue)")
+                #expect(Set(ids).count == ids.count, "\(game.rawValue) \(type.rawValue)")
+            }
+            let locations = WildAreaData.locations(for: game)
+            #expect(!locations.isEmpty, "\(game.rawValue)")
+            #expect(Set(locations.map(\.id)).count == locations.count, "\(game.rawValue)")
+            #expect(Set(locations.map(\.name)).count == locations.count, "\(game.rawValue)")
+            #expect(!locations.contains { $0.name.isEmpty }, "\(game.rawValue)")
+        }
+    }
+
+    /// Where two locations share PokéFinder's name, each gets its number.
+    @Test func sharedNamesToldApart() {
+        let hgss = WildAreaData.locationNames(for: .heartGold)
+        #expect(hgss[23] == "National Park (1)" && hgss[24] == "National Park (2)")
+        let bdsp = WildAreaData.locationNames(for: .brilliantDiamond)
+        #expect([bdsp[60], bdsp[61], bdsp[62]] == ["Turnback Cave (1)", "Turnback Cave (2)", "Turnback Cave (3)"])
+        #expect(hgss[22] == "Route 35")
+    }
+
+    /// The two National Parks are different tables, and each searches its
+    /// own; a location the game doesn't have gives nothing, where it gave
+    /// the list's first area.
+    @Test func searchesTheChosenArea() throws {
+        let parks = WildAreaData.areas(for: .heartGold, type: .grass).filter { $0.location == 23 || $0.location == 24 }
+        try #require(parks.count == 2)
+        #expect(parks[0].slots.map(\.species) != parks[1].slots.map(\.species))
+        for park in parks {
+            let results = PFBridge.wildGenerate4(seed: 0x0C12_0353, initialAdvances: 0, maxAdvances: 3_000, method: .methodK,
+                                                 tid: 0, sid: 0, game: .heartGold, encounter: .grass, location: park.location)
+            #expect(!results.isEmpty)
+            #expect(Set(results.map(\.specie)).isSubset(of: Set(park.slots.map(\.species))), "\(park.name)")
+        }
+        #expect(WildAreaData.area(for: .emerald, type: .grass, location: 250) == nil)
+        #expect(PFBridge.wildGenerate3(seed: 0, initialAdvances: 0, maxAdvances: 100, method: .method1,
+                                       tid: 0, sid: 0, game: .emerald, encounter: .grass, location: 250).isEmpty)
+        #expect(PFBridge.wildSearch3Async(method: .method1, tid: 0, sid: 0, game: .emerald,
+                                          encounter: .grass, location: 250) == nil)
+    }
+
+    /// Gen 5's areas and slots follow the season: winter Route 7 has
+    /// Cubchoo, spring's doesn't, and some areas aren't there in winter.
+    @Test func gen5Seasons() throws {
+        let route7 = try location(.black, "Route 7")
+        let spring = try #require(WildAreaData.area(for: .black, type: .grass, location: route7))
+        let winter = try #require(WildAreaData.area(for: .black, type: .grass, location: route7, settings: .init(season: 3)))
+        #expect(winter.slots.contains { $0.species == 613 })
+        #expect(!spring.slots.contains { $0.species == 613 })
+        #expect(WildAreaData.areas(for: .black, type: .grass, settings: .init(season: 3)).count
+                < WildAreaData.areas(for: .black, type: .grass).count)
+        // The generator takes the season and the Pokémon picker's slots.
+        let cubchoo = winter.encounterSlots(for: 613)
+        let results = PFBridge.wildGenerate5(seed: 0x1234_5678_9ABC_DEF0, initialAdvances: 0, maxAdvances: 2_000,
+                                             ivInitialAdvances: 0, ivMaxAdvances: 0, method: .method5, tid: 0, sid: 0,
+                                             game: .black, encounter: .grass, location: route7, season: 3,
+                                             mac: 0, keypresses: Array(repeating: false, count: 9),
+                                             vcount: 0, gxstat: 0, vframe: 0, skipLR: false, timer0Min: 0, timer0Max: 0,
+                                             memoryLink: false, shinyCharm: false, dsType: 0, language: 0,
+                                             encounterSlots: cubchoo)
+        #expect(!results.isEmpty && results.allSatisfy { $0.specie == 613 })
+    }
+
+    /// Gen 4's time of day: HeartGold's Route 29 has Hoothoot at night, not
+    /// in the morning, and a night search finds it.
+    @Test func gen4TimeOfDay() throws {
+        let route29 = try location(.heartGold, "Route 29")
+        let morning = try #require(WildAreaData.area(for: .heartGold, type: .grass, location: route29))
+        let night = try #require(WildAreaData.area(for: .heartGold, type: .grass, location: route29, settings: .init(time: 2)))
+        #expect(night.slots.contains { $0.species == 163 } && !morning.slots.contains { $0.species == 163 })
+        let results = PFBridge.wildGenerate4(seed: 0x0C12_0353, initialAdvances: 0, maxAdvances: 3_000, method: .methodK,
+                                             tid: 0, sid: 0, game: .heartGold, encounter: .grass, location: route29,
+                                             settings: Gen4EncounterSettings(time: 2))
+        #expect(results.contains { $0.specie == 163 })
+        // Diamond, Pearl and Platinum's grass reads it too.
+        let platinum = WildAreaData.areas(for: .platinum, type: .grass)
+        let platinumNight = WildAreaData.areas(for: .platinum, type: .grass, settings: .init(time: 2))
+        #expect(zip(platinum, platinumNight).contains { $0.slots.map(\.species) != $1.slots.map(\.species) })
+    }
+
+    /// Each setting changes the slots PokéFinder says it does.
+    @Test func gen4Settings() throws {
+        func changed(_ game: FinderGameVersion, _ settings: WildSettings, type: EncounterType = .grass,
+                     slots: Set<Int>) -> Bool {
+            let plain = WildAreaData.areas(for: game, type: type)
+            let set = WildAreaData.areas(for: game, type: type, settings: settings)
+            let differing = zip(plain, set).flatMap { a, b in
+                zip(a.slots, b.slots).filter { $0.species != $1.species }.map(\.0.index)
+            }
+            return !differing.isEmpty && Set(differing).isSubset(of: slots)
+        }
+        #expect(changed(.platinum, .init(swarm: true), slots: [0, 1]))
+        #expect(changed(.platinum, .init(dual: .ruby), slots: [8, 9]))
+        #expect(changed(.platinum, .init(radar: true), slots: [4, 5, 10, 11]))
+        #expect(changed(.heartGold, .init(radio: 1), slots: [2, 3, 4, 5]))
+        #expect(changed(.heartGold, .init(swarm: true), type: .surf, slots: [0]))
+        #expect(changed(.brilliantDiamond, .init(time: 2), slots: [2, 3]))
+        // The Great Marsh's daily Pokémon takes slots 6 and 7.
+        let marsh = try #require(WildAreaData.area(for: .platinum, type: .grass, location: 23))
+        let daily = PFBridge.dailyPokemon(game: .platinum, trophyGarden: false)
+        let pick = try #require(daily.first { specie in !marsh.slots.contains { $0.species == specie } })
+        let replaced = try #require(WildAreaData.area(for: .platinum, type: .grass, location: 23,
+                                                      settings: .init(replacement0: pick)))
+        #expect(replaced.slots[6].species == pick && replaced.slots[7].species == pick)
+        #expect(PFBridge.dailyPokemon(game: .platinum, trophyGarden: true).count == 16)
+        // The Safari Zone's blocks change its slots.
+        let safari = WildAreaData.areas(for: .heartGold, type: .grass).filter(\.isSafariZone)
+        let blocked = WildAreaData.areas(for: .heartGold, type: .grass, settings: .init(blocks: [30, 30, 30, 30]))
+            .filter(\.isSafariZone)
+        #expect(!safari.isEmpty && safari.allSatisfy { $0.slots.count == 10 })
+        #expect(zip(safari, blocked).contains { $0.slots.map(\.species) != $1.slots.map(\.species) })
+    }
+
+    /// The Poké Radar is PokéFinder's own method, from the chosen slot; its
+    /// shiny patch gives shinies.
+    @Test func pokeRadar() throws {
+        let route201 = try location(.platinum, "Route 201")
+        let area = try #require(WildAreaData.area(for: .platinum, type: .grass, location: route201,
+                                                  settings: .init(radar: true)))
+        let radar = Gen4EncounterSettings(radar: true)
+        let results = PFBridge.wildGenerate4(seed: 0x0C12_0353, initialAdvances: 0, maxAdvances: 500, method: .pokeRadar,
+                                             tid: 0, sid: 0, game: .platinum, encounter: .grass, location: route201,
+                                             settings: radar, fixedSlot: 4)
+        #expect(!results.isEmpty && results.allSatisfy { $0.specie == area.slots[4].species })
+        let shiny = PFBridge.wildGenerate4(seed: 0x0C12_0353, initialAdvances: 0, maxAdvances: 100, method: .pokeRadar,
+                                           tid: 1234, sid: 5678, game: .platinum, encounter: .grass, location: route201,
+                                           settings: radar, radarShiny: true, fixedSlot: 4)
+        #expect(!shiny.isEmpty && shiny.allSatisfy { $0.shiny > 0 })
+    }
+
+    /// A Feebas tile adds Feebas after the rod's slots, half the time.
+    @Test func feebasTile() throws {
+        let plain = try #require(WildAreaData.area(for: .emerald, type: .superRod, location: 33))
+        let tile = try #require(WildAreaData.area(for: .emerald, type: .superRod, location: 33,
+                                                  settings: .init(feebasTile: true)))
+        #expect(!plain.slots.contains { $0.species == 349 })
+        #expect(tile.slots.last?.species == 349 && tile.slots.last?.slotRate == "50%")
+        #expect(tile.slots.first?.slotRate == "20%")
+        #expect(plain.isFeebasLocation && WildAreaData.areas(for: .emerald, type: .superRod).filter(\.isFeebasLocation).count == 1)
+    }
+
+    /// Slot labels come from the thresholds PokéFinder rolls against, per
+    /// game and encounter type, and each area's add up to 100%.
+    @Test func slotRatesSumTo100() {
+        for game in FinderGameVersion.allCases where !game.isSwSh {
+            var encounters = EncounterType.types(for: game.generation).map(\.pfEncounter)
+            if game.isHGSS { encounters += [.headbutt, .bugCatchingContest] }
+            for encounter in encounters {
+                for area in WildAreaData.areas(for: game, encounter: encounter) {
+                    let rates = WildAreaData.slotRates(game: game, encounter: encounter, slotCount: area.slots.count,
+                                                       safari: area.isSafariZone && area.type != nil)
+                    #expect(rates.count == area.slots.count, "\(game.rawValue) \(encounter.displayName) \(area.name)")
+                    #expect(abs(rates.reduce(0, +) - 100) < 0.001, "\(game.rawValue) \(encounter.displayName) \(area.name)")
+                }
+            }
+        }
+        // Not Gen 3's rods everywhere: Diamond's Old Rod has five slots, and
+        // HeartGold's rods their own rates.
+        #expect(WildAreaData.slotRates(game: .diamond, encounter: .oldRod, slotCount: 5) == [60, 30, 5, 4, 1])
+        #expect(WildAreaData.slotRates(game: .heartGold, encounter: .superRod, slotCount: 5) == [40, 30, 15, 10, 5])
+        #expect(WildAreaData.slotRates(game: .emerald, encounter: .oldRod, slotCount: 2) == [70, 30])
+    }
+
+    /// BDSP's Grand Underground searches one area, as PokéFinder's screen
+    /// does: its results are that area's Pokémon, and the Pokémon picker
+    /// narrows them.
+    @Test func undergroundOneArea() throws {
+        let areas = PFBridge.undergroundAreas8(storyFlag: 6, game: .bd)
+        try #require(areas.count > 1)
+        // The bridge holds up to 255 species an area; the largest have about 70.
+        #expect(areas.allSatisfy { !$0.species.isEmpty && $0.species.count < 255 && !$0.name.isEmpty })
+        #expect(areas.map(\.name).first == "Spacious Cave")
+        func generate(_ area: PFBridge.UndergroundArea, species: [UInt16] = []) -> [PFBridge.Gen8UndergroundResult] {
+            PFBridge.undergroundGenerate8(seed0: 0x1234_5678_9ABC_DEF0, seed1: 0x0FED_CBA9_8765_4321,
+                                          initialAdvances: 0, maxAdvances: 300, tid: 0, sid: 0, game: .bd,
+                                          storyFlag: 6, location: area.location, species: species)
+        }
+        let first = generate(areas[0])
+        let second = generate(areas[1])
+        #expect(!first.isEmpty && Set(first.map(\.specie)).isSubset(of: Set(areas[0].species)))
+        #expect(Set(first.map(\.specie)) != Set(second.map(\.specie)))
+        let one = try #require(first.first?.specie)
+        let only = generate(areas[0], species: [one])
+        #expect(!only.isEmpty && only.allSatisfy { $0.specie == one })
+    }
+
+    /// BDSP's wild generator takes the settings and the Pokémon picker's
+    /// slots (it ignored both).
+    @Test func bdspSettingsAndPokemon() throws {
+        let area = try #require(WildAreaData.areas(for: .brilliantDiamond, type: .grass, settings: .init(time: 2))
+            .first { night in
+                WildAreaData.area(for: .brilliantDiamond, type: .grass, location: night.location)?.slots[2].species
+                    != night.slots[2].species
+            })
+        let nightOnly = area.slots[2].species
+        var results: [StaticSearchResult] = []
+        wildGenerateGen8Streaming(seed0: 0x1234_5678_9ABC_DEF0, seed1: 0x0FED_CBA9_8765_4321,
+                                  initialAdvance: 0, maxAdvance: 3_000, natures: [], tid: 0, sid: 0,
+                                  shinyOnly: false, lead: .none, game: .bd, shinyCharm: false,
+                                  encounter: .grass, location: area.location, settings: Gen4EncounterSettings(time: 2),
+                                  encounterSlots: area.encounterSlots(for: nightOnly)) { results.append($0) }
+        #expect(!results.isEmpty && results.allSatisfy { $0.specie == nightOnly })
     }
 }

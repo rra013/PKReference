@@ -644,11 +644,17 @@ enum FinderMethod: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 
     /// PokéFinder's Gen 3 static generator has no Method 2 (it gives Method
-    /// 1), so statics offer the two it has in both modes.
-    static func methods(for gen: FinderGeneration, staticEncounter: Bool = false) -> [FinderMethod] {
+    /// 1), so statics offer the two it has in both modes. Its Gen 4 wild
+    /// generator and searcher have Method J for Diamond, Pearl and Platinum
+    /// and Method K for HeartGold and SoulSilver, each only its own game's
+    /// (Method 1 gave nothing, and the other game's method wrong results).
+    static func methods(for gen: FinderGeneration, staticEncounter: Bool = false,
+                        game: FinderGameVersion? = nil) -> [FinderMethod] {
         switch gen {
         case .gen3: return staticEncounter ? [.method1, .method4] : [.method1, .method2, .method4]
-        case .gen4: return [.method1, .methodJ, .methodK]
+        case .gen4:
+            guard !staticEncounter, let game else { return [.method1, .methodJ, .methodK] }
+            return game.isHGSS ? [.methodK] : [.methodJ]
         case .gen5: return [.method5, .method5IVs, .method5CGear]
         case .gen8: return [.method1]
         }
@@ -1670,6 +1676,8 @@ nonisolated func wildGenerateGen8Streaming(
     game: PFGame,
     shinyCharm: Bool,
     encounter: PFEncounter, location: UInt8,
+    /// BDSP's grass reads the time, swarm, radar and daily Pokémon.
+    settings: Gen4EncounterSettings = .init(),
     filterGender: UInt8 = 255,
     filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
@@ -1689,6 +1697,8 @@ nonisolated func wildGenerateGen8Streaming(
             lead: pfLead, tid: tid, sid: sid, game: game,
             shinyCharm: shinyCharm,
             encounter: encounter, location: location,
+            time: settings.time, swarm: settings.swarm, radar: settings.radar,
+            replacement0: settings.replacement0, replacement1: settings.replacement1,
             filterGender: filterGender, filterAbility: filterAbility,
             filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers,
             encounterSlots: encounterSlots)
@@ -1867,6 +1877,7 @@ nonisolated func undergroundGenerateGen8Streaming(
     game: PFGame,
     shinyCharm: Bool,
     diglett: Bool, storyFlag: Int32, levelFlag: UInt8 = 0,
+    location: UInt8, species: [UInt16] = [],
     filterGender: UInt8 = 255, filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
     onProgress: (Double) -> Void = { _ in },
@@ -1885,7 +1896,7 @@ nonisolated func undergroundGenerateGen8Streaming(
             diglett: diglett, levelFlag: levelFlag,
             tid: tid, sid: sid, game: game,
             shinyCharm: shinyCharm,
-            storyFlag: storyFlag,
+            storyFlag: storyFlag, location: location, species: species,
             filterGender: filterGender, filterAbility: filterAbility,
             filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
         for r in results {
@@ -2119,8 +2130,11 @@ nonisolated func runWildSearch(
     searcherMinAdv: UInt32 = 0, searcherMaxAdv: UInt32 = 100,
     minDelay: UInt32, maxDelay: UInt32,
     pfGame: PFGame, pfEnc: PFEncounter, locationID: UInt8,
-    slotSpecies: [UInt16],
-    speciesFilter: UInt16, lead: FinderLead, syncNature: UInt8 = 0, deadBattery: Bool,
+    encounterSlots: [Bool] = Array(repeating: true, count: 12),
+    settings: Gen4EncounterSettings = .init(),
+    radar: Bool = false, radarShiny: Bool = false, radarSlot: UInt8 = 0,
+    happiness: UInt8 = 0,
+    lead: FinderLead, syncNature: UInt8 = 0, deadBattery: Bool,
     filterGender: UInt8 = 255, filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
     onResult: @Sendable (StaticSearchResult) -> Void,
@@ -2138,14 +2152,8 @@ nonisolated func runWildSearch(
     let ivMax: [UInt8] = [maxIVs.0, maxIVs.1, maxIVs.2, maxIVs.3, maxIVs.4, maxIVs.5]
     let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
-    var encounterSlots = [Bool](repeating: true, count: 12)
-    if speciesFilter != 0 {
-        for i in 0..<12 {
-            encounterSlots[i] = i < slotSpecies.count && slotSpecies[i] == speciesFilter
-        }
-    }
-
-    let pfMethod = finderMethodToPF(method)
+    // The Poké Radar has its own method in PokéFinder, from one slot.
+    let pfMethod = radar ? .pokeRadar : finderMethodToPF(method)
 
     // Generators take Synchronize's nature; searchers take any.
     let pfLead = mode == .generator ? lead.pfGeneratorLead(syncNature: syncNature) : lead.pfLead
@@ -2159,7 +2167,7 @@ nonisolated func runWildSearch(
                 seed: seed, initialAdvances: start, maxAdvances: count,
                 method: pfMethod, lead: pfLead,
                 tid: tid, sid: sid, game: pfGame,
-                deadBattery: deadBattery,
+                deadBattery: deadBattery, feebasTile: settings.feebasTile,
                 encounter: pfEnc, location: locationID,
                 filterGender: filterGender, filterAbility: filterAbility,
                 filterShiny: shinyFilter,
@@ -2184,6 +2192,7 @@ nonisolated func runWildSearch(
                 method: pfMethod, lead: pfLead,
                 tid: tid, sid: sid, game: pfGame,
                 encounter: pfEnc, location: locationID,
+                settings: settings, radarShiny: radarShiny, happiness: happiness, fixedSlot: radarSlot,
                 filterGender: filterGender, filterAbility: filterAbility,
                 filterShiny: shinyFilter,
                 ivMin: ivMin, ivMax: ivMax, natures: natArr,
@@ -2208,12 +2217,12 @@ nonisolated func runWildSearch(
         }
         onProgress(100)
     } else {
-        let handle: OpaquePointer
+        let started: OpaquePointer?
         if gen == .gen3 {
-            handle = PFBridge.wildSearch3Async(
+            started = PFBridge.wildSearch3Async(
                 method: pfMethod, lead: pfLead,
                 tid: tid, sid: sid, game: pfGame,
-                deadBattery: deadBattery,
+                deadBattery: deadBattery, feebasTile: settings.feebasTile,
                 encounter: pfEnc, location: locationID,
                 filterGender: filterGender, filterAbility: filterAbility,
                 filterShiny: shinyFilter,
@@ -2221,17 +2230,23 @@ nonisolated func runWildSearch(
                 powers: hiddenPowers,
                 encounterSlots: encounterSlots)
         } else {
-            handle = PFBridge.wildSearch4Async(
+            started = PFBridge.wildSearch4Async(
                 minAdvance: searcherMinAdv, maxAdvance: searcherMaxAdv,
                 minDelay: minDelay, maxDelay: maxDelay,
                 method: pfMethod, lead: pfLead,
                 tid: tid, sid: sid, game: pfGame,
                 encounter: pfEnc, location: locationID,
+                settings: settings, radarShiny: radarShiny, happiness: happiness, fixedSlot: radarSlot,
                 filterGender: filterGender, filterAbility: filterAbility,
                 filterShiny: shinyFilter,
                 ivMin: ivMin, ivMax: ivMax, natures: natArr,
                 powers: hiddenPowers,
                 encounterSlots: encounterSlots)
+        }
+        // No such area in this game: nothing to search.
+        guard let handle = started else {
+            onProgress(100)
+            return
         }
         defer { PFBridge.searchFree(handle) }
 
@@ -2300,26 +2315,6 @@ nonisolated func runWildSearch(
         }
         onProgress(100)
     }
-}
-
-nonisolated func findLocationID(pfGame: PFGame, pfEnc: PFEncounter, isGen3: Bool, locationName: String) -> UInt8 {
-    let areas: [PFEncounterAreaSwift]
-    if isGen3 {
-        areas = PFBridge.getEncounters3(encounter: pfEnc, game: pfGame)
-    } else {
-        areas = PFBridge.getEncounters4(encounter: pfEnc, game: pfGame, tid: 0, sid: 0)
-    }
-    return areas.first { $0.locationName == locationName }?.location ?? 0
-}
-
-nonisolated func findLocationID5(pfGame: PFGame, pfEnc: PFEncounter, locationName: String, season: UInt8 = 0) -> UInt8 {
-    let areas = PFBridge.getEncounters5(encounter: pfEnc, game: pfGame, season: season)
-    return areas.first { $0.locationName == locationName }?.location ?? 0
-}
-
-nonisolated func findLocationID8(pfGame: PFGame, pfEnc: PFEncounter, locationName: String) -> UInt8 {
-    let areas = PFBridge.getEncounters8(encounter: pfEnc, game: pfGame)
-    return areas.first { $0.locationName == locationName }?.location ?? 0
 }
 
 // ============================================================================
@@ -2857,6 +2852,10 @@ struct RNGToolsView: View {
             .task { await DebugSnapshot.openSheet("frlgCalibration") { selectedTool = RNGToolTab.finder.rawValue } }
             // `-debugOpenSheet gameCubeSearch`: the GameCube tab, then a search.
             .task { await DebugSnapshot.openSheet("gameCubeSearch") { selectedTool = RNGToolTab.gamecube.rawValue } }
+            // `-debugOpenSheet finder` and `routes`: those tools, as set up
+            // by the `finder_*` launch arguments.
+            .task { await DebugSnapshot.openSheet("finder") { selectedTool = RNGToolTab.finder.rawValue } }
+            .task { await DebugSnapshot.openSheet("routes") { selectedTool = RNGToolTab.encounters.rawValue } }
             #endif
             .onChange(of: FinderTimerBridge.shared.shouldSwitchToTimer) {
                 if FinderTimerBridge.shared.shouldSwitchToTimer {
@@ -3630,9 +3629,29 @@ struct FinderRootView: View {
     @AppStorage("finder_encounterMode") private var encounterMode: EncounterMode = .static_
     @AppStorage("finder_encounterCategory") private var encounterCategory: StaticEncounterCategory = .legends
     @State private var selectedEncounter: StaticEncounter?
-    @AppStorage("finder_selectedLocation") private var selectedLocation: String = ""
+    /// The wild location, by PokéFinder's ID (-1 for none chosen yet).
+    @AppStorage("finder_wildLocation") private var selectedLocation: Int = -1
     @AppStorage("finder_encounterType") private var selectedEncounterType: EncounterType = .grass
     @AppStorage("finder_speciesFilter") private var selectedSpeciesFilter: UInt16 = 0
+
+    // What changes a wild area's slots (`WildSettings`), where its game has it
+    @AppStorage("finder_wildTime") private var wildTime: Int = 0
+    @AppStorage("finder_wildSwarm") private var wildSwarm: Bool = false
+    @AppStorage("finder_wildDual") private var wildDual: String = ""
+    @AppStorage("finder_wildReplacement0") private var wildReplacement0: Int = 0
+    @AppStorage("finder_wildReplacement1") private var wildReplacement1: Int = 0
+    @AppStorage("finder_wildFeebasTile") private var wildFeebasTile: Bool = false
+    @AppStorage("finder_wildRadar") private var wildRadar: Bool = false
+    @AppStorage("finder_wildRadarShiny") private var wildRadarShiny: Bool = false
+    /// The slot the Poké Radar finds.
+    @AppStorage("finder_wildRadarSlot") private var wildRadarSlot: Int = 0
+    @AppStorage("finder_wildRadio") private var wildRadio: Int = 0
+    @AppStorage("finder_wildPlainsBlocks") private var wildPlainsBlocks: Int = 0
+    @AppStorage("finder_wildForestBlocks") private var wildForestBlocks: Int = 0
+    @AppStorage("finder_wildPeakBlocks") private var wildPeakBlocks: Int = 0
+    @AppStorage("finder_wildWaterBlocks") private var wildWaterBlocks: Int = 0
+    /// HeartGold and SoulSilver's fishing modifier, as PokéFinder offers it.
+    @AppStorage("finder_wildHappiness") private var wildHappiness: Int = 0
 
     enum EncounterMode: String, CaseIterable, Identifiable {
         case static_ = "Static"
@@ -3751,6 +3770,10 @@ struct FinderRootView: View {
     @AppStorage("finder_gen8storyStage") private var gen8StoryStage: Int = 1
     /// PokéFinder's level flag, 0–8 (`UndergroundProgress.levels`).
     @AppStorage("finder_gen8levelFlag") private var gen8LevelFlag: Int = 0
+    /// The Grand Underground area, by PokéFinder's location (-1 for none
+    /// chosen yet), and the Pokémon to find there (0 for any).
+    @AppStorage("finder_undergroundLocation") private var undergroundLocation: Int = -1
+    @AppStorage("finder_undergroundSpecies") private var undergroundSpecies: Int = 0
 
     // Gen 8 ID filter parameters
     @AppStorage("finder_gen8filterTID") private var gen8FilterTIDText: String = ""
@@ -3855,16 +3878,15 @@ struct FinderRootView: View {
                             Text(g.rawValue).tag(g)
                         }
                     }
-                    .onChange(of: selectedGame) {
+                    .onChange(of: selectedGame) { oldGame, _ in
                         let cats = StaticEncounterData.categories(for: selectedGame)
                         if !cats.contains(encounterCategory) {
                             encounterCategory = cats.first ?? .legends
                         }
                         selectedEncounter = nil
-                        let locs = PFEncounterDataProvider.locationNames(for: selectedGame)
-                        if !locs.contains(selectedLocation) {
-                            selectedLocation = locs.first ?? ""
-                        }
+                        keepWildLocation(from: oldGame)
+                        fixWildSelection()
+                        fixUndergroundSelection()
                         autoSelectMethod()
                     }
 
@@ -3921,56 +3943,7 @@ struct FinderRootView: View {
                             encounterInfoCard(enc)
                         }
                     } else if encounterMode == .wild {
-                        let locations = PFEncounterDataProvider.locationNames(for: selectedGame)
-                        if !locations.isEmpty {
-                            Picker("Location", selection: $selectedLocation) {
-                                ForEach(locations, id: \.self) { loc in
-                                    Text(loc).tag(loc)
-                                }
-                            }
-                            .onAppear {
-                                if selectedLocation.isEmpty {
-                                    selectedLocation = locations.first ?? ""
-                                }
-                            }
-
-                            let types = PFEncounterDataProvider.encounterTypes(for: selectedGame, location: selectedLocation)
-                            if !types.isEmpty {
-                                Picker("Encounter", selection: $selectedEncounterType) {
-                                    ForEach(types) { t in
-                                        Text(t.rawValue).tag(t)
-                                    }
-                                }
-                                .onChange(of: selectedLocation) {
-                                    let available = PFEncounterDataProvider.encounterTypes(for: selectedGame, location: selectedLocation)
-                                    if !available.contains(selectedEncounterType) {
-                                        selectedEncounterType = available.first ?? .grass
-                                    }
-                                }
-                            }
-
-                            if let route = PFEncounterDataProvider.wildEncounter(for: selectedGame, location: selectedLocation, type: selectedEncounterType) {
-                                let uniqueSpecies = route.slots.reduce(into: [(UInt16, String)]()) { result, slot in
-                                    if !result.contains(where: { $0.0 == slot.species }) {
-                                        result.append((slot.species, slot.speciesName))
-                                    }
-                                }
-
-                                Picker("Pokemon", selection: $selectedSpeciesFilter) {
-                                    Text("Any").tag(UInt16(0))
-                                    ForEach(uniqueSpecies, id: \.0) { species, name in
-                                        Text(name).tag(species)
-                                    }
-                                }
-                                .onChange(of: selectedLocation) { selectedSpeciesFilter = 0 }
-                                .onChange(of: selectedEncounterType) { selectedSpeciesFilter = 0 }
-
-                                wildSlotTable(route: route)
-                            }
-                        } else {
-                            Text("No wild data for \(selectedGame.rawValue)")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
+                        wildEncounterSection
                     } else if encounterMode == .egg {
                         gen8EggParametersView
                     } else if encounterMode == .raid {
@@ -4070,13 +4043,6 @@ struct FinderRootView: View {
                             Text("Japanese").tag(UInt8(4))
                             Text("Korean").tag(UInt8(5))
                             Text("Spanish").tag(UInt8(6))
-                        }
-
-                        Picker("Season", selection: $gen5Season) {
-                            Text("Spring").tag(UInt8(0))
-                            Text("Summer").tag(UInt8(1))
-                            Text("Autumn").tag(UInt8(2))
-                            Text("Winter").tag(UInt8(3))
                         }
 
                         Toggle("Skip L/R", isOn: $gen5SkipLR)
@@ -4233,7 +4199,7 @@ struct FinderRootView: View {
                               systemImage: "magnifyingglass")
                     }
                     .buttonStyle(.primaryAction)
-                    .disabled(needsStaticEncounter)
+                    .disabled(searchBlockedReason != nil)
                     if stoppedAtLimit {
                         Text(searchResultLimitNote)
                             .font(.caption).foregroundStyle(.orange)
@@ -4244,8 +4210,8 @@ struct FinderRootView: View {
                             .font(.caption).foregroundStyle(.orange)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    if needsStaticEncounter {
-                        Text("Choose the Pokémon under Encounter: Gen 5 and 8 searches need its template.")
+                    if let searchBlockedReason {
+                        Text(searchBlockedReason)
                             .font(.caption).foregroundStyle(.orange)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -4362,13 +4328,16 @@ struct FinderRootView: View {
     // MARK: Encounter Helpers
 
     private var availableLeads: [FinderLead] {
-        FinderLead.leads(for: generation, mode: encounterMode, game: selectedGame)
+        let leads = FinderLead.leads(for: generation, mode: encounterMode, game: selectedGame)
+        // The Poké Radar chooses the slot and the level itself, so PokéFinder
+        // drops the leads that change them.
+        return usesPokeRadar ? leads.filter { ![.magnetPull, .staticLead, .pressure].contains($0) } : leads
     }
 
     private var leadApplies: Bool { availableLeads.count > 1 }
 
     private var availableMethods: [FinderMethod] {
-        FinderMethod.methods(for: generation, staticEncounter: encounterMode == .static_)
+        FinderMethod.methods(for: generation, staticEncounter: encounterMode == .static_, game: selectedGame)
     }
 
     private func fixLead() {
@@ -4443,13 +4412,283 @@ struct FinderRootView: View {
     }
 
     /// Gen 5 and 8's static searches need the Pokémon's template.
-    private var needsStaticEncounter: Bool {
-        encounterMode == .static_ && (generation == .gen5 || generation == .gen8) && selectedEncounter == nil
+    /// Why Search is off, if it is.
+    private var searchBlockedReason: String? {
+        if encounterMode == .static_ && (generation == .gen5 || generation == .gen8) && selectedEncounter == nil {
+            return "Choose the Pokémon under Encounter: Gen 5 and 8 searches need its template."
+        }
+        if encounterMode == .wild && wildArea == nil {
+            return "Choose a location with wild Pokémon under Encounter."
+        }
+        if encounterMode == .underground && undergroundArea == nil {
+            return "Choose an area under Encounter."
+        }
+        // The Safari Zone rerolls a Pokémon until an IV is 31, which
+        // PokéFinder's searcher works back from.
+        if encounterMode == .wild && mode == .searcher && wildArea?.isSafariZone == true
+            && ![minHP, minAtk, minDef, minSpA, minSpD, minSpe].contains(31) {
+            return "Safari Zone Pokémon reroll until one IV is 31, so the Searcher needs one: set an IV's minimum to 31."
+        }
+        return nil
     }
 
-    private func wildSlotTable(route: WildEncounterRoute) -> some View {
+    /// The wild settings as chosen. Each game's areas read only theirs.
+    private var wildSettings: WildSettings {
+        WildSettings(time: Int32(wildTime.clamped(to: 0...2)), swarm: wildSwarm,
+                     dual: FinderGameVersion(rawValue: wildDual),
+                     replacement0: UInt16(clamping: wildReplacement0), replacement1: UInt16(clamping: wildReplacement1),
+                     feebasTile: wildFeebasTile, radar: wildRadar, radio: Int32(wildRadio.clamped(to: 0...3)),
+                     blocks: [wildPlainsBlocks, wildForestBlocks, wildPeakBlocks, wildWaterBlocks].map { UInt8(clamping: $0) },
+                     season: gen5Season)
+    }
+
+    /// The chosen wild area, as PokéFinder lists it with these settings.
+    private var wildArea: WildArea? {
+        guard selectedLocation >= 0 else { return nil }
+        return WildAreaData.area(for: selectedGame, type: selectedEncounterType,
+                                 location: UInt8(clamping: selectedLocation), settings: wildSettings)
+    }
+
+    private var wildSettingsShown: WildAreaData.Shown {
+        WildAreaData.settingsShown(game: selectedGame, type: selectedEncounterType,
+                                   location: selectedLocation >= 0 ? UInt8(clamping: selectedLocation) : nil)
+    }
+
+    /// Diamond, Pearl and Platinum's Poké Radar, which PokéFinder generates
+    /// and searches by its own method, from one slot.
+    private var usesPokeRadar: Bool {
+        encounterMode == .wild && generation == .gen4 && selectedGame.isDPPt
+            && selectedEncounterType == .grass && wildRadar
+    }
+
+    /// The Dual Slot games, as PokéFinder offers them.
+    private static let dualSlotGames: [FinderGameVersion] = [.ruby, .sapphire, .fireRed, .leafGreen, .emerald]
+
+    /// IDs are each game's own (Diamond's Oreburgh Mine B1F is HeartGold's
+    /// Violet City), so a new game keeps the location by name, if it has it.
+    private func keepWildLocation(from oldGame: FinderGameVersion) {
+        guard selectedLocation >= 0,
+              let name = WildAreaData.locationNames(for: oldGame)[UInt8(clamping: selectedLocation)] else { return }
+        selectedLocation = WildAreaData.locations(for: selectedGame, settings: wildSettings)
+            .first { $0.name == name }.map { Int($0.id) } ?? -1
+    }
+
+    /// A stored location, type, Pokémon or radar slot the game (or season,
+    /// or settings) doesn't have falls back to the first it does.
+    private func fixWildSelection() {
+        let settings = wildSettings
+        let locations = WildAreaData.locations(for: selectedGame, settings: settings)
+        if !locations.contains(where: { Int($0.id) == selectedLocation }) {
+            selectedLocation = locations.first.map { Int($0.id) } ?? -1
+        }
+        if selectedLocation >= 0 {
+            let types = WildAreaData.types(for: selectedGame, location: UInt8(clamping: selectedLocation), settings: settings)
+            if !types.contains(selectedEncounterType), let first = types.first { selectedEncounterType = first }
+        }
+        if let area = wildArea {
+            if selectedSpeciesFilter != 0 && !area.slots.contains(where: { $0.species == selectedSpeciesFilter }) {
+                selectedSpeciesFilter = 0
+            }
+            if !area.slots.contains(where: { $0.index == wildRadarSlot }) { wildRadarSlot = 0 }
+        }
+        if !wildDual.isEmpty && !Self.dualSlotGames.contains(where: { $0.rawValue == wildDual }) { wildDual = "" }
+    }
+
+    /// The chosen Grand Underground area, at the chosen story stage.
+    private var undergroundArea: PFBridge.UndergroundArea? {
+        undergroundAreas.first { Int($0.location) == undergroundLocation }
+    }
+
+    private var undergroundAreas: [PFBridge.UndergroundArea] {
+        PFBridge.undergroundAreas8(storyFlag: Int32(gen8StoryStage.clamped(to: 1...UndergroundProgress.stories.count)),
+                                   diglett: gen8Diglett, game: selectedGame.pfGame)
+    }
+
+    private func fixUndergroundSelection() {
+        let areas = undergroundAreas
+        if !areas.contains(where: { Int($0.location) == undergroundLocation }) {
+            undergroundLocation = areas.first.map { Int($0.location) } ?? -1
+        }
+        if undergroundSpecies != 0, let area = undergroundArea,
+           !area.species.contains(UInt16(clamping: undergroundSpecies)) {
+            undergroundSpecies = 0
+        }
+    }
+
+    /// The wild encounter: the location by PokéFinder's ID, the encounter
+    /// type, what its game lets you set, the Pokémon and the slots.
+    @ViewBuilder
+    private var wildEncounterSection: some View {
+        let settings = wildSettings
+        if generation == .gen5 {
+            LabeledContent("Season") {
+                Picker("Season", selection: $gen5Season) {
+                    Text("Spring").tag(UInt8(0))
+                    Text("Summer").tag(UInt8(1))
+                    Text("Autumn").tag(UInt8(2))
+                    Text("Winter").tag(UInt8(3))
+                }
+                .labelsHidden()
+            }
+            .onChange(of: gen5Season) { fixWildSelection() }
+        }
+        let locations = WildAreaData.locations(for: selectedGame, settings: settings)
+        if locations.isEmpty {
+            Text("No wild data for \(selectedGame.rawValue)")
+                .font(.caption).foregroundStyle(.secondary)
+        } else {
+            Picker("Location", selection: $selectedLocation) {
+                ForEach(locations, id: \.id) { location in
+                    Text(location.name).tag(Int(location.id))
+                }
+            }
+            .onAppear { fixWildSelection() }
+            .onChange(of: selectedLocation) {
+                selectedSpeciesFilter = 0
+                fixWildSelection()
+            }
+
+            let types = selectedLocation < 0 ? [] :
+                WildAreaData.types(for: selectedGame, location: UInt8(clamping: selectedLocation), settings: settings)
+            if !types.isEmpty {
+                Picker("Encounter", selection: $selectedEncounterType) {
+                    ForEach(types) { t in
+                        Text(t.rawValue).tag(t)
+                    }
+                }
+                .onChange(of: selectedEncounterType) {
+                    selectedSpeciesFilter = 0
+                    fixWildSelection()
+                }
+            }
+
+            wildSettingsControls
+                .onChange(of: settings) { fixWildSelection() }
+
+            if let area = wildArea {
+                if usesPokeRadar {
+                    LabeledContent("Radar Pokémon") {
+                        Picker("Radar Pokémon", selection: $wildRadarSlot) {
+                            ForEach(area.slots) { slot in
+                                Text("\(slot.speciesName) Lv\(slot.minLevel) (slot \(slot.index))").tag(slot.index)
+                            }
+                        }
+                        .labelsHidden()
+                    }
+                    Toggle("Shiny Patch", isOn: $wildRadarShiny)
+                    Text("The Poké Radar finds one slot's Pokémon. Turn on Shiny Patch for a patch that sparkles: its Pokémon is shiny.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Picker("Pokemon", selection: $selectedSpeciesFilter) {
+                        Text("Any").tag(UInt16(0))
+                        ForEach(area.uniqueSpecies, id: \.species) { species, name in
+                            Text(name).tag(species)
+                        }
+                    }
+                }
+
+                wildSlotTable(area: area)
+            }
+        }
+    }
+
+    /// What changes the area's slots, where PokéFinder's screen for the game
+    /// shows it.
+    @ViewBuilder
+    private var wildSettingsControls: some View {
+        let shown = wildSettingsShown
+        if shown.contains(.time) {
+            LabeledContent("Time") {
+                Picker("Time", selection: $wildTime) {
+                    Text("Morning").tag(0)
+                    Text("Day").tag(1)
+                    Text("Night").tag(2)
+                }
+                .labelsHidden()
+            }
+        }
+        if shown.contains(.swarm) {
+            Toggle("Swarm", isOn: $wildSwarm)
+        }
+        if shown.contains(.radio) {
+            LabeledContent("Radio") {
+                Picker("Radio", selection: $wildRadio) {
+                    Text("Off").tag(0)
+                    Text("Hoenn Sound").tag(1)
+                    Text("Sinnoh Sound").tag(2)
+                    Text("Mysterious Transmission").tag(3)
+                }
+                .labelsHidden()
+            }
+        }
+        if shown.contains(.dual) {
+            LabeledContent("Dual Slot") {
+                Picker("Dual Slot", selection: $wildDual) {
+                    Text("None").tag("")
+                    ForEach(Self.dualSlotGames) { game in
+                        Text(game.rawValue).tag(game.rawValue)
+                    }
+                }
+                .labelsHidden()
+            }
+        }
+        if shown.contains(.radar) {
+            Toggle("Poké Radar", isOn: $wildRadar)
+        }
+        if shown.contains(.dailyPokemon) {
+            let trophyGarden = selectedLocation == 117
+            let options = PFBridge.dailyPokemon(game: selectedGame.pfGame, trophyGarden: trophyGarden)
+            LabeledContent(trophyGarden ? "Daily Pokémon 1" : "Daily Pokémon") {
+                Picker(trophyGarden ? "Daily Pokémon 1" : "Daily Pokémon", selection: $wildReplacement0) {
+                    Text("None").tag(0)
+                    ForEach(options, id: \.self) { specie in
+                        Text(PFBridge.specieName(specie)).tag(Int(specie))
+                    }
+                }
+                .labelsHidden()
+            }
+            if trophyGarden {
+                LabeledContent("Daily Pokémon 2") {
+                    Picker("Daily Pokémon 2", selection: $wildReplacement1) {
+                        Text("None").tag(0)
+                        ForEach(options, id: \.self) { specie in
+                            Text(PFBridge.specieName(specie)).tag(Int(specie))
+                        }
+                    }
+                    .labelsHidden()
+                }
+                if (wildReplacement0 == 0) != (wildReplacement1 == 0) {
+                    Text("The Trophy Garden's daily Pokémon take effect with both chosen.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        if shown.contains(.feebasTile) {
+            Toggle("Feebas Tile", isOn: $wildFeebasTile)
+        }
+        if shown.contains(.blocks) {
+            Stepper("Plains Blocks: \(wildPlainsBlocks)", value: $wildPlainsBlocks, in: 0...99)
+            Stepper("Forest Blocks: \(wildForestBlocks)", value: $wildForestBlocks, in: 0...99)
+            Stepper("Peak Blocks: \(wildPeakBlocks)", value: $wildPeakBlocks, in: 0...99)
+            Stepper("Water Blocks: \(wildWaterBlocks)", value: $wildWaterBlocks, in: 0...99)
+        }
+        if shown.contains(.happiness) {
+            LabeledContent("Happiness Bonus") {
+                Picker("Happiness Bonus", selection: $wildHappiness) {
+                    ForEach([0, 20, 30, 40, 50], id: \.self) { bonus in
+                        Text(bonus == 0 ? "None" : "+\(bonus)").tag(bonus)
+                    }
+                }
+                .labelsHidden()
+            }
+        }
+    }
+
+    private func wildSlotTable(area: WildArea) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(route.slots) { slot in
+            ForEach(area.slots) { slot in
                 HStack {
                     Text(slot.slotRate)
                         .font(.system(.caption2, design: .monospaced))
@@ -4766,6 +5005,34 @@ struct FinderRootView: View {
 
     private var gen8UndergroundParametersView: some View {
         VStack(spacing: 8) {
+            // One area at a time, as PokéFinder's Underground screen.
+            let areas = undergroundAreas
+            LabeledContent("Area") {
+                Picker("Area", selection: $undergroundLocation) {
+                    ForEach(areas, id: \.location) { area in
+                        Text(area.name).tag(Int(area.location))
+                    }
+                }
+                .labelsHidden()
+            }
+            .onAppear { fixUndergroundSelection() }
+            .onChange(of: undergroundLocation) {
+                undergroundSpecies = 0
+                fixUndergroundSelection()
+            }
+            .onChange(of: gen8StoryStage) { fixUndergroundSelection() }
+            .onChange(of: gen8Diglett) { fixUndergroundSelection() }
+            if let area = undergroundArea {
+                LabeledContent("Pokemon") {
+                    Picker("Pokemon", selection: $undergroundSpecies) {
+                        Text("Any").tag(0)
+                        ForEach(area.species, id: \.self) { specie in
+                            Text(PFBridge.specieName(specie)).tag(Int(specie))
+                        }
+                    }
+                    .labelsHidden()
+                }
+            }
             Toggle("Diglett Bonus", isOn: $gen8Diglett)
             // Labelled: on iOS a menu shows only its value.
             LabeledContent("Story Progress") {
@@ -5028,7 +5295,8 @@ struct FinderRootView: View {
     /// What the results were found for.
     private var resultsKey: [String] {
         [generation, selectedGame, encounterMode, encounterCategory, selectedEncounter?.id as Any,
-         selectedLocation, selectedEncounterType, method].map { String(describing: $0) }
+         selectedLocation, selectedEncounterType, method, wildSettings, undergroundLocation]
+            .map { String(describing: $0) }
     }
 
     private func clearResults() {
@@ -5143,35 +5411,28 @@ struct FinderRootView: View {
         let g5IVMinAdv = UInt32(clamping: gen5IVMinAdvance)
         let g5IVMaxAdv = UInt32(clamping: gen5IVMaxAdvance)
 
-        // Wild encounter context (pre-compute on main actor)
+        // Wild encounter context (pre-compute on main actor): the area by
+        // PokéFinder's location ID, its settings, and the slots the Pokémon
+        // picker (or the Poké Radar) allows.
         let encMode = encounterMode
-        let encLocation = selectedLocation
-        let speciesFilter = selectedSpeciesFilter
         let pfGameVal = selectedGame.pfGame
         let pfEncVal = selectedEncounterType.pfEncounter
-        let isGen3 = generation == .gen3
-        let locationIDVal: UInt8 = {
-            if generation == .gen5 {
-                return findLocationID5(pfGame: pfGameVal, pfEnc: pfEncVal, locationName: encLocation, season: g5Season)
-            } else if generation == .gen8 {
-                return findLocationID8(pfGame: pfGameVal, pfEnc: pfEncVal, locationName: encLocation)
-            }
-            return findLocationID(pfGame: pfGameVal, pfEnc: pfEncVal,
-                                  isGen3: isGen3, locationName: encLocation)
-        }()
+        let area = encMode == .wild ? wildArea : nil
+        let locationIDVal = area?.location ?? 0
+        let gen4Settings = wildSettings.gen4
+        let radar = usesPokeRadar
+        let radarSlot = UInt8(clamping: wildRadarSlot)
+        let radarShiny = radar && wildRadarShiny
+        let happiness: UInt8 = wildSettingsShown.contains(.happiness) ? UInt8(clamping: wildHappiness) : 0
+        let wildSlots: [Bool] = radar ? (0..<12).map { $0 == Int(radarSlot) }
+            : area?.encounterSlots(for: selectedSpeciesFilter) ?? Array(repeating: true, count: 12)
+        let undergroundLocationVal = UInt8(clamping: max(undergroundLocation, 0))
+        let undergroundSpeciesVal: [UInt16] = undergroundSpecies > 0 ? [UInt16(clamping: undergroundSpecies)] : []
         // The static encounter's place in PokéFinder's tables, for its
         // template: gender, shiny lock, fixed IVs.
         let staticTemplate: PFStaticTemplateRef? = encMode == .static_
             ? selectedEncounter.flatMap { $0.generation == gen ? $0.template : nil } : nil
         let gen3Template = gen == .gen3 ? staticTemplate : nil
-        let slotSpecies: [UInt16]
-        if let route = PFEncounterDataProvider.wildEncounter(for: selectedGame,
-                                                              location: encLocation,
-                                                              type: selectedEncounterType) {
-            slotSpecies = route.slots.map { $0.species }
-        } else {
-            slotSpecies = []
-        }
 
         enum SearchEvent: Sendable {
             case result(StaticSearchResult)
@@ -5234,6 +5495,7 @@ struct FinderRootView: View {
                     shinyOnly: shiny, lead: ld, syncNature: sNat, game: pfGameVal,
                     shinyCharm: g8ShinyCharm,
                     diglett: g8Diglett, storyFlag: g8StoryFlag, levelFlag: g8LevelFlag,
+                    location: undergroundLocationVal, species: undergroundSpeciesVal,
                     filterGender: genderFilter, filterAbility: abilityFilter,
                     hiddenPowers: hpFilter,
                     onProgress: { continuation.yield(.progress($0)) }
@@ -5255,7 +5517,7 @@ struct FinderRootView: View {
                         startYear: g5StartYear, startMonth: g5StartMonth, startDay: g5StartDay,
                         endYear: g5EndYear, endMonth: g5EndMonth, endDay: g5EndDay,
                         filterGender: genderFilter, filterAbility: abilityFilter,
-                        hiddenPowers: hpFilter,
+                        hiddenPowers: hpFilter, encounterSlots: wildSlots,
                         onResult: { continuation.yield(.result($0)) },
                         onProgress: { continuation.yield(.progress($0)) })
                 } else if gen == .gen5 {
@@ -5271,7 +5533,7 @@ struct FinderRootView: View {
                         memoryLink: g5MemoryLink, shinyCharm: g5ShinyCharm,
                         dsType: g5DSType, language: g5Language,
                         filterGender: genderFilter, filterAbility: abilityFilter,
-                        hiddenPowers: hpFilter,
+                        hiddenPowers: hpFilter, encounterSlots: wildSlots,
                         onProgress: { continuation.yield(.progress($0)) }
                     ) { continuation.yield(.result($0)) }
                     continuation.yield(.progress(100))
@@ -5282,9 +5544,9 @@ struct FinderRootView: View {
                         natures: natFilter, tid: tID, sid: sID,
                         shinyOnly: shiny, lead: ld, syncNature: sNat, game: pfGameVal,
                         shinyCharm: g8ShinyCharm,
-                        encounter: pfEncVal, location: locationIDVal,
+                        encounter: pfEncVal, location: locationIDVal, settings: gen4Settings,
                         filterGender: genderFilter, filterAbility: abilityFilter,
-                        hiddenPowers: hpFilter,
+                        hiddenPowers: hpFilter, encounterSlots: wildSlots,
                         onProgress: { continuation.yield(.progress($0)) }
                     ) { continuation.yield(.result($0)) }
                     continuation.yield(.progress(100))
@@ -5301,9 +5563,10 @@ struct FinderRootView: View {
                                   searcherMinAdv: srcMinAdv, searcherMaxAdv: srcMaxAdv,
                                   minDelay: UInt32(delMin), maxDelay: UInt32(delMax),
                                   pfGame: pfGameVal, pfEnc: pfEncVal,
-                                  locationID: locationIDVal,
-                                  slotSpecies: slotSpecies,
-                                  speciesFilter: speciesFilter,
+                                  locationID: locationIDVal, encounterSlots: wildSlots,
+                                  settings: gen4Settings,
+                                  radar: radar, radarShiny: radarShiny, radarSlot: radarSlot,
+                                  happiness: happiness,
                                   lead: ld, syncNature: sNat, deadBattery: isDeadBattery,
                                   filterGender: genderFilter, filterAbility: abilityFilter,
                                   hiddenPowers: hpFilter,

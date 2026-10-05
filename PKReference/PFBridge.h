@@ -112,6 +112,28 @@ typedef struct {
     PFSlot slots[12];
 } PFEncounterArea;
 
+/// What changes a Gen 4 area's slots, as PokéFinder's EncounterSettings4.
+typedef struct {
+    /// 0 morning, 1 day, 2 night.
+    int time;
+    bool swarm;
+    /// Diamond, Pearl and Platinum: the GBA game in Slot 2 (a Game), or 0.
+    uint32_t dual;
+    /// Diamond, Pearl and Platinum: the Great Marsh's daily Pokémon (first)
+    /// and the Trophy Garden's two (both), or 0.
+    uint16_t replacement[2];
+    /// Diamond, Pearl and Platinum: fishing on Mt. Coronet B1F's Feebas tile.
+    bool feebasTile;
+    /// Diamond, Pearl and Platinum: the Poké Radar's slots.
+    bool radar;
+    /// HeartGold and SoulSilver: 0 off, 1 Hoenn Sound, 2 Sinnoh Sound,
+    /// 3 the Mysterious Transmission (Unown).
+    int radio;
+    /// HeartGold and SoulSilver: the Safari Zone's blocks placed, by type:
+    /// Plains, Forest, Peak and Water.
+    uint8_t blocks[4];
+} PFEncounterSettings4;
+
 typedef struct {
     uint32_t game;
     uint16_t specie;
@@ -220,6 +242,7 @@ void pf_staticSearch3_free(PFStaticSearch3Handle handle);
 
 typedef void *PFSearchHandle;
 
+/// NULL when the game has no such area.
 PFSearchHandle pf_wildSearch3_start(uint8_t method, uint8_t lead,
                                      uint16_t tid, uint16_t sid,
                                      uint32_t game, bool deadBattery, bool feebasTile,
@@ -229,12 +252,17 @@ PFSearchHandle pf_wildSearch3_start(uint8_t method, uint8_t lead,
                                      const bool natures[25], const bool powers[16],
                                      const bool encounterSlots[12]);
 
+/// Gen 4's searcher. `method` may be Poké Radar, with `fixedSlot` the
+/// radar's slot and `radarShiny` a shiny patch. NULL when the game has no
+/// such area.
 PFSearchHandle pf_wildSearch4_start(uint32_t minAdvance, uint32_t maxAdvance,
                                      uint32_t minDelay, uint32_t maxDelay,
                                      uint8_t method, uint8_t lead,
                                      uint16_t tid, uint16_t sid,
-                                     uint32_t game, bool feebasTile,
+                                     uint32_t game,
                                      uint8_t encounter, uint8_t location,
+                                     const PFEncounterSettings4 *settings,
+                                     bool radarShiny, uint8_t happiness, uint8_t fixedSlot,
                                      uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
                                      const uint8_t ivMin[6], const uint8_t ivMax[6],
                                      const bool natures[25], const bool powers[16],
@@ -349,13 +377,13 @@ PFEncounterArea *pf_getEncounters3(uint8_t encounter, uint32_t game,
                                     bool feebasTile, int *outCount);
 PFEncounterArea *pf_getEncounters4(uint8_t encounter, uint32_t game,
                                     uint16_t tid, uint16_t sid,
-                                    int time, bool swarm,
-                                    uint32_t dual,
-                                    uint16_t replacement0, uint16_t replacement1,
-                                    bool feebasTile, bool radar,
-                                    int radio,
-                                    const uint8_t blocks[5],
+                                    const PFEncounterSettings4 *settings,
                                     int *outCount);
+/// The Pokémon that can be the Great Marsh's daily Pokémon (or, with
+/// `trophyGarden`, the Trophy Garden's) in a Diamond, Pearl, Platinum or
+/// BDSP game, with the National Pokédex or without: up to 32, into `out`.
+/// Returns the count.
+int pf_getDailyPokemon(uint32_t game, bool trophyGarden, uint16_t out[32]);
 PFStaticTemplate *pf_getStaticEncounters3(int type, int *outCount);
 PFStaticTemplate *pf_getStaticEncounters4(int type, int *outCount);
 
@@ -379,20 +407,9 @@ PFWildGeneratorState *pf_wildGenerate3(uint32_t seed,
                                         const bool encounterSlots[12],
                                         int *outCount);
 
-PFWildSearcherState *pf_wildSearch3(uint8_t method,
-                                     uint8_t lead,
-                                     uint16_t tid, uint16_t sid,
-                                     uint32_t game,
-                                     bool deadBattery,
-                                     bool feebasTile,
-                                     uint8_t encounter,
-                                     uint8_t location,
-                                     uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
-                                     const uint8_t ivMin[6], const uint8_t ivMax[6],
-                                     const bool natures[25], const bool powers[16],
-                                     const bool encounterSlots[12],
-                                     int *outCount);
-
+/// Gen 4's generator. `method` may be Poké Radar, with `fixedSlot` the
+/// radar's slot and `radarShiny` a shiny patch; `happiness` is HeartGold and
+/// SoulSilver's fishing modifier.
 PFWildGeneratorState4 *pf_wildGenerate4(uint32_t seed,
                                          uint32_t initialAdvances,
                                          uint32_t maxAdvances,
@@ -401,29 +418,15 @@ PFWildGeneratorState4 *pf_wildGenerate4(uint32_t seed,
                                          uint8_t lead,
                                          uint16_t tid, uint16_t sid,
                                          uint32_t game,
-                                         bool feebasTile,
                                          uint8_t encounter,
                                          uint8_t location,
+                                         const PFEncounterSettings4 *settings,
+                                         bool radarShiny, uint8_t happiness, uint8_t fixedSlot,
                                          uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
                                          const uint8_t ivMin[6], const uint8_t ivMax[6],
                                          const bool natures[25], const bool powers[16],
                                          const bool encounterSlots[12],
                                          int *outCount);
-
-PFWildSearcherState4 *pf_wildSearch4(uint32_t minAdvance, uint32_t maxAdvance,
-                                      uint32_t minDelay, uint32_t maxDelay,
-                                      uint8_t method,
-                                      uint8_t lead,
-                                      uint16_t tid, uint16_t sid,
-                                      uint32_t game,
-                                      bool feebasTile,
-                                      uint8_t encounter,
-                                      uint8_t location,
-                                      uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
-                                      const uint8_t ivMin[6], const uint8_t ivMax[6],
-                                      const bool natures[25], const bool powers[16],
-                                      const bool encounterSlots[12],
-                                      int *outCount);
 
 // MARK: - Egg Generator State
 
@@ -1067,6 +1070,14 @@ typedef struct {
     uint8_t level;
 } PFUndergroundState;
 
+/// A Grand Underground area: its location (PokéFinder names it as location
+/// + 181) and the species it can give at the story stage.
+typedef struct {
+    uint8_t location;
+    uint8_t speciesCount;
+    uint16_t species[255];
+} PFUndergroundArea;
+
 // MARK: - Gen 8 Static Generator
 
 PFGeneratorState8 *pf_staticGenerate8(uint64_t seed0, uint64_t seed1,
@@ -1159,11 +1170,15 @@ PFUndergroundState *pf_undergroundGenerate8(uint64_t seed0, uint64_t seed1,
                                              uint16_t tid, uint16_t sid,
                                              uint32_t game,
                                              bool nationalDex, bool shinyCharm, bool ovalCharm,
-                                             int storyFlag,
+                                             int storyFlag, uint8_t location,
+                                             const uint16_t *species, int speciesCount,
                                              uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
                                              const uint8_t ivMin[6], const uint8_t ivMax[6],
                                              const bool natures[25], const bool powers[16],
                                              int *outCount);
+
+PFUndergroundArea *pf_getUndergroundAreas8(int storyFlag, bool diglett, uint32_t game,
+                                           bool nationalDex, int *outCount);
 
 // MARK: - Gen 8 Encounter Data
 
