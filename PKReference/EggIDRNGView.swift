@@ -182,7 +182,7 @@ struct EggRNGView: View {
                     HStack {
                         Text("Egg Species #")
                         Spacer()
-                        TextField("", value: $eggSpecie, format: .number)
+                        LiveIntField(value: $eggSpecie, range: 1...Int(UInt16.max), grouping: false)
                             .clamping($eggSpecie, to: 1...Int(UInt16.max))
                             .textFieldStyle(.roundedBorder).scaledWidth(80)
                             .multilineTextAlignment(.trailing)
@@ -228,7 +228,7 @@ struct EggRNGView: View {
             }
             .padding()
         }
-        .scrollDismissesKeyboard(.interactively)
+        .dismissesKeyboard()
         #if os(iOS)
         .onTapGesture { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
         #endif
@@ -241,12 +241,12 @@ struct EggRNGView: View {
                                 item: Binding<UInt8>, nature: Binding<UInt8>) -> some View {
         SectionCard(title: label, icon: "figure.stand") {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                IVSliderRow8(label: "HP", value: hp)
-                IVSliderRow8(label: "Atk", value: atk)
-                IVSliderRow8(label: "Def", value: def)
-                IVSliderRow8(label: "SpA", value: spa)
-                IVSliderRow8(label: "SpD", value: spd)
-                IVSliderRow8(label: "Spe", value: spe)
+                IVField(label: "HP", value: hp)
+                IVField(label: "Atk", value: atk)
+                IVField(label: "Def", value: def)
+                IVField(label: "SpA", value: spa)
+                IVField(label: "SpD", value: spd)
+                IVField(label: "Spe", value: spe)
             }
 
             Picker("Gender", selection: gender) {
@@ -533,7 +533,7 @@ struct IDRNGView: View {
             }
             .padding()
         }
-        .scrollDismissesKeyboard(.interactively)
+        .dismissesKeyboard()
         #if os(iOS)
         .onTapGesture { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
         #endif
@@ -606,44 +606,29 @@ struct IDRNGView: View {
             HStack {
                 Text("Date")
                 Spacer()
-                TextField("Y", value: $gen4Year, format: .number.grouping(.never))
+                LiveIntField("Y", value: $gen4Year, range: 2000...2099, grouping: false)
                     .clamping($gen4Year, to: 2000...2099)
                     .textFieldStyle(.roundedBorder).scaledWidth(60)
-                    #if os(iOS)
-                    .keyboardType(.numberPad)
-                    #endif
                 Text("/")
-                TextField("M", value: $gen4Month, format: .number.grouping(.never))
+                LiveIntField("M", value: $gen4Month, range: 1...12, grouping: false)
                     .clamping($gen4Month, to: 1...12)
                     .textFieldStyle(.roundedBorder).scaledWidth(40)
-                    #if os(iOS)
-                    .keyboardType(.numberPad)
-                    #endif
                 Text("/")
-                TextField("D", value: $gen4Day, format: .number.grouping(.never))
+                LiveIntField("D", value: $gen4Day, range: 1...31, grouping: false)
                     .clamping($gen4Day, to: 1...31)
                     .textFieldStyle(.roundedBorder).scaledWidth(40)
-                    #if os(iOS)
-                    .keyboardType(.numberPad)
-                    #endif
             }
 
             HStack {
                 Text("Time")
                 Spacer()
-                TextField("H", value: $gen4Hour, format: .number.grouping(.never))
+                LiveIntField("H", value: $gen4Hour, range: 0...23, grouping: false)
                     .clamping($gen4Hour, to: 0...23)
                     .textFieldStyle(.roundedBorder).scaledWidth(40)
-                    #if os(iOS)
-                    .keyboardType(.numberPad)
-                    #endif
                 Text(":")
-                TextField("M", value: $gen4Minute, format: .number.grouping(.never))
+                LiveIntField("M", value: $gen4Minute, range: 0...59, grouping: false)
                     .clamping($gen4Minute, to: 0...59)
                     .textFieldStyle(.roundedBorder).scaledWidth(40)
-                    #if os(iOS)
-                    .keyboardType(.numberPad)
-                    #endif
             }
 
             gen4FilterSection
@@ -660,12 +645,9 @@ struct IDRNGView: View {
             HStack {
                 Text("Year")
                 Spacer()
-                TextField("", value: $gen4SearchYear, format: .number.grouping(.never))
+                LiveIntField("", value: $gen4SearchYear, range: 2000...2099, grouping: false)
                     .clamping($gen4SearchYear, to: 2000...2099)
                     .textFieldStyle(.roundedBorder).scaledWidth(100).multilineTextAlignment(.trailing)
-                    #if os(iOS)
-                    .keyboardType(.numberPad)
-                    #endif
             }
             RNGIntField(label: "Min Delay", value: $gen4SearchMinDelay, range: RNGFieldRange.word)
             RNGIntField(label: "Max Delay", value: $gen4SearchMaxDelay, range: RNGFieldRange.word)

@@ -719,6 +719,25 @@ bool pf_calcIVs(uint32_t game, uint16_t specie, uint8_t form,
 /// it isn't in the game.
 bool pf_baseStats(uint32_t game, uint16_t specie, uint8_t form, uint8_t out[6]);
 
+/// How many forms `specie` has in `game`'s table (1 when only its base
+/// one; 0 when it isn't in the game).
+uint8_t pf_formCount(uint32_t game, uint16_t specie);
+
+/// The species `game`'s table marks present, as PokéFinder's IV calculator
+/// lists them. Free with pf_freeResults.
+uint16_t *pf_presentSpecies(uint32_t game, int *outCount);
+
+/// PokéFinder's next level: per stat, the first level above `level` at which
+/// two of these IVs (bit n of `masks[i]` set for IV n) give different stats;
+/// `level` itself when the IV is known or no level up to 100 does.
+bool pf_nextLevel(uint32_t game, uint16_t specie, uint8_t form, const uint32_t masks[6],
+                  uint8_t level, uint8_t nature, uint8_t out[6]);
+
+/// PokéFinder's characteristic text for index 0–29 ("Loves to eat", …):
+/// index / 5 picks the stat (HP, Atk, Def, Spe, SpA, SpD), index % 5 the
+/// IV mod 5.
+char *pf_getCharacteristic(uint8_t characteristic);
+
 // MARK: - Gen 5 Generator State
 
 typedef struct {

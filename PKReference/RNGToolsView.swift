@@ -2335,8 +2335,10 @@ private let pfNatureModifiers: [[Float]] = [
 ]
 
 /// Compute stat matching PokeFinder's Nature::computeStat
-private func pfComputeStat(baseStat: UInt16, iv: UInt8, nature: UInt8, level: UInt8, index: UInt8) -> UInt16 {
-    let stat = ((2 * UInt16(baseStat) + UInt16(iv)) * UInt16(level)) / 100
+/// The stat formula from Gen 3 on; EVs count a quarter (PokéFinder's
+/// leaves them out: RNG catches have none).
+private func pfComputeStat(baseStat: UInt16, iv: UInt8, nature: UInt8, level: UInt8, index: UInt8, ev: Int = 0) -> UInt16 {
+    let stat = ((2 * UInt16(baseStat) + UInt16(iv) + UInt16(clamping: max(0, ev) / 4)) * UInt16(level)) / 100
     if index == 0 { // HP
         return stat + UInt16(level) + 10
     } else {
@@ -2356,9 +2358,11 @@ struct IVCalcResult: Identifiable {
     }
 }
 
-/// Full IV range calculator matching PokeFinder's IVChecker::calculateIVRange
+/// Full IV range calculator matching PokeFinder's IVChecker::calculateIVRange,
+/// with EVs for today's games (`evs` per stat, 0–252).
 func pfCalculateIVRange(baseStats: [UInt8], stats: [[UInt16]], levels: [UInt8],
-                         nature: UInt8, characteristic: UInt8 = 255, hiddenPower: UInt8 = 255) -> [IVCalcResult] {
+                         nature: UInt8, characteristic: UInt8 = 255, hiddenPower: UInt8 = 255,
+                         evs: [Int] = Array(repeating: 0, count: 6)) -> [IVCalcResult] {
     let statNames = ["HP", "Attack", "Defense", "Sp. Atk", "Sp. Def", "Speed"]
     let ivOrder: [UInt8] = [0, 1, 2, 5, 3, 4]
 
@@ -2373,7 +2377,7 @@ func pfCalculateIVRange(baseStats: [UInt8], stats: [[UInt16]], levels: [UInt8],
             for iv: UInt8 in 0...31 {
                 if nature != 255 {
                     let calc = pfComputeStat(baseStat: UInt16(baseStats[i]), iv: iv,
-                                              nature: nature, level: levels[si], index: UInt8(i))
+                                              nature: nature, level: levels[si], index: UInt8(i), ev: evs[i])
                     if calc == statSet[i] {
                         minIVs[i] = min(iv, minIVs[i])
                         maxIVs[i] = max(iv, maxIVs[i])
@@ -2381,7 +2385,7 @@ func pfCalculateIVRange(baseStats: [UInt8], stats: [[UInt16]], levels: [UInt8],
                 } else {
                     // Unknown nature: check with Hardy (neutral) and also +/- 10%
                     let calc = pfComputeStat(baseStat: UInt16(baseStats[i]), iv: iv,
-                                              nature: 0, level: levels[si], index: UInt8(i))
+                                              nature: 0, level: levels[si], index: UInt8(i), ev: evs[i])
                     if calc == statSet[i] ||
                         (i != 0 && (UInt16(Float(calc) * 0.9) == statSet[i] || UInt16(Float(calc) * 1.1) == statSet[i])) {
                         minIVs[i] = min(iv, minIVs[i])
@@ -2400,11 +2404,14 @@ func pfCalculateIVRange(baseStats: [UInt8], stats: [[UInt16]], levels: [UInt8],
             charIndex = Int(ivOrder[Int(characteristic) / 5])
             let charResult = characteristic % 5
 
-            for iv in minIVs[charIndex]...maxIVs[charIndex] {
-                if (iv % 5) == charResult {
-                    if minIVs.allSatisfy({ iv >= $0 }) {
-                        current[charIndex].append(iv)
-                        characteristicHigh = iv
+            // When no IV fits the stat, its range is empty: min above max.
+            if minIVs[charIndex] <= maxIVs[charIndex] {
+                for iv in minIVs[charIndex]...maxIVs[charIndex] {
+                    if (iv % 5) == charResult {
+                        if minIVs.allSatisfy({ iv >= $0 }) {
+                            current[charIndex].append(iv)
+                            characteristicHigh = iv
+                        }
                     }
                 }
             }
@@ -2998,6 +3005,7 @@ struct RNGTimerView: View {
             }
             .padding()
         }
+        .dismissesKeyboard()
         // The countdown and Stop stay in view while it runs; Start is at the
         // bottom, below the settings.
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -3236,10 +3244,10 @@ struct RNGTimerView: View {
                     Text("Phase \(i + 1)").font(.caption).foregroundStyle(.secondary)
                         .lineLimit(1)
                         .scaledWidth(56, relativeTo: .caption, alignment: .leading)
-                    TextField("Value", value: Binding(
+                    LiveIntField("Value", value: Binding(
                         get: { customPhases[i].target },
                         set: { customPhases[i].target = $0 }
-                    ), format: .number)
+                    ))
                     .textFieldStyle(.roundedBorder).scaledWidth(80)
 
                     Picker("", selection: Binding(
@@ -3249,10 +3257,10 @@ struct RNGTimerView: View {
                         ForEach(CustomTimerUnit.allCases) { u in Text(u.rawValue).tag(u) }
                     }.scaledWidth(100)
 
-                    TextField("Cal", value: Binding(
+                    LiveIntField("Cal", value: Binding(
                         get: { customPhases[i].calibration },
                         set: { customPhases[i].calibration = $0 }
-                    ), format: .number)
+                    ))
                     .textFieldStyle(.roundedBorder).scaledWidth(60)
 
                     if customPhases.count > 1 {
@@ -3339,173 +3347,6 @@ struct RNGTimerView: View {
 }
 
 // ============================================================================
-// MARK: - IV Calculator View
-// ============================================================================
-
-struct IVCalculatorView: View {
-    @Query(sort: \PKMNStats.name) private var allPokemon: [PKMNStats]
-    @State private var searchText = ""
-    @State private var selectedPokemon: PKMNStats?
-    @State private var level: UInt8 = 50
-    @State private var natureIndex: UInt8 = 3 // Adamant
-
-    @State private var evHP = 0; @State private var evAtk = 0; @State private var evDef = 0
-    @State private var evSpAtk = 0; @State private var evSpDef = 0; @State private var evSpeed = 0
-
-    @State private var statHP: UInt16 = 0; @State private var statAtk: UInt16 = 0
-    @State private var statDef: UInt16 = 0; @State private var statSpAtk: UInt16 = 0
-    @State private var statSpDef: UInt16 = 0; @State private var statSpeed: UInt16 = 0
-
-    @State private var results: [IVCalcResult] = []
-
-    private var filteredPokemon: [PKMNStats] {
-        let t = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !t.isEmpty else { return [] }
-        return Array(allPokemon.filter { $0.name.lowercased().contains(t) }.prefix(20))
-    }
-
-    var body: some View {
-        ScrollView {
-            CardStack {
-                if allPokemon.isEmpty {
-                    ContentUnavailableView("Syncing Data", systemImage: "antenna.radiowaves.left.and.right",
-                        description: Text("Waiting for Pokemon data to sync..."))
-                } else {
-                    pokemonSelector
-                    if selectedPokemon != nil {
-                        configSection
-                        statEntrySection
-                        calculateButton
-                        resultsSection
-                    }
-                }
-            }.padding()
-        }
-    }
-
-    private var pokemonSelector: some View {
-        SectionCard(title: "Pokemon", icon: "sparkles") {
-            VStack(spacing: 8) {
-                TextField("Search Pokemon...", text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-                    .onChange(of: searchText) { selectedPokemon = nil; results = [] }
-
-                if !filteredPokemon.isEmpty && selectedPokemon == nil {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 4) {
-                            ForEach(filteredPokemon, id: \.id) { pkmn in
-                                Button {
-                                    selectedPokemon = pkmn
-                                    searchText = pkmn.name
-                                    results = []
-                                } label: {
-                                    Text(pkmn.name).frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.vertical, 4).padding(.horizontal, 8)
-                                }.buttonStyle(.plain)
-                            }
-                        }
-                    }.frame(maxHeight: 200)
-                }
-
-                if let pkmn = selectedPokemon {
-                    HStack(spacing: 12) {
-                        baseStatPill("HP", pkmn.baseHP)
-                        baseStatPill("Atk", pkmn.baseAtk)
-                        baseStatPill("Def", pkmn.baseDef)
-                        baseStatPill("SpA", pkmn.baseSpAtk)
-                        baseStatPill("SpD", pkmn.baseSpDef)
-                        baseStatPill("Spe", pkmn.baseSpeed)
-                    }.font(.caption)
-
-                    Button("Clear") { selectedPokemon = nil; searchText = ""; results = [] }.font(.caption)
-                }
-            }
-        }
-    }
-
-    private func baseStatPill(_ label: String, _ value: Int) -> some View {
-        VStack(spacing: 2) {
-            Text(label).foregroundStyle(.secondary)
-            Text("\(value)").bold()
-        }.frame(maxWidth: .infinity)
-    }
-
-    private var configSection: some View {
-        SectionCard(title: "Config", icon: "slider.horizontal.3") {
-            HStack {
-                Text("Level")
-                Spacer()
-                TextField("Lv", value: $level, format: .number)
-                    .textFieldStyle(.roundedBorder).scaledWidth(60)
-            }
-            Picker("Nature", selection: $natureIndex) {
-                ForEach(Array(allNatures.enumerated()), id: \.element.id) { i, n in
-                    Text("\(n.name) \(n.summary)").tag(UInt8(i))
-                }
-            }
-        }
-    }
-
-    private var statEntrySection: some View {
-        SectionCard(title: "Stats (from in-game summary)", icon: "number") {
-            VStack(spacing: 8) {
-                IVCalcRow16(label: "HP", stat: $statHP, ev: $evHP)
-                IVCalcRow16(label: "Attack", stat: $statAtk, ev: $evAtk)
-                IVCalcRow16(label: "Defense", stat: $statDef, ev: $evDef)
-                IVCalcRow16(label: "Sp. Atk", stat: $statSpAtk, ev: $evSpAtk)
-                IVCalcRow16(label: "Sp. Def", stat: $statSpDef, ev: $evSpDef)
-                IVCalcRow16(label: "Speed", stat: $statSpeed, ev: $evSpeed)
-            }
-        }
-    }
-
-    private var calculateButton: some View {
-        Button {
-            guard let pkmn = selectedPokemon else { return }
-            // PokeFinder's formula uses base stats without EVs in the stat formula
-            // Our stats already include EVs from in-game, so pass them as-is
-            let baseStats: [UInt8] = [UInt8(pkmn.baseHP), UInt8(pkmn.baseAtk), UInt8(pkmn.baseDef),
-                                       UInt8(pkmn.baseSpAtk), UInt8(pkmn.baseSpDef), UInt8(pkmn.baseSpeed)]
-            let stats: [[UInt16]] = [[statHP, statAtk, statDef, statSpAtk, statSpDef, statSpeed]]
-            results = pfCalculateIVRange(baseStats: baseStats, stats: stats, levels: [level], nature: natureIndex)
-        } label: {
-            Label("Calculate IVs", systemImage: "function")
-        }
-        .buttonStyle(.primaryAction)
-    }
-
-    private var resultsSection: some View {
-        Group {
-            if !results.isEmpty {
-                SectionCard(title: "Results", icon: "checkmark.circle") {
-                    ForEach(results) { r in
-                        HStack {
-                            Text(r.statName).lineLimit(1).scaledWidth(80, alignment: .leading)
-                            Spacer()
-                            if r.possibleIVs.isEmpty {
-                                Text("Invalid").foregroundStyle(.red).bold()
-                            } else {
-                                Text(r.displayRange)
-                                    .font(.system(.body, design: .monospaced)).bold()
-                                    .foregroundStyle(ivColor(r.possibleIVs))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func ivColor(_ ivs: [UInt8]) -> Color {
-        guard let best = ivs.last else { return .primary }
-        if best == 31 { return .green }
-        if best == 0 { return .red }
-        if best >= 28 { return .blue }
-        return .primary
-    }
-}
-
-// ============================================================================
 // MARK: - IV to PID View (PokeFinder feature)
 // ============================================================================
 
@@ -3519,30 +3360,31 @@ struct IVToPIDView: View {
     @State private var nature: UInt8 = 0
     @State private var tid: UInt16 = 0
     @State private var results: [LCRNGReverse.IVToPIDResult] = []
+    @State private var searched = false
 
     var body: some View {
         ScrollView {
             CardStack {
                 SectionCard(title: "IVs", icon: "number.square") {
-                    IVSliderRow8(label: "HP", value: $hp)
-                    IVSliderRow8(label: "Attack", value: $atk)
-                    IVSliderRow8(label: "Defense", value: $def)
-                    IVSliderRow8(label: "Sp. Atk", value: $spa)
-                    IVSliderRow8(label: "Sp. Def", value: $spd)
-                    IVSliderRow8(label: "Speed", value: $spe)
+                    IVField(label: "HP", value: $hp)
+                    IVField(label: "Attack", value: $atk)
+                    IVField(label: "Defense", value: $def)
+                    IVField(label: "Sp. Atk", value: $spa)
+                    IVField(label: "Sp. Def", value: $spd)
+                    IVField(label: "Speed", value: $spe)
                 }
 
                 SectionCard(title: "Trainer Info", icon: "person") {
-                    HStack {
-                        Text("Nature (0-24)")
-                        Spacer()
-                        TextField("", value: $nature, format: .number)
-                            .textFieldStyle(.roundedBorder).scaledWidth(60)
+                    LabeledContent("Nature") {
+                        Picker("Nature", selection: $nature) {
+                            ForEach(0..<25, id: \.self) { Text(pfNatureNames[$0]).tag(UInt8($0)) }
+                        }
+                        .labelsHidden()
                     }
                     HStack {
                         Text("Trainer ID")
                         Spacer()
-                        TextField("", value: $tid, format: .number)
+                        LiveIntField(value: $tid, grouping: false)
                             .textFieldStyle(.roundedBorder).scaledWidth(80)
                     }
                 }
@@ -3551,6 +3393,7 @@ struct IVToPIDView: View {
                     results = LCRNGReverse.calculatePIDs(hp: hp, atk: atk, def: def,
                                                           spa: spa, spd: spd, spe: spe,
                                                           nature: nature, tid: tid)
+                    searched = true
                 } label: {
                     Label("Find PIDs", systemImage: "magnifyingglass")
                 }
@@ -3579,11 +3422,12 @@ struct IVToPIDView: View {
                             Divider()
                         }
                     }
-                } else if !results.isEmpty {
-                    Text("No results found").foregroundStyle(.secondary)
+                } else if searched {
+                    Text("No PIDs give these IVs with this nature.").foregroundStyle(.secondary)
                 }
             }.padding()
         }
+        .dismissesKeyboard()
     }
 }
 
@@ -3608,12 +3452,12 @@ struct HiddenPowerCalcView: View {
         ScrollView {
             CardStack {
                 SectionCard(title: "IVs", icon: "number.square") {
-                    IVSliderRow(label: "HP", value: $ivHP)
-                    IVSliderRow(label: "Attack", value: $ivAtk)
-                    IVSliderRow(label: "Defense", value: $ivDef)
-                    IVSliderRow(label: "Sp. Atk", value: $ivSpAtk)
-                    IVSliderRow(label: "Sp. Def", value: $ivSpDef)
-                    IVSliderRow(label: "Speed", value: $ivSpeed)
+                    IVField(label: "HP", value: $ivHP)
+                    IVField(label: "Attack", value: $ivAtk)
+                    IVField(label: "Defense", value: $ivDef)
+                    IVField(label: "Sp. Atk", value: $ivSpAtk)
+                    IVField(label: "Sp. Def", value: $ivSpDef)
+                    IVField(label: "Speed", value: $ivSpeed)
                 }
 
                 SectionCard(title: "Hidden Power", icon: "questionmark.diamond") {
@@ -3623,27 +3467,35 @@ struct HiddenPowerCalcView: View {
                             .background(TypePalette.fill(for: hpType).opacity(0.2)).clipShape(Capsule())
                     }
                     HStack {
-                        Text("Base Power (Gen V-VI)"); Spacer()
+                        Text("Base Power (Gen 3–5)"); Spacer()
                         Text("\(hpPower)").bold().font(.system(.body, design: .monospaced))
                     }
-                    Text("Note: In Gen VII+, Hidden Power always has 60 base power.")
+                    Text("From Gen 6 on, Hidden Power always has 60 base power.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
                 SectionCard(title: "Common Hidden Power IVs", icon: "table") {
                     VStack(spacing: 6) {
-                        hpPreset("Fire", ivs: "31/30/31/30/31/30")
-                        hpPreset("Ice", ivs: "31/30/30/31/31/31")
-                        hpPreset("Grass", ivs: "31/30/31/30/31/30")
-                        hpPreset("Electric", ivs: "31/31/31/30/31/31")
-                        hpPreset("Ground", ivs: "31/31/31/30/30/31")
-                        hpPreset("Fighting", ivs: "31/31/30/30/30/30")
-                        hpPreset("Flying", ivs: "30/30/30/30/30/31")
+                        ForEach(Self.presets, id: \.type) { preset in
+                            hpPreset(preset.type, ivs: preset.ivs.map(String.init).joined(separator: "/"))
+                        }
                     }
                 }
             }.padding()
         }
+        .dismissesKeyboard()
     }
+
+    /// HP/Atk/Def/SpA/SpD/Spe.
+    static let presets: [(type: String, ivs: [Int])] = [
+        ("Fire", [31, 30, 31, 30, 31, 30]),
+        ("Ice", [31, 30, 30, 31, 31, 31]),
+        ("Grass", [31, 30, 31, 30, 31, 31]),
+        ("Electric", [31, 31, 31, 30, 31, 31]),
+        ("Ground", [31, 31, 31, 30, 30, 31]),
+        ("Fighting", [31, 31, 30, 30, 30, 30]),
+        ("Flying", [30, 30, 30, 30, 30, 31]),
+    ]
 
     private func hpPreset(_ type: String, ivs: String) -> some View {
         HStack {
@@ -4674,7 +4526,7 @@ struct FinderRootView: View {
             Text("Parent A").font(.subheadline).bold().frame(maxWidth: .infinity, alignment: .leading)
             ForEach(0..<6) { i in
                 let statNames = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"]
-                IVSliderRow8(label: statNames[i], value: Binding(
+                IVField(label: statNames[i], value: Binding(
                     get: { gen8EggParentAIVs[i] },
                     set: { gen8EggParentAIVs[i] = $0 }
                 ))
@@ -4700,7 +4552,7 @@ struct FinderRootView: View {
             Text("Parent B").font(.subheadline).bold().frame(maxWidth: .infinity, alignment: .leading)
             ForEach(0..<6) { i in
                 let statNames = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"]
-                IVSliderRow8(label: statNames[i], value: Binding(
+                IVField(label: statNames[i], value: Binding(
                     get: { gen8EggParentBIVs[i] },
                     set: { gen8EggParentBIVs[i] = $0 }
                 ))
@@ -4737,7 +4589,7 @@ struct FinderRootView: View {
             HStack {
                 Text("Den Index")
                 Spacer()
-                TextField("0", value: $gen8RaidDen, format: .number)
+                LiveIntField("0", value: $gen8RaidDen)
                     .textFieldStyle(.roundedBorder)
                     .scaledWidth(80)
                     .multilineTextAlignment(.trailing)
@@ -4749,7 +4601,7 @@ struct FinderRootView: View {
             HStack {
                 Text("Raid Index")
                 Spacer()
-                TextField("0", value: $gen8RaidIndex, format: .number)
+                LiveIntField("0", value: $gen8RaidIndex)
                     .textFieldStyle(.roundedBorder)
                     .scaledWidth(80)
                     .multilineTextAlignment(.trailing)
@@ -4757,7 +4609,7 @@ struct FinderRootView: View {
             HStack {
                 Text("Level")
                 Spacer()
-                TextField("60", value: $gen8RaidLevel, format: .number)
+                LiveIntField("60", value: $gen8RaidLevel)
                     .textFieldStyle(.roundedBorder)
                     .scaledWidth(80)
                     .multilineTextAlignment(.trailing)
@@ -5490,6 +5342,7 @@ struct SeedToTimeView: View {
             }
             .padding()
         }
+        .dismissesKeyboard()
         .navigationTitle(frlg == nil ? "Seed to Time" : "Initial Seeds")
         .navigationDestination(item: $calibrating) { seed in
             if let frlg, let calibration {
@@ -5800,11 +5653,11 @@ struct FinderIVRangeRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(label).lineLimit(1).scaledWidth(70, alignment: .leading)
-            TextField("Min", value: $min, format: .number)
+            LiveIntField("Min", value: $min, range: 0...31)
                 .textFieldStyle(.roundedBorder).scaledWidth(50)
                 .multilineTextAlignment(.trailing)
             Text("–")
-            TextField("Max", value: $max, format: .number)
+            LiveIntField("Max", value: $max, range: 0...31)
                 .textFieldStyle(.roundedBorder).scaledWidth(50)
                 .multilineTextAlignment(.trailing)
             Spacer()
@@ -6004,18 +5857,119 @@ struct RNGCreditsView: View {
 // MARK: - Reusable Components
 // ============================================================================
 
+/// A whole-number field that takes its number as you type.
+/// `TextField(value:format:)` only takes it when the field loses focus, so a
+/// button tapped straight after typing (Find IVs, Start, Update Calibration)
+/// used the number from before.
+struct LiveIntField: View {
+    private let title: String
+    @Binding private var value: Int?
+    private let range: ClosedRange<Int>?
+    private let prompt: Text?
+    private let grouping: Bool
+
+    @State private var text = ""
+    @State private var selection: TextSelection?
+    @FocusState private var focused: Bool
+
+    /// An entry outside `range` is clamped, and the field shows the clamped
+    /// number once it loses focus. `grouping` is for quantities, not IDs or
+    /// years.
+    init(_ title: String = "", value: Binding<Int?>, range: ClosedRange<Int>? = nil,
+         prompt: Text? = nil, grouping: Bool = true) {
+        self.title = title
+        _value = value
+        self.range = range
+        self.prompt = prompt
+        self.grouping = grouping
+    }
+
+    /// For a number that's always there: emptying the field keeps the last
+    /// one, and an entry is clamped to what `T` holds.
+    init<T: FixedWidthInteger>(_ title: String = "", value: Binding<T>, range: ClosedRange<Int>? = nil,
+                               prompt: Text? = nil, grouping: Bool = true) {
+        let fits = Int(clamping: T.min)...Int(clamping: T.max)
+        self.init(title,
+                  value: Binding<Int?>(get: { Int(value.wrappedValue) },
+                                         set: { if let number = $0 { value.wrappedValue = T(clamping: number) } }),
+                  range: range?.clamped(to: fits) ?? fits, prompt: prompt, grouping: grouping)
+    }
+
+    private var allowsNegative: Bool { (range?.lowerBound ?? -1) < 0 }
+
+    var body: some View {
+        TextField(title, text: $text, selection: $selection, prompt: prompt)
+            .focused($focused)
+            .autocorrectionDisabled()
+            #if os(iOS)
+            // The number pad has no minus sign.
+            .keyboardType(allowsNegative ? .numbersAndPunctuation : .numberPad)
+            #endif
+            .onChange(of: text) { typed() }
+            // Set from elsewhere: a button, or a saved value.
+            .onChange(of: value, initial: true) { if number(in: text) != value { show() } }
+            .onChange(of: focused) {
+                show()
+                // Typing replaces the number, as a 31 is usually retyped,
+                // not added to.
+                if focused { selectAll() }
+            }
+    }
+
+    private func selectAll() {
+        // After the tap that focused it has placed the caret.
+        Task { @MainActor in
+            selection = TextSelection(range: text.startIndex..<text.endIndex)
+        }
+    }
+
+    private func typed() {
+        // Showing the number isn't typing it.
+        guard focused else { return }
+        let cleaned = Self.cleaned(text, allowsNegative: allowsNegative)
+        guard cleaned == text else { text = cleaned; return }
+        let entry = number(in: text)
+        if entry != value, entry != nil || text.isEmpty { value = entry }
+    }
+
+    private func number(in text: String) -> Int? {
+        guard let number = Int(text) else { return nil }
+        return range.map { number.clamped(to: $0) } ?? number
+    }
+
+    /// Plain digits while editing; grouped, if wanted, otherwise.
+    private func show() {
+        guard let value else { text = ""; return }
+        text = focused || !grouping ? String(value) : value.formatted()
+    }
+
+    /// Digits only, with a leading minus where it's allowed, and few enough
+    /// to fit an `Int`.
+    nonisolated static func cleaned(_ text: String, allowsNegative: Bool) -> String {
+        var result = ""
+        for character in text where character.isASCII {
+            if character.isNumber {
+                result.append(character)
+            } else if character == "-", allowsNegative, result.isEmpty {
+                result.append(character)
+            }
+        }
+        return String(result.prefix(result.hasPrefix("-") ? 11 : 10))
+    }
+}
+
 struct RNGIntField: View {
     let label: String
     @Binding var value: Int
-    /// What the field allows; an entry outside it is clamped when it
-    /// commits, so the screen shows what's used.
+    /// What the field allows; an entry outside it is clamped, and the field
+    /// shows what's used once it loses focus.
     var range: ClosedRange<Int>? = nil
     var body: some View {
         // At accessibility sizes the field moves under its label.
         AdaptiveStack(spacing: 6) {
             Text(label).lineLimit(1).minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            TextField("", value: $value, format: .number)
+            LiveIntField(value: $value, range: range)
                 .textFieldStyle(.roundedBorder).scaledWidth(100).multilineTextAlignment(.trailing)
         }
     .clamping($value, to: range)
@@ -6035,7 +5989,8 @@ extension Comparable {
 }
 
 extension View {
-    /// Clamps a number field's value to `range` when it commits.
+    /// Clamps a number field's value to `range`, as when it's set from
+    /// elsewhere.
     func clamping(_ value: Binding<Int>, to range: ClosedRange<Int>?) -> some View {
         onChange(of: value.wrappedValue, initial: true) {
             guard let range else { return }
@@ -6067,7 +6022,7 @@ struct RNGOptIntField: View {
         AdaptiveStack(spacing: 6) {
             Text(label).lineLimit(1).minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            TextField("", value: $value, format: .number, prompt: Text("—"))
+            LiveIntField(value: $value, range: 0...Int.max, prompt: Text("—"))
                 .textFieldStyle(.roundedBorder).scaledWidth(100).multilineTextAlignment(.trailing)
         }
     }
@@ -6080,35 +6035,52 @@ struct IVCalcRow16: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(label).lineLimit(1).scaledWidth(70, alignment: .leading)
-            TextField("Stat", value: $stat, format: .number)
+            LiveIntField("Stat", value: $stat)
                 .textFieldStyle(.roundedBorder).scaledWidth(70)
             Text("EV:").font(.caption).foregroundStyle(.secondary)
-            TextField("EV", value: $ev, format: .number)
+            LiveIntField("EV", value: $ev, range: 0...255)
                 .textFieldStyle(.roundedBorder).scaledWidth(60)
         }
     }
 }
 
-struct IVSliderRow: View {
+/// An IV, 0–31, as a number field: exact, and narrow enough for a grid (a
+/// slider there had no room for its track, and drew as an empty capsule).
+struct IVField: View {
     let label: String
-    @Binding var value: Int
+    @Binding var value: UInt8
+
+    init(label: String, value: Binding<UInt8>) {
+        self.label = label
+        _value = value
+    }
+
+    init(label: String, value: Binding<Int>) {
+        self.label = label
+        _value = Binding(get: { UInt8(clamping: value.wrappedValue) }, set: { value.wrappedValue = Int($0) })
+    }
+
     var body: some View {
-        HStack {
-            Text(label).lineLimit(1).scaledWidth(70, alignment: .leading)
-            Slider(value: Binding(get: { Double(value) }, set: { value = Int($0) }), in: 0...31, step: 1)
-            Text("\(value)").font(.system(.body, design: .monospaced)).lineLimit(1).scaledWidth(30, alignment: .trailing)
+        HStack(spacing: 6) {
+            Text(label).lineLimit(1).minimumScaleFactor(0.8)
+            Spacer(minLength: 4)
+            LiveIntField(label, value: $value, range: 0...31)
+                .textFieldStyle(.roundedBorder).scaledWidth(52)
+                .multilineTextAlignment(.trailing)
+                .font(.system(.body, design: .monospaced))
         }
     }
 }
 
-struct IVSliderRow8: View {
-    let label: String
-    @Binding var value: UInt8
-    var body: some View {
-        HStack {
-            Text(label).lineLimit(1).scaledWidth(70, alignment: .leading)
-            Slider(value: Binding(get: { Double(value) }, set: { value = UInt8($0) }), in: 0...31, step: 1)
-            Text("\(value)").font(.system(.body, design: .monospaced)).lineLimit(1).scaledWidth(30, alignment: .trailing)
-        }
+extension View {
+    /// Scrolling or tapping off a field puts the keyboard away, as the
+    /// number pad has no Return key.
+    func dismissesKeyboard() -> some View {
+        #if os(iOS)
+        scrollDismissesKeyboard(.interactively)
+            .onTapGesture { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
+        #else
+        self
+        #endif
     }
 }

@@ -372,6 +372,128 @@ struct IVCheckerTests {
     }
 }
 
+// MARK: - IV Calculator Tests
+
+@MainActor
+struct IVCalculatorTests {
+    private func line(_ level: Int, _ stats: [Int]) -> FRLGStatsLine {
+        FRLGStatsLine(level: level, stats: stats.map { Optional($0) })
+    }
+
+    /// Emerald's Pikachu, level 50, Hardy, every IV 15: each stat allows 15,
+    /// and Sword's base stats don't fit its Defense.
+    @Test func eachGamesBaseStats() throws {
+        let stats = [102, 67, 42, 62, 52, 102]
+        guard case .result(let emerald) = IVCalcEngine.calculate(game: .emerald, specie: 25, form: 0, lines: [line(50, stats)],
+                                                                nature: 0, characteristic: nil, hiddenPower: nil) else {
+            Issue.record("Emerald should fit"); return
+        }
+        #expect(emerald.ivs.allSatisfy { $0.contains(15) })
+        let sword = IVCalcEngine.calculate(game: .sword, specie: 25, form: 0, lines: [line(50, stats)],
+                                           nature: 0, characteristic: nil, hiddenPower: nil)
+        #expect(sword == .error("No Defense IV fits. Check the nature, level and stats."))
+    }
+
+    /// The nature's index is PokéFinder's (pid % 25): Modest (15) raises
+    /// Sp. Atk, so a Modest stat isn't a Hardy one.
+    @Test func natureOrderIsPokeFinders() throws {
+        #expect(pfNatureNames[15] == "Modest" && pfNatureNames[3] == "Adamant")
+        #expect(pfNatureLabel(15) == "Modest (+Sp.Atk / -Atk)" && pfNatureLabel(0) == "Hardy")
+        let stats = [102, 60, 42, 68, 52, 102]  // Pikachu Lv 50, IVs 15, Modest
+        guard case .result(let modest) = IVCalcEngine.calculate(game: .emerald, specie: 25, form: 0, lines: [line(50, stats)],
+                                                               nature: 15, characteristic: nil, hiddenPower: nil) else {
+            Issue.record("Modest should fit"); return
+        }
+        #expect(modest.ivs[3].contains(15) && modest.ivs[1].contains(15))
+        #expect(IVCalcEngine.calculate(game: .emerald, specie: 25, form: 0, lines: [line(50, stats)],
+                                       nature: 0, characteristic: nil, hiddenPower: nil) != .result(modest))
+    }
+
+    /// A characteristic and a Hidden Power type narrow the IVs, and a second
+    /// line at a later level narrows them further.
+    @Test func narrowing() throws {
+        let level5 = [20, 12, 9, 11, 10, 15]   // Pikachu Lv 5, IVs 31, Hardy (Platinum's stats)
+        guard case .result(let wide) = IVCalcEngine.calculate(game: .platinum, specie: 25, form: 0, lines: [line(5, level5)],
+                                                             nature: 0, characteristic: nil, hiddenPower: nil) else {
+            Issue.record("should fit"); return
+        }
+        #expect(wide.ivs[0].count > 1)
+        #expect(wide.nextLevel[0] > 5)
+        // "Takes plenty of siestas" family: HP highest, HP IV % 5 == 1 → 31.
+        guard case .result(let charFiltered) = IVCalcEngine.calculate(game: .platinum, specie: 25, form: 0, lines: [line(5, level5)],
+                                                                     nature: 0, characteristic: 1, hiddenPower: nil) else {
+            Issue.record("should fit"); return
+        }
+        #expect(charFiltered.ivs[0].allSatisfy { $0 % 5 == 1 })
+        #expect(charFiltered.ivs[0].count < wide.ivs[0].count)
+        let level100 = [211, 146, 96, 136, 116, 216]  // the same at Lv 100, where every IV shows
+        guard case .result(let both) = IVCalcEngine.calculate(game: .platinum, specie: 25, form: 0,
+                                                             lines: [line(5, level5), line(100, level100)],
+                                                             nature: 0, characteristic: nil, hiddenPower: nil) else {
+            Issue.record("should fit"); return
+        }
+        #expect(both.ivs.allSatisfy { $0 == [31] })
+        // Hidden Power Dark needs every IV odd.
+        guard case .result(let dark) = IVCalcEngine.calculate(game: .platinum, specie: 25, form: 0, lines: [line(5, level5)],
+                                                             nature: 0, characteristic: nil, hiddenPower: 15) else {
+            Issue.record("should fit"); return
+        }
+        #expect(dark.ivs.allSatisfy { $0.allSatisfy { $0 % 2 == 1 } })
+    }
+
+    /// The species and forms each game has, as PokéFinder lists them.
+    @Test func speciesAndForms() {
+        #expect(PFBridge.presentSpecies(game: .emerald).count == 386)
+        #expect(PFBridge.presentSpecies(game: .platinum).last == 493)
+        #expect(PFBridge.formCount(game: .emerald, specie: 386) == 4)    // Deoxys
+        #expect(PFBridge.formCount(game: .platinum, specie: 479) == 6)   // Rotom
+        #expect(PFBridge.formCount(game: .emerald, specie: 25) == 1)
+        // Deoxys's Attack Forme has its own stats.
+        #expect(PFBridge.baseStats(game: .emerald, specie: 386, form: 1) != PFBridge.baseStats(game: .emerald, specie: 386, form: 0))
+        #expect(PFBridge.characteristics.count == 30 && !PFBridge.characteristics[0].isEmpty)
+    }
+
+    @Test func ivText() {
+        #expect(IVCalcEngine.text([31]) == "31")
+        #expect(IVCalcEngine.text([17, 18, 19]) == "17–19")
+        #expect(IVCalcEngine.text([16, 21, 26, 31]) == "16, 21, 26, 31")
+        #expect(IVCalcEngine.text([28, 29, 31]) == "28, 29, 31")
+    }
+
+    /// Today's games count EVs: 252 in Attack is 63 more points at Lv 100.
+    @Test func currentGamesUseEVs() {
+        let base: [UInt8] = [35, 55, 40, 50, 50, 90]
+        let withEVs = pfCalculateIVRange(baseStats: base, stats: [[211, 209, 116, 136, 136, 216]], levels: [100], nature: 0,
+                                         evs: [0, 252, 0, 0, 0, 0])
+        #expect(withEVs[1].possibleIVs == [31])
+        let withoutEVs = pfCalculateIVRange(baseStats: base, stats: [[211, 209, 116, 136, 136, 216]], levels: [100], nature: 0)
+        #expect(withoutEVs[1].possibleIVs.isEmpty)
+    }
+
+    /// The Hidden Power screen's presets give their types.
+    @Test func hiddenPowerPresets() {
+        for preset in HiddenPowerCalcView.presets {
+            let ivs = preset.ivs
+            #expect(calculateHiddenPowerType(ivHP: ivs[0], ivAtk: ivs[1], ivDef: ivs[2], ivSpeed: ivs[5],
+                                             ivSpAtk: ivs[3], ivSpDef: ivs[4]) == preset.type, "\(preset.type)")
+        }
+    }
+
+    /// The number fields keep digits, and a minus only where it's allowed
+    /// and only in front.
+    @Test func numberFieldEntry() {
+        #expect(LiveIntField.cleaned("1,200", allowsNegative: false) == "1200")
+        #expect(LiveIntField.cleaned("-95", allowsNegative: false) == "95")
+        #expect(LiveIntField.cleaned("-95", allowsNegative: true) == "-95")
+        #expect(LiveIntField.cleaned("9-5", allowsNegative: true) == "95")
+        #expect(LiveIntField.cleaned("3 1a", allowsNegative: false) == "31")
+        #expect(LiveIntField.cleaned("٣١", allowsNegative: false) == "")
+        // Short enough for an Int either way.
+        #expect(LiveIntField.cleaned(String(repeating: "9", count: 30), allowsNegative: false).count == 10)
+        #expect(LiveIntField.cleaned("-" + String(repeating: "9", count: 30), allowsNegative: true).count == 11)
+    }
+}
+
 // MARK: - Hidden Power Tests
 
 struct HiddenPowerEonTests {

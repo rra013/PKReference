@@ -382,6 +382,7 @@ struct Gen3SeedFromPokemonView: View {
             }
             .padding()
         }
+        .dismissesKeyboard()
         .navigationTitle("Seed from a Pokémon")
     }
 
