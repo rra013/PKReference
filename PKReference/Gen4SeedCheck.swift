@@ -111,14 +111,17 @@ nonisolated enum Gen4SeedCheck {
     /// The same around a seed whose clock time isn't known (the Finder's
     /// Generator): a second either way moves the seed's top byte by one,
     /// and a delay its low half.
-    static func candidates(aroundSeed seed: UInt32, delays: Int, seconds: Int,
+    /// Around a bare seed, each delay is for a DS set to `year`: the seed's
+    /// low bits less the years since 2000, as Seed to Time gives it.
+    static func candidates(aroundSeed seed: UInt32, delays: Int, seconds: Int, year: Int = 2000,
                            roamers: [Bool] = [false, false, false], previousRoutes: [UInt8] = [0, 0, 0]) -> [Candidate] {
         let ab = Int(seed >> 24), cd = (seed >> 16) & 0xFF, efgh = Int(seed & 0xFFFF)
+        let years = max(0, year - 2000)
         var result: [Candidate] = []
         for secondOffset in -seconds...seconds {
             for delayOffset in -delays...delays where (0...0xFFFF).contains(efgh + delayOffset) {
                 let near = (UInt32((ab + secondOffset) & 0xFF) << 24) | (cd << 16) | UInt32(efgh + delayOffset)
-                result.append(candidate(seed: near, time: nil, delay: efgh + delayOffset, delayOffset: delayOffset,
+                result.append(candidate(seed: near, time: nil, delay: efgh + delayOffset - years, delayOffset: delayOffset,
                                         secondOffset: secondOffset, roamers: roamers, previousRoutes: previousRoutes))
             }
         }
@@ -200,6 +203,8 @@ struct Gen4SeedCheckView: View {
     /// The target's clock time, or nil to check around a bare seed.
     @State var target: Gen4SeedTime
     let bareSeed: UInt32?
+    /// The DS's year, for a bare seed's delays.
+    let year: Int
     @State var heartGoldSoulSilver: Bool
     /// The delay you hit, and how far it is from the target's.
     let use: (Gen4SeedCheck.Candidate) -> Void
@@ -214,10 +219,11 @@ struct Gen4SeedCheckView: View {
     @State private var previousRoutes: [UInt8] = [0, 0, 0]
     @State private var seenRoutes: [UInt8] = [0, 0, 0]
 
-    init(target: Gen4SeedTime, bareSeed: UInt32? = nil, heartGoldSoulSilver: Bool,
+    init(target: Gen4SeedTime, bareSeed: UInt32? = nil, year: Int = 2000, heartGoldSoulSilver: Bool,
          use: @escaping (Gen4SeedCheck.Candidate) -> Void) {
         _target = State(initialValue: target)
         self.bareSeed = bareSeed
+        self.year = year
         _heartGoldSoulSilver = State(initialValue: heartGoldSoulSilver)
         self.use = use
     }
@@ -225,7 +231,7 @@ struct Gen4SeedCheckView: View {
     private var candidates: [Gen4SeedCheck.Candidate] {
         let roamersIn = heartGoldSoulSilver ? roamers : [false, false, false]
         if let bareSeed {
-            return Gen4SeedCheck.candidates(aroundSeed: bareSeed, delays: delays, seconds: seconds,
+            return Gen4SeedCheck.candidates(aroundSeed: bareSeed, delays: delays, seconds: seconds, year: year,
                                             roamers: roamersIn, previousRoutes: previousRoutes)
         }
         return Gen4SeedCheck.candidates(around: target, delays: delays, seconds: seconds,

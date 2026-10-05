@@ -1250,10 +1250,12 @@ nonisolated enum PFBridge {
                              year: UInt16, month: UInt8, day: UInt8,
                              hour: UInt8, minute: UInt8,
                              targetTID: UInt16 = 0, filterTID: Bool = false,
-                             targetSID: UInt16 = 0, filterSID: Bool = false) -> [IDResult4] {
+                             targetSID: UInt16 = 0, filterSID: Bool = false,
+                             targetTSV: UInt16 = 0, filterTSV: Bool = false) -> [IDResult4] {
         var count: Int32 = 0
         guard let ptr = pf_idGenerate4(minDelay, maxDelay, year, month, day, hour, minute,
-                                        targetTID, filterTID, targetSID, filterSID, &count) else { return [] }
+                                        targetTID, filterTID, targetSID, filterSID,
+                                        targetTSV, filterTSV, &count) else { return [] }
         defer { pf_freeResults(ptr) }
         return (0..<Int(count)).map { i in
             let r = ptr[i]

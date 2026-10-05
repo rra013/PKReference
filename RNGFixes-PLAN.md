@@ -1,7 +1,7 @@
 # RNG tools fixes: plan
 
 Status: **PRs 1–8, 11 and 11b merged** (2026-10-04 and 05, #74–#83);
-**PR 9 built** (§5); **PRs 10 and 12 planned** (§6, §7). From the RNG
+**PRs 9 and 10 built** (§5, §6); **PR 12 planned** (§7). From the RNG
 audit's 45 findings, and twelve found since (46–57). The owner took every recommendation in §9, and in
 §10 for PRs 5–12. When PR 12 merges, what's still true here moves into
 `HANDOFF.md` and this file goes.
@@ -38,7 +38,7 @@ history has that version.
 | 7 | 12, 13, 31, 39, 53, 54 | Gen 3 targets: Ruby/Sapphire days, Emerald, Dead Battery | [#82](https://github.com/rra013/PKReference/pull/82), merged 2026-10-05 |
 | 8 | 36, 37, 48, 55 | Finder results: generators in chunks, empty and stale results | [#83](https://github.com/rra013/PKReference/pull/83), merged 2026-10-05 |
 | 9 | 19, 20, 24, 25, 44, 49, 56, 57 | Wild areas from PokéFinder's tables | Built (§5) |
-| 10 | 17 (Gen 8), 35, 40 | Gen 4 tools: years, delays, TSV | Planned (§6) |
+| 10 | 17 (Gen 8), 35, 40 | Gen 4 tools: years, delays, TSV | Built (§6) |
 | 12 | 17 (Gen 5), 26, 34 | Gen 5 profiles, calibrator, IDs and Timer | Planned (§7) |
 
 PRs 1–4 were the worst ten findings. PR 11 was moved up after PR 6
@@ -217,6 +217,26 @@ is gone.
 - **Tests:** for 2010, the delays shown are the ones entered; the TSV
   filter keeps only matches; a coin flip one second off is found; a 2010
   delay is the 2000 one less 10.
+
+**Built (2026-10-05).**
+
+- **Seed to Time year (35):** a DS Year card on a Gen 4 target's Seed to
+  Time (2000–2099, kept between visits). Each time's delay is for that
+  year, with the year in the time handed to the Timer, so Check Your Seed
+  rebuilds the seeds around it (`Gen4SeedTime` already took a year). A
+  year that would make the delay negative says which years work.
+- **TID/SID (40):** the bridge turns the entered delays into the seed's low
+  bits for the year (`delayBitsForYear`), for the Generator and the
+  Searcher, so the delays shown are the ones entered. The Generator's TSV
+  filter is passed.
+- **TID/SID's tabs (17):** Gen 3 and Gen 4 only (`IDRNGView.generations`).
+- **Changed from the plan:** checking around a bare seed (the Finder's Gen 4
+  Generator) gives delays for Seed to Time's year too. Its delays were the
+  seed's low bits, so with a later year the hit and the Timer's target
+  would have differed by the years since 2000.
+- **Kept as PokéFinder:** the Finder's Gen 4 searchers take delays as the
+  seed's low bits (a DS set to 2000), as PokéFinder's Static4 and Wild4
+  do; only Seed to Time takes the year.
 
 ---
 

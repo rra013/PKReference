@@ -526,11 +526,13 @@ PFIDState *pf_idGenerate3_FRLGE(uint16_t tid,
                                  uint32_t initialAdvances, uint32_t maxAdvances,
                                  int *outCount);
 
+/// Gen 4 IDs for the delays entered, as delays on a DS set to `year`.
 PFIDState4 *pf_idGenerate4(uint32_t minDelay, uint32_t maxDelay,
                              uint16_t year, uint8_t month, uint8_t day,
                              uint8_t hour, uint8_t minute,
                              uint16_t targetTID, bool filterTID,
                              uint16_t targetSID, bool filterSID,
+                             uint16_t targetTSV, bool filterTSV,
                              int *outCount);
 
 // MARK: - GameCube Shadow Template Info

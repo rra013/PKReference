@@ -1496,20 +1496,32 @@ extern "C" PFIDState *pf_idGenerate3_FRLGE(uint16_t tid,
 
 // MARK: - ID Generator Gen 4
 
+/// PokéFinder's Gen 4 ID tools loop the seed's low 16 bits and report them
+/// as the delay less the years since 2000 (`efgh + 2000 - year`). The app's
+/// fields are the delays to hit, so they're turned into those bits first.
+static u32 delayBitsForYear(u32 delay, uint16_t year)
+{
+    return delay + static_cast<u32>(std::max<int>(0, year - 2000));
+}
+
 extern "C" PFIDState4 *pf_idGenerate4(uint32_t minDelay, uint32_t maxDelay,
                                         uint16_t year, uint8_t month, uint8_t day,
                                         uint8_t hour, uint8_t minute,
                                         uint16_t targetTID, bool filterTID,
                                         uint16_t targetSID, bool filterSID,
+                                        uint16_t targetTSV, bool filterTSV,
                                         int *outCount)
 {
     std::vector<u16> tidFilter;
     std::vector<u16> sidFilter;
+    std::vector<u16> tsvFilter;
     if (filterTID) tidFilter.push_back(targetTID);
     if (filterSID) sidFilter.push_back(targetSID);
+    if (filterTSV) tsvFilter.push_back(targetTSV);
 
-    IDFilter filter(tidFilter, sidFilter, {}, {}, {}, {});
-    IDGenerator4 generator(minDelay, maxDelay, year, month, day, hour, minute, filter);
+    IDFilter filter(tidFilter, sidFilter, {}, tsvFilter, {}, {});
+    IDGenerator4 generator(delayBitsForYear(minDelay, year), delayBitsForYear(maxDelay, year),
+                           year, month, day, hour, minute, filter);
 
     auto results = generator.generate();
     *outCount = static_cast<int>(results.size());
@@ -1554,6 +1566,10 @@ extern "C" PFIDSearch4Handle pf_idSearch4_start(bool infinite, uint16_t year,
 
     IDFilter filter(tidFilter, sidFilter, {}, tsvFilter, {}, {});
     auto *searcher = new IDSearcher4(filter);
+
+    // The delays to hit, as the seed's low bits for the year.
+    minDelay = delayBitsForYear(minDelay, year);
+    maxDelay = delayBitsForYear(maxDelay, year);
 
     // IDSearcher4 counts each seed it tries but has no total of its own:
     // every delay, with each of the 256 second bytes and 24 hours. Infinite
