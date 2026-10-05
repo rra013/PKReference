@@ -2,6 +2,8 @@
 
 This document lists every competitively relevant ability and whether it is implemented in the damage calculator, how it works, and any simplifications made.
 
+**Scope (checked 2026-10-05):** this is the legacy engine (`CalcEngine.evaluateLegacy`). `CalcEngine.evaluate` uses it whenever the Champions port can't take the matchup: when either side isn't in Champions mode (the mainline calc, and the EV solver and Battle Sim battles built on it), or when the port's data lacks the species or move. Champions matchups go through the `@smogon/calc` port, which models abilities as upstream does (see `ShowdownPort-NOTES.md`). Every ability marked Implemented or Simplified here is handled in `computeAbilityModifiers()`, and none marked Not Implemented is.
+
 ## Legend
 
 - **Implemented** — Fully modeled in `computeAbilityModifiers()`

@@ -9,7 +9,8 @@
 //  Open intent and `AppNavigator`. The answers' wording is in
 //  `IntentAnswers.swift`, the snippets in `IntentSnippets.swift`, and the
 //  entities in `IntentEntities.swift`; saved sets and teams have their own
-//  actions in `SavedIntents.swift`. AppIntents-PLAN.md has the plan.
+//  actions in `SavedIntents.swift`. HANDOFF.md's feature notes have the
+//  decisions behind them.
 //
 
 import AppIntents

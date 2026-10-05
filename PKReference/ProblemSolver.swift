@@ -4,8 +4,8 @@
 //
 //  Finds the Pokémon, move and investment combinations that knock out a
 //  chosen set in one hit (or two), guaranteed, under Champions doubles
-//  rules, and says which of them move first. ProblemSolver-PLAN.md has the
-//  plan and the owner's decisions.
+//  rules, and says which of them move first. HANDOFF.md's feature notes
+//  have the owner's decisions.
 //
 //  Every answer comes from the calc itself (`CalcEngine.evaluate`, through
 //  `EVSolver` for the scaling down), never from an estimate, so the solver

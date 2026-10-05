@@ -2,7 +2,7 @@
 //  ProblemSolverTests.swift
 //  PKReferenceTests
 //
-//  Covers the Problem Solver's search (ProblemSolver-PLAN.md): every answer
+//  Covers the Problem Solver's search (HANDOFF.md's feature notes): every answer
 //  is a guaranteed OHKO by the calc itself, at the fewest points (one fewer
 //  fails), in the right group; a resisted move isn't an answer; a Speed
 //  nature or Choice Scarf is used when it's what moves first; the problem

@@ -6,7 +6,7 @@
 //  and the Pokémon, moves and investments that knock it out in one hit or
 //  two, guaranteed, under Champions doubles rules (`ProblemSolver`). Each
 //  answer opens in the damage calc exactly as solved, or saves as a set.
-//  ProblemSolver-PLAN.md has the plan.
+//  HANDOFF.md's feature notes have the owner's decisions.
 //
 
 import SwiftUI

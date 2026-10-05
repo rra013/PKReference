@@ -1,6 +1,6 @@
 # PK Reference: handoff
 
-State of `main` as of 2026-09-30, how the codebase fits together for the
+State of `main` as of 2026-10-05, how the codebase fits together for the
 next change, and what's worth doing next. The [README](README.md) describes
 the app itself; this file is for whoever works on it.
 
@@ -10,35 +10,32 @@ the app itself; this file is for whoever works on it.
 2. [Where things live](#where-things-live)
 3. [Recipes](#recipes)
 4. [Conventions](#conventions)
-5. [Building and testing](#building-and-testing)
-6. [Known limitations](#known-limitations)
-7. [What's next](#whats-next)
-8. [Other documents](#other-documents)
+5. [Feature notes](#feature-notes)
+6. [Building and testing](#building-and-testing)
+7. [Known limitations](#known-limitations)
+8. [What's next](#whats-next)
+9. [Other documents](#other-documents)
 
 ---
 
 ## Recent work
 
-Since the UI work (#23–#35), the PRs moved game data into JSON, fixed
-iPad layouts, and built the Mac app. Each one's description says what changed
-and what was checked.
+From #57 to #85 (2026-09-30 to 2026-10-05), by area. Each PR's description
+says what changed and what was checked.
 
-| PR | Change |
+| PRs | Area |
 |---|---|
-| [#36](https://github.com/rra013/PKReference/pull/36) | Matchup colors for Pokémon 1 and 2 (`MatchupColors`) |
-| [#37](https://github.com/rra013/PKReference/pull/37), [#38](https://github.com/rra013/PKReference/pull/38) | iPad layout fixes |
-| [#39](https://github.com/rra013/PKReference/pull/39) | The remaining hard-coded colors |
-| [#40](https://github.com/rra013/PKReference/pull/40)–[#46](https://github.com/rra013/PKReference/pull/46) | Game data into JSON: regulation rules, Mega forms, Tera type, Battle Sim move tables, held items, setup moves, the type chart (and Poison resisting Bug) |
-| [#47](https://github.com/rra013/PKReference/pull/47) | PokéFinder's generator scripts and inputs left out of the bundle |
-| [#48](https://github.com/rra013/PKReference/pull/48) | The item picker shows the held item; mainline mode offers Choice items again |
-| [#49](https://github.com/rra013/PKReference/pull/49), [#50](https://github.com/rra013/PKReference/pull/50), [#53](https://github.com/rra013/PKReference/pull/53) | The Mac app: builds and runs, sidebar and Settings window, screen pass |
-| [#51](https://github.com/rra013/PKReference/pull/51) | A fresh detail page for each selection in split views |
-| [#52](https://github.com/rra013/PKReference/pull/52) | No build warnings |
-| [#54](https://github.com/rra013/PKReference/pull/54) | The Mac app merged into `main` |
-| [#55](https://github.com/rra013/PKReference/pull/55) | Siri, Spotlight and Shortcuts, Phase 1; the app is named PK Reference |
-| [#56](https://github.com/rra013/PKReference/pull/56) | The Xcode project, targets, module and folders renamed to PKReference |
+| [#57](https://github.com/rra013/PKReference/pull/57)–[#59](https://github.com/rra013/PKReference/pull/59) | Siri, Spotlight and Shortcuts, Phase 2: Compare Speed, Check Legality, saved sets and teams (in Spotlight too), the system's in-app search, and search sentences read into a damage calc. See [Feature notes](#siri-spotlight-and-shortcuts). |
+| [#60](https://github.com/rra013/PKReference/pull/60)–[#67](https://github.com/rra013/PKReference/pull/67), [#69](https://github.com/rra013/PKReference/pull/69) | The Problem Solver: the solver and its tab, field options, grouping by Pokémon, two hits, an ability filter, usage ranking, Siri's Find Counters, and Sturdy, Focus Sash and Disguise taking a hit in the calc. See [Feature notes](#problem-solver). |
+| [#68](https://github.com/rra013/PKReference/pull/68), [#85](https://github.com/rra013/PKReference/pull/85) | Champions data: Dragoninite in every regulation; the 15 items M-B added, which M-B and M-C lacked; and the game's names for Golisopite and Baxcalibrite. Sets saved with the old names still load (`HeldItem.renamed`). |
+| [#70](https://github.com/rra013/PKReference/pull/70)–[#83](https://github.com/rra013/PKReference/pull/83) | RNG tools: FireRed/LeafGreen initial seeds and calibration from Ten Lines (#70–#72), a Mac crash opening Calibrate (#73), then the RNG fixes' PRs 1–8, 11 and 11b from the 2026-10-03 audit (#74–#83). See [`RNGFixes-PLAN.md`](RNGFixes-PLAN.md). |
+| [#84](https://github.com/rra013/PKReference/pull/84), [#85](https://github.com/rra013/PKReference/pull/85) | An optional backend in `backend/`: Limitless tournaments through Kafka into usage counts served over REST, with hand-typed names standardized. The app doesn't use it yet. |
 
-Full suite with the RNG fixes' PR 8: 1237 tests, all passing.
+Before that, #23–#56 were the UI pass, game data into JSON, iPad fixes, the
+Mac app, Siri Phase 1 and the rename to PK Reference.
+
+Full suite on 2026-10-05, after #85: 1,241 tests, all passing on the iPhone
+17 Pro Max simulator. The iOS and Mac builds had no warnings.
 
 ---
 
@@ -88,6 +85,33 @@ checked by a test that it loads:
 The Showdown damage port has its own data (`showdown-champions-data.json`);
 `TypeChartTests` checks the two type charts agree.
 
+What stays in Swift, because it's behavior rather than data: items with
+effects (`HeldItem.builtIns`, with `typeBoostingItemMap` and
+`typeResistBerryMap`), the Battle Sim's dispatch lists for moves that need
+their own code, and the damage engines.
+
+**`backend/`**: an optional Java 21 / Spring Boot service, separate from the
+app ([`backend/README.md`](backend/README.md)). It polls Limitless every 30
+minutes, streams tournaments and standings through Kafka, and serves usage
+counts at `GET /api/usage`. Its `NameStandardizer` reads every repo-root
+`champions-*.json` and `showdown-champions-data.json`, which Maven bundles at
+build time, so a new regulation needs nothing there. `mvn verify` runs its tests. The app doesn't
+call it yet (see [What's next](#whats-next)).
+
+**RNG tools** (`RNGToolsView.swift` and the files beside it): PokéFinder's
+C++ core is called through `PFBridge.h`/`.mm`, with `PFBridgeSwift.swift` as
+the Swift side. Fixes go in the bridge or the app, not in `PKReference/Core`,
+whose changes `MODIFICATIONS.md` lists. [`RNGFixes-PLAN.md`](RNGFixes-PLAN.md)
+§2 lists the patterns new RNG code follows: streaming searches, chunked
+generators, the result limit, live number fields. FireRed and LeafGreen's
+initial seeds, ported from [Ten Lines](https://github.com/Lincoln-LM/ten-lines)
+(GPL-3.0, no "or later"), are `FRLGSeeds.swift` (the engine) and
+`FRLGSeedsView.swift` (the screens), with the community's farmed lists
+bundled as `PKReference/frlg-seeds-*.csv` and refreshed by
+`tools/update_frlg_seeds.sh` (Update Seed Lists does it in the app). On
+Switch the overworld advances twice a frame, so the Timer's target there is
+the continue screen's frame.
+
 ---
 
 ## Recipes
@@ -126,6 +150,14 @@ The Showdown damage port has its own data (`showdown-champions-data.json`);
 3. If it changes how many views draw, read it in `AppearanceSettings`
    (`ContentView.swift`) and pass it through `EnvironmentValues`, as
    `density` does. That modifier also dresses the Mac's Settings window.
+
+**Adding a Champions regulation**: follow [`tools/README.md`](tools/README.md).
+The bar is that a regulation is data: its two JSON files, a line per new
+Mega in `mega_forms.json`, and its case in `ChampionsRegulation` and in
+`RegulationChoice` (`IntentEntities.swift`, for Siri; `AppIntentsTests`
+fails until it's there). No validator constants, Battle Sim tables or
+gimmick gates change. The Problem Solver and Team Search build their lists
+from the regulation's files.
 
 **Adding a Battle Sim move effect**: add the move to the right table in
 `PKReference/battle_moves.json` (its `notes` say what each holds), keyed by its
@@ -221,6 +253,98 @@ change keeps them passing, it's faithful.
 **UI changes are checked on the simulator**, in light and dark mode and, for
 layout changes, at an accessibility text size. Each PR lists what was and
 wasn't checked.
+
+---
+
+## Feature notes
+
+How two finished features were designed, and the owner's decisions that
+still hold for changes to them. Their plans were removed on 2026-10-05; git
+history has them.
+
+### Siri, Spotlight and Shortcuts
+
+App Intents, on iPhone, iPad and the Mac: `AppIntents.swift`,
+`SavedIntents.swift`, `IntentEntities.swift`, `IntentAnswers.swift` (the
+wording, as plain functions the tests call) and `IntentSnippets.swift`.
+`AppNavigator` opens the app on a page. None of Apple's assistant schemas
+fit a Pokémon reference, so they're plain App Intents.
+
+- **Ten App Shortcuts, the most an app can have:** Look Up Pokémon,
+  Calculate Damage, Search Teams, Compare Speed, Check Legality, Find
+  Counters (the Problem Solver's), Show Saved Set, Show Saved Team, Load Set
+  into Damage Calc, and the system's in-app search (`.system.search`, which
+  the new Siri looks for). A new action has to replace one.
+- **Saved sets and teams are in Spotlight** (`IndexedEntity`), refreshed at
+  launch and a second after a save (`IntentIndex`).
+- **The owner's decisions (2026-09-30):**
+  - Every action answers in place, with an "Open in PK Reference" button.
+    Load Set into Damage Calc is the exception: opening the calc is what
+    it's for, and it keeps the calc's defender, as the Load button does.
+  - Calculate Damage and Compare Speed assume nothing. Each side's stats are
+    a required choice, which Siri asks for: a saved set of that Pokémon, no
+    investment, full investment, or full investment and a boosting nature
+    (Jolly for Speed). Each choice says exactly what it means, and takes the
+    words players use ("max def", "uninvested") as synonyms.
+  - A phrase holds one parameter, so Compare Speed's phrases name the first
+    Pokémon and Siri asks for the second.
+  - Check Legality's regulation is optional (the one in Settings, always
+    named in the answer), and legality comes from the regulation's files:
+    species, Megas and forms.
+  - Show Saved Team checks a Champions team with the Battle Sim's check and
+    says the first problem.
+  - Phrases follow how the owner asks ("how much will \(attacker) do").
+  - With no Pokédex data yet, an action says to open the app once.
+- **Checking it:** `AppIntentsTests` covers the answers, entity queries
+  and each `perform()`. The build writes the intents and phrases to
+  `Metadata.appintents` in the app, which shows what the system will offer.
+  On the Mac, `-debugSnippets YES` renders the snippets and `-debugNavigate`
+  makes an Open button's request. The simulator runs Shortcuts but not
+  Apple Intelligence, so Siri itself needs the owner's devices.
+
+### Problem Solver
+
+`ProblemSolver.swift` (the search), `TwoHitSolver.swift` and
+`ProblemSolverView.swift` (the tab, in More on the iPhone and the bar on
+iPad and the Mac), with `ProblemSolverTests`.
+
+- **Brute force through the calc.** The owner's first idea, Pokémon with a
+  super-effective STAB move at full investment, misses real answers: a
+  neutral move with Adaptability or Huge Power, a Mega, the target's own
+  ability, a strongest move that's a trap (Explosion, Hyper Beam). So every
+  legal Pokémon, form and Mega, with each ability and damaging move, goes
+  through `CalcEngine.evaluate`, the calc screen's own door, and `EVSolver`
+  scales each answer down to the fewest points. The idea survives as the
+  search's order. All of M-C, 25,922 candidates, solves in about 2 s in a
+  debug build, so the planned pruning bound wasn't built.
+- **The owner's decisions (2026-09-30):**
+  - Champions doubles rules: level 50, the regulation's caps, spread moves
+    at 0.75× as if both foes are in.
+  - Guaranteed only: the lowest roll, no crit, must KO.
+  - The target's Intimidate applies to physical answers, with a switch.
+  - Items: the move type's 1.2× booster, or a Mega's stone. Choice Scarf is
+    a second pass for answers that can't otherwise move first.
+  - An attacking nature and a Speed nature are both tried; the one needing
+    fewer points wins.
+  - Two hits: a fast check over the whole roster, then, when something
+    acts between the hits (a Sitrus Berry, Leftovers, Multiscale), each
+    answer played out in the battle simulator.
+  - Usage is a sort option ("Most used"), from Team Search's Limitless
+    teams.
+  - Find Counters asks for the target's investment each time.
+  - One PR per feature.
+- **What building it showed:**
+  - Negative priority (Focus Punch) moves last, whatever the Speeds.
+  - Intimidate cuts both ways: Defiant and Competitive answers get stronger
+    (`ProblemSolver.intimidated(ability:)`).
+  - Sturdy, Focus Sash and Disguise take a hit (`CalcEngine.oneHitSurvival`),
+    so against them only multi-hit moves or Mold Breaker count in one hit.
+  - The simulator re-check runs on the main actor (the simulator's damage
+    goes through `DamageCalcVM`), so it works in 25 ms slices.
+  - The set to beat is the calc's `SideCard` without moves, so it loads,
+    pastes and saves as a calc side does.
+- **Checking it:** `-debugNavigate problem:Incineroar,intimidate,bulky`
+  opens the tab on a set.
 
 ---
 
@@ -346,54 +470,45 @@ From the recent PRs, each also noted in its description:
 
 ## What's next
 
-Roughly in order of value for effort.
+Roughly in order of value for effort. Only open work is listed; what's done
+is in [Recent work](#recent-work) and the README.
 
-1. **Data compartmentalization.** [`PKReference/CompartmentalizationPlan.md`](PKReference/CompartmentalizationPlan.md)
-   lists seven migrations of game data into JSON, all done: each
-   regulation's `rules` block (P1), the Battle Sim's move tables (P2), the
-   type chart (P3), the Mega forms (P4), Mega stones as held items (P5), the
-   validator's setup moves and Choice items (P6) and a set's Tera type (P7).
-   See the plan for what each covers and leaves; what's left are the parts
-   of P5 and P7 that need features first (items, Tera, Dynamax).
-2. **Mac app, distributed outside the App Store.** Steps 1–3 were built on
-   `mac-main` and merged into `main` on 2026-09-30; the Mac app is now just
-   another destination of `main`, and `mac-main` is retired.
-   1. Builds and runs. Done: iOS-only APIs guarded, Mac entitlements.
-   2. App shell. Done: the tabs in a sidebar (`.sidebarAdaptable`), with no
-      More list; Settings as the ⌘, window; a 1280×820 default window, at
-      least 900×600. The sidebar itself hasn't been seen in a snapshot,
-      since snapshots can't draw glass.
-   3. Screen pass. Done: list/detail tabs in `ListDetailSplit`; form text
-      fields and segmented pickers without stray labels; a right-click
-      Delete where rows only swiped (Sets, Teams, Load Spread); every sheet
-      sized with `sheetSize()` (all 17 already had Done or Cancel); Edit ›
-      Find (⌘F) and the tabs in the View menu (⌘1–⌘9), which the owner
-      checked on the Mac along with right-click Delete. Left out: a
-      paste-import command, since the calc has two sides to paste into.
-   4. Developer ID signing, the hardened runtime, notarization, and releases
-      on GitHub, with the tagged source for the GPL. Optionally Sparkle for
-      updates.
-3. **Siri, Spotlight and Shortcuts.** [`AppIntents-PLAN.md`](AppIntents-PLAN.md):
-   App Intents for iPhone, iPad and the Mac. Phases 1 and 2 are built: Look
-   Up Pokémon, Calculate Damage, Search Teams, Compare Speed, Check
-   Legality, Find Counters (the Problem Solver's), Show Saved Set, Show
-   Saved Team and Load Set into Damage Calc, answering in place with an
-   Open button. That's ten App Shortcuts, the most an app can have, so a
-   new one has to replace one; the system's in-app search
-   (`.system.search`, which the new Siri looks for); and saved sets and
-   teams in Spotlight (`AppIntents.swift`, `SavedIntents.swift`,
-   `IntentEntities.swift`, `IntentAnswers.swift`, `IntentSnippets.swift`;
-   `AppNavigator` opens the page). Left: trying the phrases with the
-   conversational Siri on the owner's devices and tuning descriptions to
-   what it picks (Phase 3). `-debugSnippets YES` renders the snippets on the
-   Mac, and `-debugNavigate` makes an Open button's request. On the
-   owner's Mac (2026-09-30), Spotlight refused every third-party app's
-   items, this app's sets and teams included, from Xcode's build folder or
-   from Applications ("Failed to request donation": the connection to
-   `com.apple.SetStoreUpdateService` is invalidated; Chrome and Claude
-   failed the same way). That's macOS, not the app: on the simulator the
-   sets and teams are indexed and open from Spotlight. Recheck after a
-   macOS update.
+1. **The RNG fixes' last three PRs**, in
+   [`RNGFixes-PLAN.md`](RNGFixes-PLAN.md) §5–§7, with the owner's choices in
+   its §10:
+   - PR 9 takes wild areas from PokéFinder's tables: by location ID, Gen 5
+     seasons, Gen 4's time, swarms, radar and radio, each game's slot
+     rates, one Underground area at a time. It also deletes
+     `WildEncounterData.swift`.
+   - PR 10 fixes the Gen 4 tools: Seed to Time's year, TID/SID's delays and
+     TSV filter, and removes TID/SID's Gen 8 tab.
+   - PR 12 adds Gen 5 profiles, a calibrator, Gen 5 IDs and Gen 5's Send to
+     Timer.
+
+   When PR 12 merges, the plan's leftovers come here and the file goes.
+2. **The items M-B added that sets can't hold.** #85 made M-B's 15 items
+   legal, but 11 have no `HeldItem`: Wide Lens, Muscle Band, Wise Glasses,
+   Zoom Lens, Iron Ball, Shed Shell, Big Root and the four weather rocks.
+   Pickers don't offer them, and the calc treats a set holding one as
+   holding nothing. The Showdown port already models Muscle Band, Wise
+   Glasses and Iron Ball (`ShowdownChampions.swift`,
+   `ShowdownMechanics.swift`), so adding those to `HeldItem.builtIns` (the
+   "Adding a held item" recipe) makes them work in the calc and the Problem
+   Solver. The rest only matter in the Battle Sim, where each needs code.
+3. **Siri, Spotlight and Shortcuts.** See [Feature notes](#siri-spotlight-and-shortcuts).
+   - Left of Phase 3: try the phrases with the conversational Siri on the
+     owner's devices, and tune the descriptions to what it picks.
+   - Spotlight on the Mac closed after Calculate Damage (2026-09-30). The
+     calc ran and answered, then the Shortcuts runner logged "No LSRecord
+     for yukisoft.PKReference". Suspected: the Xcode build runs from
+     `~/Library`, which the runner's sandbox can't read. To check, try a
+     build in Applications.
+   - On the owner's Mac (2026-09-30), Spotlight refused every third-party
+     app's items, this app's sets and teams included ("Failed to request
+     donation": the connection to `com.apple.SetStoreUpdateService` is
+     invalidated; Chrome and Claude failed the same way). That's macOS: on
+     the simulator they're indexed and open from Spotlight. Recheck after a
+     macOS update.
    - **Known system bug, not the app's:** in the iOS Shortcuts app, PK
      Reference's suggested tile can be titled with one Pokémon ("Hydrapple",
      the last suggested) and run with another (Venusaur, the first). The
@@ -403,72 +518,53 @@ Roughly in order of value for effort.
      phrases correctly (checked by the owner on the Mac, 2026-09-30). A
      no-default options provider and `parameterPresentation` didn't change
      the tile. Worth a Feedback report to Apple; don't chase it in the app.
-   - **A new regulation** also needs a case in `RegulationChoice`
-     (`IntentEntities.swift`); `AppIntentsTests` fails until it has one.
-4. **Problem Solver.** [`ProblemSolver-PLAN.md`](ProblemSolver-PLAN.md):
-   pick a set that's a problem, get the Pokémon, move and investment
-   combinations that OHKO or 2HKO it (guaranteed, Champions doubles),
-   grouped by whether they move first. Brute force through the calc engine,
-   pruned by a heuristic. Phases 1 and 2 are built: the solver
-   (`ProblemSolver.swift`) and the tab (`ProblemSolverView.swift`, under
-   More on the iPhone), with `ProblemSolverTests`. The whole of M-C, 25,922 candidates, solves in about
-   2 s in a debug build. Phase 3 is built too, one PR per feature: field
-   options, grouping by Pokémon, the two-hit mode (fast check, then the
-   battle simulator), usage ranking (Limitless teams) and Siri's "what
-   beats X" (Find Counters). Decisions in the plan's §8.
+4. **Mac app releases outside the App Store.** The Mac app is a destination
+   of `main` since 2026-09-30. Left: Developer ID signing, the hardened
+   runtime, notarization, and releases on GitHub with the tagged source for
+   the GPL; optionally Sparkle for updates. It needs the owner's Apple
+   developer account. Left out on purpose: a menu command for paste import,
+   since the calc has two sides to paste into.
 5. **Team Search open risks.**
    - Confirm Limitless's rate limits and terms before corpus builds grow.
+     It returned HTTP 429 after about five full crawls in an hour, so tests
+     don't crawl it.
    - Early in a regulation there's little data. An "include last
      regulation's teams" option (keeping only teams legal now) was planned
      but not built.
    - Names Limitless writes that the alias table doesn't know still search,
      but saving a team reports them; a log of them would show the gaps.
-6. **Gen 9 in the Showdown port.** Only Champions is ported; other
+6. **Use the backend in the app.** The owner wants this, later (2026-10-05).
+   Today each device downloads Limitless's teams itself, for Team Search and
+   the Problem Solver's usage ranking; `backend/` could serve those counts.
+   Before relying on it:
+   - It has only run under `mvn verify`'s embedded Kafka, never against a
+     real broker or the live Limitless API.
+   - Its default Limitless game, `VGC`, is the one the app uses
+     (`TeamCorpus.swift`), so that's right.
+   - It polls Limitless every 30 minutes, so item 5's rate limits and terms
+     apply to it too.
+7. **FireRed and LeafGreen's open items.** Wild calibration (Ten Lines'
+   `check_seeds_wild`); Teachy TV on Switch, which Ten Lines hasn't worked
+   out either; and the Switch lists' settings nobody has farmed yet (Ten
+   Lines leaves those columns out, and so does the app). The Mew event uses
+   Emerald's Mew template since #76, so it can be searched and calibrated.
+8. **Gen 9 in the Showdown port.** Only Champions is ported; other
    generations use the legacy engine, and `calculateShowdown` stops with a
    clear error for them. See [`PKReference/ShowdownPort-NOTES.md`](PKReference/ShowdownPort-NOTES.md).
-7. **FireRed and LeafGreen initial seeds** (built 2026-10-03), ported from
-   [Ten Lines](https://github.com/Lincoln-LM/ten-lines) (GPL-3.0, no "or
-   later"; see `THIRD_PARTY_NOTICES.md`). In the Finder's Gen 3 FireRed or
-   LeafGreen search, Initial Seed narrows the targets to those a seed you
-   can hit reaches in your advance range, for every version Ten Lines knows
-   (GBA ENG/EU/JPN, mGBA, Switch ENG/EU and JPN), by sound, button mode,
-   seed button and held button, with Teachy TV on GBA. The options start on
-   the game's own (Mono, Help, A, nothing held), which every list farms;
-   settings a version's list hasn't farmed are marked "(not farmed)", the
-   card says what the list covers, and warns when the choices find nothing.
-   A target's page lists
-   its seeds with seed times per console, and Send to Timer sets the Gen 3
-   timer's pre-timer and target frame. `FRLGSeeds.swift` is the engine,
-   `FRLGSeedsView.swift` the screens; the farmed lists are bundled
-   (`PKReference/frlg-seeds-*.csv`, refreshed by `tools/update_frlg_seeds.sh`)
-   and Update Seed Lists downloads newer ones in the app. On Switch the
-   overworld advances twice a frame, so the timer's target is the continue
-   screen's frame (advances less twice the Overworld Frames). Calibrate, on
-   each seed of a static target, is Ten Lines' calibration form: shininess,
-   nature (Any turns the IV calculation off and searches every nature) and
-   gender, then the stats from the summary screen, a line per level, which
-   PokéFinder's IV checker turns into editable IV ranges with the
-   encounter's own template's base stats (`pf_calcIVsStatic3`). The search
-   (`FRLGCalibration`, generating from that template with
-   `pf_staticTemplateGenerate3`) lists the presses and frames that make it,
-   nearest first, and Calibrate from This corrects the seed press and final
-   press, saved for every seed after. The Finder's Gen 3 static search
-   streams: PokéFinder's searcher runs on its own thread
-   (`pf_staticSearch3_start`), read every tenth of a second for results and
-   progress, and Stop cancels it. It and the Generator use the chosen
-   encounter's template, so gender follows the species; with no Pokémon
-   chosen every result is genderless, and the gender filter says so. The
-   reachable list (`FRLGMatchCache`) checks each new result once. Still
-   open: wild calibration (Ten Lines' check_seeds_wild), Teachy TV on
-   Switch, which Ten Lines hasn't worked out either, and the Switch lists'
-   settings nobody has farmed yet (Ten Lines leaves those columns out, and
-   so does the app). Gen 4's static search still runs all at once with a
-   stand-in template. The Finder's FireRed and LeafGreen Mew event has no
-   PokéFinder template (it has Mew only on Emerald), so it can't be
-   calibrated yet.
-8. **App Store.** Blocked on the GPL until PokéFinder's authors give
-   permission, or the RNG core is rewritten per
-   [`RNGRewrite-PLAN.md`](RNGRewrite-PLAN.md) (on hold).
+9. **Game data that waits on features.** Moving game data into JSON
+   finished on 2026-09-28. What's left needs the feature first:
+   - Terastallizing. Sets and teams store a Tera type, but nothing uses it.
+     The Showdown port supports `teraType`, so the calc's Champions path
+     could pass it, with a "Terastallized" toggle, once a regulation allows
+     Tera. The legacy engine and Battle Sim have no Tera.
+   - The validator's `teraNotAllowed`, unused: flagging it now would warn
+     on every Gen 9 paste imported into Champions and block those teams in
+     the Battle Sim, for a type nothing uses.
+   - Dynamax level and a Z-Move slot: add them with the feature that uses
+     them.
+10. **App Store.** Blocked on the GPL until PokéFinder's authors give
+    permission, or the RNG core is rewritten per
+    [`RNGRewrite-PLAN.md`](RNGRewrite-PLAN.md) (on hold).
 
 ---
 
@@ -480,15 +576,20 @@ Roughly in order of value for effort.
 | [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) | Bundled third-party code and its licenses |
 | [`PKReference/Core/MODIFICATIONS.md`](PKReference/Core/MODIFICATIONS.md) | Changes made to PokéFinder's code (required by its GPL) |
 | [`PKReference/ShowdownPort-NOTES.md`](PKReference/ShowdownPort-NOTES.md) | Scope and wiring of the `@smogon/calc` port |
-| [`PKReference/AbilityReference.md`](PKReference/AbilityReference.md) | Which abilities the legacy damage engine models |
-| [`PKReference/CompartmentalizationPlan.md`](PKReference/CompartmentalizationPlan.md) | Plan for moving game data into JSON (done) |
-| [`AppIntents-PLAN.md`](AppIntents-PLAN.md) | Plan for Siri, Spotlight and Shortcuts actions (Phases 1 and 2 built) |
-| [`ProblemSolver-PLAN.md`](ProblemSolver-PLAN.md) | Plan for the Problem Solver: counters that OHKO a chosen set |
+| [`PKReference/AbilityReference.md`](PKReference/AbilityReference.md) | Which abilities the legacy damage engine models (matchups the port can't take) |
+| [`RNGFixes-PLAN.md`](RNGFixes-PLAN.md) | Fixes from the 2026-10-03 RNG tools audit: PRs 1–8, 11 and 11b merged; 9, 10 and 12 planned |
 | [`RNGRewrite-PLAN.md`](RNGRewrite-PLAN.md) | Plan for an independent RNG core (on hold) |
-| [`RNGFixes-PLAN.md`](RNGFixes-PLAN.md) | Fixes from the 2026-10-03 RNG tools audit: four PRs for the worst ten findings (merged), then the rest (PRs 5–7, 11 and 11b merged, 8 built, 9, 10 and 12 planned; the owner's choices in §9) |
-| [`tools/README.md`](tools/README.md) | Scripts that regenerate the bundled data |
+| [`tools/README.md`](tools/README.md) | Adding a Champions regulation, and the scripts that regenerate the bundled data |
+| [`backend/README.md`](backend/README.md) | Running and testing the optional backend |
 
-Removed on 2026-09-27, all in git history: `CalcCore-HANDOFF.md` (the EV
+Removed on 2026-10-05, all in git history: `AppIntents-PLAN.md` and
+`ProblemSolver-PLAN.md` (finished; their decisions are in
+[Feature notes](#feature-notes)), `PKReference/CompartmentalizationPlan.md`
+(finished; what's left is item 9 above, and its bar for a new regulation is
+in [Recipes](#recipes)) and `DocsCleanup-HANDOFF.md` (this cleanup's
+handoff).
+
+Removed on 2026-09-27: `CalcCore-HANDOFF.md` (the EV
 solver work, finished; its conventions are above; it was also being copied
 into the app),
 `TeamSearch-PLAN.md` (finished; its open risks are above) and
