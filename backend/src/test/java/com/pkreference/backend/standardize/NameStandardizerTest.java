@@ -41,6 +41,16 @@ class NameStandardizerTest {
     }
 
     @Test
+    void serebiiSpellingsBeatTheRegulationFilesGuesses() {
+        assertThat(std.item("M-C", "Golisopite")).isEqualTo("Golisopite");
+        assertThat(std.item("M-C", "baxcalibrite")).isEqualTo("Baxcalibrite");
+        // Items real tournament teams use that no regulation file lists.
+        assertThat(std.item("M-C", "light clay")).isEqualTo("Light Clay");
+        assertThat(std.item("M-C", "Wise Glasses")).isEqualTo("Wise Glasses");
+        assertThat(std.item("M-C", "Muscle  Band")).isEqualTo("Muscle Band");
+    }
+
+    @Test
     void noItemVariantsMerge() {
         assertThat(std.item("M-C", "none")).isEqualTo("No Item");
         assertThat(std.item("M-C", "No Item")).isEqualTo("No Item");
