@@ -2392,3 +2392,86 @@ struct Gen3TargetTests {
         #expect(SeedToTimeView.waitText(frames: Int(GBA_FRAMERATE * 3600 * 3.5)) == "3 h 30 min")
     }
 }
+
+// MARK: - Finder results: generators in chunks, empty results
+
+struct GeneratorChunkTests {
+    /// Each chunk starts where the last ended, a 32-bit range stops at its
+    /// top, and progress ends at 100.
+    @Test func chunksCoverTheRange() {
+        var calls: [[UInt32]] = []
+        var progress: [Double] = []
+        generateInChunks(initialAdvance: 3, maxAdvance: 20, chunkSize: 7, onProgress: { progress.append($0) }) {
+            calls.append([$0, $1]); return 0
+        }
+        #expect(calls == [[3, 6], [10, 6], [17, 6]])
+        #expect(progress.last == 100 && progress == progress.sorted())
+
+        calls = []
+        generateInChunks(initialAdvance: UInt32.max - 2, maxAdvance: 10, chunkSize: 7) { calls.append([$0, $1]); return 0 }
+        #expect(calls == [[UInt32.max - 2, 2]])
+    }
+
+    @Test func stopsAtTheLimit() {
+        var calls = 0
+        generateInChunks(initialAdvance: 0, maxAdvance: 1_000, chunkSize: 10, limit: 12) { _, _ in calls += 1; return 5 }
+        #expect(calls == 3)
+    }
+
+    private func pairs(_ results: [StaticSearchResult]) -> [String] { results.map { "\($0.advances) \($0.pid)" } }
+
+    /// Over three chunks, each generator gives what one call to PokéFinder does.
+    @Test func chunkedResultsMatchOneCall() {
+        let adamant = [Bool](repeating: false, count: 25).enumerated().map { $0.offset == 3 }
+        var gen3: [StaticSearchResult] = []
+        staticGenerateGen3Streaming(seed: 0x1234, initialAdvance: 5, maxAdvance: 25_000, natures: [3],
+                                    tid: 0, sid: 0, shinyOnly: false, method: .method1) { gen3.append($0) }
+        let one3 = PFBridge.staticGenerate3(seed: 0x1234, initialAdvances: 5, maxAdvances: 25_000, method: .method1,
+                                            tid: 0, sid: 0, natures: adamant)
+        #expect(!gen3.isEmpty && pairs(gen3) == one3.map { "\($0.advances) \($0.pid)" })
+
+        var gen4: [StaticSearchResult] = []
+        staticGenerateGen4Streaming(seed: 0x0C12_0353, initialAdvance: 5, maxAdvance: 25_000, natures: [3],
+                                    tid: 0, sid: 0, shinyOnly: false, method: .methodJ, lead: .none, game: .platinum) { gen4.append($0) }
+        let one4 = PFBridge.staticGenerate4(seed: 0x0C12_0353, initialAdvances: 5, maxAdvances: 25_000, method: .methodJ,
+                                            tid: 0, sid: 0, game: .platinum, natures: adamant)
+        #expect(!gen4.isEmpty && pairs(gen4) == one4.map { "\($0.advances) \($0.pid)" })
+
+        var raid: [StaticSearchResult] = []
+        raidGenerateGen8Streaming(seed: 0xBADC0FFEE, initialAdvance: 0, maxAdvance: 25_000, natures: [3],
+                                  tid: 0, sid: 0, shinyOnly: false, game: .sword, shinyCharm: false,
+                                  denIndex: 0, rarity: 0, raidIndex: 0, level: 60) { raid.append($0) }
+        let oneRaid = PFBridge.raidGenerate8(seed: 0xBADC0FFEE, initialAdvances: 0, maxAdvances: 25_000, tid: 0, sid: 0,
+                                             game: .sword, denIndex: 0, rarity: 0, raidIndex: 0, level: 60, natures: adamant)
+        #expect(pairs(raid) == oneRaid.map { "\($0.advances) \($0.pid)" })
+
+        // PokéFinder's Gen 8 ID generator stops one short of its max advances.
+        var ids: [StaticSearchResult] = []
+        idGenerateGen8Streaming(seed0: 0x1234_5678, seed1: 0x9ABC_DEF0, initialAdvance: 0, maxAdvance: 25_000,
+                                filterTID: 0, hasTIDFilter: false, filterSID: 0, hasSIDFilter: false,
+                                filterDisplayTID: 0, hasDisplayFilter: false) { ids.append($0) }
+        let oneIDs = PFBridge.idGenerate8(seed0: 0x1234_5678, seed1: 0x9ABC_DEF0, initialAdvances: 0, maxAdvances: 25_000)
+        #expect(ids.count == 25_000 && ids.map(\.advances) == oneIDs.map(\.advances) && ids.map(\.resultTID) == oneIDs.map(\.tid))
+    }
+
+    /// A hundred million advances with nothing filtered stop at the limit,
+    /// a chunk past it at most, instead of building every result first.
+    @Test func longGenerateStopsAtTheLimit() {
+        var count = 0
+        var last: UInt32 = 0
+        staticGenerateGen3Streaming(seed: 0, initialAdvance: 0, maxAdvance: 100_000_000, natures: [],
+                                    tid: 0, sid: 0, shinyOnly: false, method: .method1) {
+            count += 1
+            last = $0.advances
+        }
+        #expect(count >= searchResultLimit && count < searchResultLimit + Int(generatorChunkSize))
+        #expect(last < UInt32(searchResultLimit) + generatorChunkSize)
+    }
+
+    @Test func noResultsWording() {
+        #expect(noResultsText(filters: []) == "Nothing found.")
+        #expect(noResultsText(filters: [], widen: "the advances") == "Nothing found. Widen the advances.")
+        #expect(noResultsText(filters: ["IVs", "natures", "Shiny Only"], widen: "the advances")
+                == "Nothing found with IVs, natures, and Shiny Only set. Loosen one, or widen the advances.")
+    }
+}

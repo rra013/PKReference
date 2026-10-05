@@ -1,8 +1,8 @@
 # RNG tools fixes: plan
 
-Status: **PRs 1–6, 11 and 11b merged** (2026-10-03 to 05); PR 7 built,
-PRs 8–10 and 12 planned (§7). From
-the RNG audit's 45 findings, and nine found since (46–54). Findings 1–10
+Status: **PRs 1–7, 11 and 11b merged** (2026-10-03 to 05); PR 8 built,
+PRs 9, 10 and 12 planned (§7). From
+the RNG audit's 45 findings, and ten found since (46–55). Findings 1–10
 are §2–§5, as four PRs; the rest are §7, as eight more. The owner took
 every recommendation in §8, and in §9 for PRs 5–12.
 
@@ -268,7 +268,7 @@ reported to the owner.
 | 5 | 11, 15, 16, 46 | Leads, methods and modes follow PokéFinder |
 | 6 | 27–30, 32, 33 | The Timer keeps time and settings |
 | 7 | 12, 13, 31, 39, 53, 54 | Gen 3 targets: Ruby/Sapphire days, Emerald, Dead Battery |
-| 8 | 36, 37, 48 | Finder results: generators in chunks, empty and stale results |
+| 8 | 36, 37, 48, 55 | Finder results: generators in chunks, empty and stale results |
 | 9 | 19, 20, 24, 25, 44, 49 | Wild areas from PokéFinder's tables |
 | 10 | 17 (Gen 8), 35, 40 | Gen 4 tools: years, delays, TSV |
 | 11 | 14 (and 38) | What you hit: Gen 4's seed check, Gen 3's frame and seed |
@@ -446,24 +446,50 @@ and Send to Timer:
   from Day 1 00:00 to Day 365 with their dates, and Day 92 00:22 sent to
   the Timer with 9,749 frames.
 
-### 7.4 PR 8: Finder results (36, 37, 48)
+### 7.4 PR 8: Finder results (36, 37, 48, 55), built
 
-- **Generators in chunks (48):** PokéFinder's generators return one
-  vector, so a Max Advance in the hundreds of millions runs out of memory
-  in the bridge. The streaming functions (Finder and GameCube) call the
-  generator a chunk of advances at a time (say 10,000; its jump-ahead start
-  is cheap), send each chunk, report progress (advances done of the
-  total), and stop at `searchResultLimit` or on Stop. Memory is one chunk.
-  Gen 5's generators chunk the PID advances. Eggs keep PR 1's estimate.
-- **Empty results (36):** a finished search or generate with nothing says
-  so, and suggests the filters to loosen (Finder, GameCube, TID/SID,
-  Eggs).
-- **Stale results (37):** changing the generation, game, mode or encounter
-  stops a running search and clears its results. Each result carries the
-  generation and game it was found with, so its page uses those.
-- **Tests:** chunked results equal one call's over a small range, for
-  every generator; progress climbs to 100; a 100-million-advance generate
-  stops at the limit with memory flat; results keep their generation.
+- **Generators in chunks (48):** `generateInChunks` runs a generator
+  10,000 advances at a time (`generatorChunkSize`; each call starts with
+  PokéFinder's jump ahead), reports the advances done as progress (whole
+  percents), and stops on Stop or once `searchResultLimit` results are
+  sent, so memory is one chunk's results. Every Finder generator uses it
+  (Gen 3/4 static and wild, Gen 5 static and wild by PID advance, Gen 8
+  static, wild, eggs, IDs, raids and Underground), and so do the GameCube
+  Generator and PokéSpot (by food advance, which PokéFinder sorts by
+  first). Checked against PokéFinder before chunking: each generator jumps
+  to its start and makes each advance on its own, and only Gen 8's ID
+  generator stops one short of its max advances (`cnt < maxAdvances`),
+  which the wrapper allows for. Eggs keep PR 1's estimate.
+- **Empty results (36):** a search or generate that ran to the end with
+  nothing says so, names the filters that are set and the range to widen
+  (`noResultsText`): Finder, GameCube, Eggs and TID/SID.
+- **Stale results (37):** changing the generation, game, encounter or
+  method clears the Finder's results and stops its search; the GameCube
+  screen's game, mode or Pokémon, the Eggs' game, and TID/SID's game or
+  mode likewise. **Changed from the plan:** switching between Searcher and
+  Generator only stops a running search. Each mode keeps its own list, so
+  Use in Generator doesn't throw away a long search. With the lists
+  cleared on every change that makes them another game's, results don't
+  need to carry their generation and game.
+- **Hidden IV filter (55):** the Gen 3/4 wild Generator filtered by the
+  Searcher's IV ranges, which the Generator doesn't show, so a Searcher
+  run with HP 31 left the Generator listing only HP 31. The Finder passes
+  0–31 there now (`runWildSearch` still takes ranges, as PR 2's tests use).
+- **Also:** the GameCube progress line counted the Searcher's list while
+  generating, and the GameCube, Eggs and TID/SID screens had a second
+  tap-to-dismiss gesture left from PR 11b.
+- **Tests:** the chunks cover the range and stop at the 32-bit top and at
+  the limit; chunked results equal one PokéFinder call over three chunks
+  for Gen 3 and 4 static, Gen 8 raids and Gen 8 IDs; a 100-million-advance
+  generate stops a chunk past the limit at most; the no-results wording.
+- **On the simulator:** 100 million advances of shiny Mild or Rash in
+  Ruby/Sapphire from 05A0 showed progress (18% after two seconds), found
+  988 in about ten seconds, with the app's memory flat at about 560 MB;
+  the list stayed after opening a result and coming back, and cleared on
+  switching to Sapphire; 100 advances found nothing and said "Nothing
+  found with natures and Shiny Only set. Loosen one, or widen the
+  advances."; the GameCube Generator listed 10,001 results over two
+  chunks.
 
 ### 7.5 PR 9: wild areas from PokéFinder (19, 20, 24, 25, 44, 49)
 
@@ -658,6 +684,8 @@ Delay Hit and Frame Hit had to come from elsewhere.
   Generator's seed, not the target's (PR 7).
 - 54: FireRed/LeafGreen targets without the seed list showed Ruby/Sapphire
   clock times (PR 7).
+- 55: the Gen 3/4 wild Generator filtered by the Searcher's hidden IV
+  ranges (PR 8).
 
 ---
 

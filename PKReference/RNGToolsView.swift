@@ -766,6 +766,56 @@ nonisolated func appendUpToLimit<T>(_ batch: some Collection<T>, to results: ino
     return results.count >= limit
 }
 
+/// How many advances one generator call covers. PokéFinder's generators
+/// return every result at once, so a Max Advance in the hundreds of millions
+/// ran out of memory; a chunk at a time, memory is one chunk's results. Each
+/// call starts with a jump ahead, which is cheap.
+nonisolated let generatorChunkSize: UInt32 = 10_000
+
+/// Runs a generator over PokéFinder's range, `initialAdvance` through
+/// `initialAdvance + maxAdvance`, a chunk at a time. `generate` gets each
+/// chunk's initial advance and max advances (the count after the first) and
+/// returns how many results it sent. Stops on cancel or once `limit` results
+/// are sent, and reports the advances done as progress (0–100).
+nonisolated func generateInChunks(initialAdvance: UInt32, maxAdvance: UInt32,
+                                  chunkSize: UInt32 = generatorChunkSize,
+                                  limit: Int = searchResultLimit,
+                                  onProgress: (Double) -> Void = { _ in },
+                                  _ generate: (_ initialAdvance: UInt32, _ maxAdvance: UInt32) -> Int) {
+    let first = UInt64(initialAdvance)
+    // Advance numbers are 32-bit.
+    let last = min(first + UInt64(maxAdvance), UInt64(UInt32.max))
+    let total = Double(last - first + 1)
+    var start = first
+    var sent = 0
+    var reported = -1.0
+    while start <= last {
+        if Task.isCancelled { return }
+        let count = min(UInt64(max(chunkSize, 1)), last - start + 1)
+        sent += generate(UInt32(start), UInt32(count - 1))
+        start += count
+        let progress = Double(start - first) / total * 100
+        // Whole percents, so a long run doesn't flood the list with updates.
+        if progress - reported >= 1 || start > last {
+            onProgress(progress)
+            reported = progress
+        }
+        if sent >= limit { return }
+    }
+}
+
+/// Said when a search or generate ran to the end and found nothing: the
+/// filters that are set, to loosen, and the range to widen.
+nonisolated func noResultsText(filters: [String], widen: String? = nil) -> String {
+    let list = filters.formatted(.list(type: .and))
+    switch (filters.isEmpty, widen) {
+    case (true, nil): return "Nothing found."
+    case (true, let widen?): return "Nothing found. Widen \(widen)."
+    case (false, nil): return "Nothing found with \(list) set. Loosen one."
+    case (false, let widen?): return "Nothing found with \(list) set. Loosen one, or widen \(widen)."
+    }
+}
+
 /// Said under the Search button when a search stopped at the limit.
 let searchResultLimitNote = "Stopped at \(searchResultLimit.formatted()) results. Narrow the search to find the rest."
 
@@ -1095,6 +1145,7 @@ nonisolated func staticGenerateGen3Streaming(
     filterGender: UInt8 = 255,
     filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
+    onProgress: (Double) -> Void = { _ in },
     onResult: (StaticSearchResult) -> Void
 ) {
     let pfMethod = finderMethodToPF(method)
@@ -1102,33 +1153,34 @@ nonisolated func staticGenerateGen3Streaming(
     for n in natures { natArr[Int(n)] = true }
     let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
-    // The encounter's template gives its gender; without one, every result
-    // is genderless.
-    let results = if let template {
-        PFBridge.staticTemplateGenerate3(
-            seed: seed, initialAdvances: initialAdvance, maxAdvances: maxAdvance,
-            method: pfMethod, template: template, tid: tid, sid: sid, game: game,
-            filterGender: filterGender, filterAbility: filterAbility,
-            filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
-    } else {
-        PFBridge.staticGenerate3(
-            seed: seed, initialAdvances: initialAdvance, maxAdvances: maxAdvance,
-            method: pfMethod, tid: tid, sid: sid,
-            filterGender: filterGender, filterAbility: filterAbility,
-            filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
-    }
-
-    for r in results {
-        if Task.isCancelled { return }
-        onResult(StaticSearchResult(
-            seed: seed, pid: r.pid,
-            ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
-            ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
-            nature: r.nature, ability: r.ability,
-            gender: r.gender, shiny: r.shiny > 0,
-            advances: r.advances, method: method,
-            hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength
-        ))
+    generateInChunks(initialAdvance: initialAdvance, maxAdvance: maxAdvance, onProgress: onProgress) { start, count in
+        // The encounter's template gives its gender; without one, every
+        // result is genderless.
+        let results = if let template {
+            PFBridge.staticTemplateGenerate3(
+                seed: seed, initialAdvances: start, maxAdvances: count,
+                method: pfMethod, template: template, tid: tid, sid: sid, game: game,
+                filterGender: filterGender, filterAbility: filterAbility,
+                filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
+        } else {
+            PFBridge.staticGenerate3(
+                seed: seed, initialAdvances: start, maxAdvances: count,
+                method: pfMethod, tid: tid, sid: sid,
+                filterGender: filterGender, filterAbility: filterAbility,
+                filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
+        }
+        for r in results {
+            onResult(StaticSearchResult(
+                seed: seed, pid: r.pid,
+                ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
+                ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
+                nature: r.nature, ability: r.ability,
+                gender: r.gender, shiny: r.shiny > 0,
+                advances: r.advances, method: method,
+                hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength
+            ))
+        }
+        return results.count
     }
 }
 
@@ -1296,6 +1348,7 @@ nonisolated func staticGenerateGen4Streaming(
     filterGender: UInt8 = 255,
     filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
+    onProgress: (Double) -> Void = { _ in },
     onResult: (StaticSearchResult) -> Void
 ) {
     let pfMethod = finderMethodToPF(method)
@@ -1304,26 +1357,27 @@ nonisolated func staticGenerateGen4Streaming(
     for n in natures { natArr[Int(n)] = true }
     let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
-    // The encounter's template gives its gender; without one, every result
-    // is genderless.
-    let results = PFBridge.staticGenerate4(
-        seed: seed, initialAdvances: initialAdvance, maxAdvances: maxAdvance,
-        method: pfMethod, lead: pfLead, template: template, tid: tid, sid: sid, game: game,
-        filterGender: filterGender, filterAbility: filterAbility,
-        filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
-
-    for r in results {
-        if Task.isCancelled { return }
-        onResult(StaticSearchResult(
-            seed: seed, pid: r.pid,
-            ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
-            ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
-            nature: r.nature, ability: r.ability,
-            gender: r.gender, shiny: r.shiny > 0,
-            advances: r.advances, method: method,
-            hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength,
-            call: r.call, chatot: r.chatot
-        ))
+    generateInChunks(initialAdvance: initialAdvance, maxAdvance: maxAdvance, onProgress: onProgress) { start, count in
+        // The encounter's template gives its gender; without one, every
+        // result is genderless.
+        let results = PFBridge.staticGenerate4(
+            seed: seed, initialAdvances: start, maxAdvances: count,
+            method: pfMethod, lead: pfLead, template: template, tid: tid, sid: sid, game: game,
+            filterGender: filterGender, filterAbility: filterAbility,
+            filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
+        for r in results {
+            onResult(StaticSearchResult(
+                seed: seed, pid: r.pid,
+                ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
+                ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
+                nature: r.nature, ability: r.ability,
+                gender: r.gender, shiny: r.shiny > 0,
+                advances: r.advances, method: method,
+                hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength,
+                call: r.call, chatot: r.chatot
+            ))
+        }
+        return results.count
     }
 }
 
@@ -1448,6 +1502,7 @@ nonisolated func staticGenerateGen5Streaming(
     filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
     staticType: Int32 = 0, staticIndex: Int32 = 0,
+    onProgress: (Double) -> Void = { _ in },
     onResult: (StaticSearchResult) -> Void
 ) {
     let pfMethod = finderMethodToPF(method)
@@ -1456,31 +1511,32 @@ nonisolated func staticGenerateGen5Streaming(
     for n in natures { natArr[Int(n)] = true }
     let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
-    let results = PFBridge.staticGenerate5(
-        seed: seed, initialAdvances: initialAdvance, maxAdvances: maxAdvance,
-        ivInitialAdvances: ivInitialAdvance, ivMaxAdvances: ivMaxAdvance,
-        method: pfMethod, lead: pfLead, tid: tid, sid: sid, game: game,
-        staticType: staticType, staticIndex: staticIndex,
-        mac: mac, keypresses: keypresses,
-        vcount: vcount, gxstat: gxstat, vframe: vframe,
-        skipLR: skipLR, timer0Min: timer0Min, timer0Max: timer0Max,
-        memoryLink: memoryLink, shinyCharm: shinyCharm,
-        dsType: dsType, language: language,
-        filterGender: filterGender, filterAbility: filterAbility,
-        filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
-
-    for r in results {
-        if Task.isCancelled { return }
-        onResult(StaticSearchResult(
-            seed: 0, pid: r.pid,
-            ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
-            ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
-            nature: r.nature, ability: r.ability,
-            gender: r.gender, shiny: r.shiny > 0,
-            advances: r.advances, method: method,
-            hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength,
-            chatot: r.chatot, ivAdvances: r.ivAdvances
-        ))
+    generateInChunks(initialAdvance: initialAdvance, maxAdvance: maxAdvance, onProgress: onProgress) { start, count in
+        let results = PFBridge.staticGenerate5(
+            seed: seed, initialAdvances: start, maxAdvances: count,
+            ivInitialAdvances: ivInitialAdvance, ivMaxAdvances: ivMaxAdvance,
+            method: pfMethod, lead: pfLead, tid: tid, sid: sid, game: game,
+            staticType: staticType, staticIndex: staticIndex,
+            mac: mac, keypresses: keypresses,
+            vcount: vcount, gxstat: gxstat, vframe: vframe,
+            skipLR: skipLR, timer0Min: timer0Min, timer0Max: timer0Max,
+            memoryLink: memoryLink, shinyCharm: shinyCharm,
+            dsType: dsType, language: language,
+            filterGender: filterGender, filterAbility: filterAbility,
+            filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
+        for r in results {
+            onResult(StaticSearchResult(
+                seed: 0, pid: r.pid,
+                ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
+                ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
+                nature: r.nature, ability: r.ability,
+                gender: r.gender, shiny: r.shiny > 0,
+                advances: r.advances, method: method,
+                hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength,
+                chatot: r.chatot, ivAdvances: r.ivAdvances
+            ))
+        }
+        return results.count
     }
 }
 
@@ -1508,6 +1564,7 @@ nonisolated func wildGenerateGen5Streaming(
     filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
     encounterSlots: [Bool] = Array(repeating: true, count: 12),
+    onProgress: (Double) -> Void = { _ in },
     onResult: (StaticSearchResult) -> Void
 ) {
     let pfMethod = finderMethodToPF(method)
@@ -1516,34 +1573,35 @@ nonisolated func wildGenerateGen5Streaming(
     for n in natures { natArr[Int(n)] = true }
     let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
-    let results = PFBridge.wildGenerate5(
-        seed: seed, initialAdvances: initialAdvance, maxAdvances: maxAdvance,
-        ivInitialAdvances: ivInitialAdvance, ivMaxAdvances: ivMaxAdvance,
-        method: pfMethod, lead: pfLead, tid: tid, sid: sid, game: game,
-        encounter: encounter, location: location, season: season,
-        mac: mac, keypresses: keypresses,
-        vcount: vcount, gxstat: gxstat, vframe: vframe,
-        skipLR: skipLR, timer0Min: timer0Min, timer0Max: timer0Max,
-        memoryLink: memoryLink, shinyCharm: shinyCharm,
-        dsType: dsType, language: language,
-        filterGender: filterGender, filterAbility: filterAbility,
-        filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers,
-        encounterSlots: encounterSlots)
-
-    for r in results {
-        if Task.isCancelled { return }
-        onResult(StaticSearchResult(
-            seed: 0, pid: r.pid,
-            ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
-            ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
-            nature: r.nature, ability: r.ability,
-            gender: r.gender, shiny: r.shiny > 0,
-            advances: r.advances, method: method,
-            hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength,
-            encounterSlot: r.encounterSlot, level: r.level,
-            item: r.item, specie: r.specie, form: r.form,
-            chatot: r.chatot, ivAdvances: r.ivAdvances
-        ))
+    generateInChunks(initialAdvance: initialAdvance, maxAdvance: maxAdvance, onProgress: onProgress) { start, count in
+        let results = PFBridge.wildGenerate5(
+            seed: seed, initialAdvances: start, maxAdvances: count,
+            ivInitialAdvances: ivInitialAdvance, ivMaxAdvances: ivMaxAdvance,
+            method: pfMethod, lead: pfLead, tid: tid, sid: sid, game: game,
+            encounter: encounter, location: location, season: season,
+            mac: mac, keypresses: keypresses,
+            vcount: vcount, gxstat: gxstat, vframe: vframe,
+            skipLR: skipLR, timer0Min: timer0Min, timer0Max: timer0Max,
+            memoryLink: memoryLink, shinyCharm: shinyCharm,
+            dsType: dsType, language: language,
+            filterGender: filterGender, filterAbility: filterAbility,
+            filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers,
+            encounterSlots: encounterSlots)
+        for r in results {
+            onResult(StaticSearchResult(
+                seed: 0, pid: r.pid,
+                ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
+                ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
+                nature: r.nature, ability: r.ability,
+                gender: r.gender, shiny: r.shiny > 0,
+                advances: r.advances, method: method,
+                hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength,
+                encounterSlot: r.encounterSlot, level: r.level,
+                item: r.item, specie: r.specie, form: r.form,
+                chatot: r.chatot, ivAdvances: r.ivAdvances
+            ))
+        }
+        return results.count
     }
 }
 
@@ -1567,6 +1625,7 @@ nonisolated func staticGenerateGen8Streaming(
     filterGender: UInt8 = 255,
     filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
+    onProgress: (Double) -> Void = { _ in },
     onResult: (StaticSearchResult) -> Void
 ) {
     let pfLead = lead.pfGeneratorLead(syncNature: syncNature)
@@ -1574,26 +1633,27 @@ nonisolated func staticGenerateGen8Streaming(
     for n in natures { natArr[Int(n)] = true }
     let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
-    let results = PFBridge.staticGenerate8(
-        seed0: seed0, seed1: seed1,
-        initialAdvances: initialAdvance, maxAdvances: maxAdvance,
-        lead: pfLead, tid: tid, sid: sid, game: game,
-        shinyCharm: shinyCharm,
-        staticType: staticType, staticIndex: staticIndex,
-        filterGender: filterGender, filterAbility: filterAbility,
-        filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
-
-    for r in results {
-        if Task.isCancelled { return }
-        onResult(StaticSearchResult(
-            seed: r.ec, pid: r.pid,
-            ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
-            ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
-            nature: r.nature, ability: r.ability,
-            gender: r.gender, shiny: r.shiny > 0,
-            advances: r.advances, method: .method1,
-            hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength
-        ))
+    generateInChunks(initialAdvance: initialAdvance, maxAdvance: maxAdvance, onProgress: onProgress) { start, count in
+        let results = PFBridge.staticGenerate8(
+            seed0: seed0, seed1: seed1,
+            initialAdvances: start, maxAdvances: count,
+            lead: pfLead, tid: tid, sid: sid, game: game,
+            shinyCharm: shinyCharm,
+            staticType: staticType, staticIndex: staticIndex,
+            filterGender: filterGender, filterAbility: filterAbility,
+            filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
+        for r in results {
+            onResult(StaticSearchResult(
+                seed: r.ec, pid: r.pid,
+                ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
+                ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
+                nature: r.nature, ability: r.ability,
+                gender: r.gender, shiny: r.shiny > 0,
+                advances: r.advances, method: .method1,
+                hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength
+            ))
+        }
+        return results.count
     }
 }
 
@@ -1614,6 +1674,7 @@ nonisolated func wildGenerateGen8Streaming(
     filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
     encounterSlots: [Bool] = Array(repeating: true, count: 12),
+    onProgress: (Double) -> Void = { _ in },
     onResult: (StaticSearchResult) -> Void
 ) {
     let pfLead = lead.pfGeneratorLead(syncNature: syncNature)
@@ -1621,29 +1682,30 @@ nonisolated func wildGenerateGen8Streaming(
     for n in natures { natArr[Int(n)] = true }
     let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
-    let results = PFBridge.wildGenerate8(
-        seed0: seed0, seed1: seed1,
-        initialAdvances: initialAdvance, maxAdvances: maxAdvance,
-        lead: pfLead, tid: tid, sid: sid, game: game,
-        shinyCharm: shinyCharm,
-        encounter: encounter, location: location,
-        filterGender: filterGender, filterAbility: filterAbility,
-        filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers,
-        encounterSlots: encounterSlots)
-
-    for r in results {
-        if Task.isCancelled { return }
-        onResult(StaticSearchResult(
-            seed: r.ec, pid: r.pid,
-            ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
-            ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
-            nature: r.nature, ability: r.ability,
-            gender: r.gender, shiny: r.shiny > 0,
-            advances: r.advances, method: .method1,
-            hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength,
-            encounterSlot: r.encounterSlot, level: r.level,
-            item: r.item, specie: r.specie, form: r.form
-        ))
+    generateInChunks(initialAdvance: initialAdvance, maxAdvance: maxAdvance, onProgress: onProgress) { start, count in
+        let results = PFBridge.wildGenerate8(
+            seed0: seed0, seed1: seed1,
+            initialAdvances: start, maxAdvances: count,
+            lead: pfLead, tid: tid, sid: sid, game: game,
+            shinyCharm: shinyCharm,
+            encounter: encounter, location: location,
+            filterGender: filterGender, filterAbility: filterAbility,
+            filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers,
+            encounterSlots: encounterSlots)
+        for r in results {
+            onResult(StaticSearchResult(
+                seed: r.ec, pid: r.pid,
+                ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
+                ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
+                nature: r.nature, ability: r.ability,
+                gender: r.gender, shiny: r.shiny > 0,
+                advances: r.advances, method: .method1,
+                hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength,
+                encounterSlot: r.encounterSlot, level: r.level,
+                item: r.item, specie: r.specie, form: r.form
+            ))
+        }
+        return results.count
     }
 }
 
@@ -1668,38 +1730,40 @@ nonisolated func eggGenerateGen8Streaming(
     shinyCharm: Bool, ovalCharm: Bool,
     filterGender: UInt8 = 255, filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
+    onProgress: (Double) -> Void = { _ in },
     onResult: (StaticSearchResult) -> Void
 ) {
     var natArr = [Bool](repeating: natures.isEmpty, count: 25)
     for n in natures { natArr[Int(n)] = true }
     let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
-    let results = PFBridge.eggGenerate8(
-        seed0: seed0, seed1: seed1,
-        initialAdvances: initialAdvance, maxAdvances: maxAdvance,
-        compatibility: compatibility,
-        parentAIVs: parentAIVs, parentBIVs: parentBIVs,
-        parentAAbility: parentAAbility, parentBAbility: parentBAbility,
-        parentAGender: parentAGender, parentBGender: parentBGender,
-        parentAItem: parentAItem, parentBItem: parentBItem,
-        parentANature: parentANature, parentBNature: parentBNature,
-        eggSpecie: eggSpecie, masuda: masuda,
-        tid: tid, sid: sid, game: game,
-        shinyCharm: shinyCharm, ovalCharm: ovalCharm,
-        filterGender: filterGender, filterAbility: filterAbility,
-        filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
-
-    for r in results {
-        if Task.isCancelled { return }
-        onResult(StaticSearchResult(
-            seed: r.ec, pid: r.pid,
-            ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
-            ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
-            nature: r.nature, ability: r.ability,
-            gender: r.gender, shiny: r.shiny > 0,
-            advances: r.advances, method: .method1,
-            inheritance: r.inheritance, eggSeed: r.seed
-        ))
+    generateInChunks(initialAdvance: initialAdvance, maxAdvance: maxAdvance, onProgress: onProgress) { start, count in
+        let results = PFBridge.eggGenerate8(
+            seed0: seed0, seed1: seed1,
+            initialAdvances: start, maxAdvances: count,
+            compatibility: compatibility,
+            parentAIVs: parentAIVs, parentBIVs: parentBIVs,
+            parentAAbility: parentAAbility, parentBAbility: parentBAbility,
+            parentAGender: parentAGender, parentBGender: parentBGender,
+            parentAItem: parentAItem, parentBItem: parentBItem,
+            parentANature: parentANature, parentBNature: parentBNature,
+            eggSpecie: eggSpecie, masuda: masuda,
+            tid: tid, sid: sid, game: game,
+            shinyCharm: shinyCharm, ovalCharm: ovalCharm,
+            filterGender: filterGender, filterAbility: filterAbility,
+            filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
+        for r in results {
+            onResult(StaticSearchResult(
+                seed: r.ec, pid: r.pid,
+                ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
+                ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
+                nature: r.nature, ability: r.ability,
+                gender: r.gender, shiny: r.shiny > 0,
+                advances: r.advances, method: .method1,
+                inheritance: r.inheritance, eggSeed: r.seed
+            ))
+        }
+        return results.count
     }
 }
 
@@ -1713,25 +1777,29 @@ nonisolated func idGenerateGen8Streaming(
     filterTID: UInt16, hasTIDFilter: Bool,
     filterSID: UInt16, hasSIDFilter: Bool,
     filterDisplayTID: UInt32, hasDisplayFilter: Bool,
+    onProgress: (Double) -> Void = { _ in },
     onResult: (StaticSearchResult) -> Void
 ) {
-    let results = PFBridge.idGenerate8(
-        seed0: seed0, seed1: seed1,
-        initialAdvances: initialAdvance, maxAdvances: maxAdvance,
-        filterTID: filterTID, hasTIDFilter: hasTIDFilter,
-        filterSID: filterSID, hasSIDFilter: hasSIDFilter,
-        filterDisplayTID: filterDisplayTID, hasDisplayFilter: hasDisplayFilter)
-
-    for r in results {
-        if Task.isCancelled { return }
-        onResult(StaticSearchResult(
-            seed: 0, pid: 0,
-            ivHP: 0, ivAtk: 0, ivDef: 0, ivSpA: 0, ivSpD: 0, ivSpe: 0,
-            nature: 0, ability: 0, gender: 0, shiny: false,
-            advances: r.advances, method: .method1,
-            resultTID: r.tid, resultSID: r.sid,
-            resultTSV: r.tsv, resultDisplayTID: r.displayTID
-        ))
+    // PokéFinder's ID generator stops one short of its max advances.
+    guard maxAdvance > 0 else { return }
+    generateInChunks(initialAdvance: initialAdvance, maxAdvance: maxAdvance - 1, onProgress: onProgress) { start, count in
+        let results = PFBridge.idGenerate8(
+            seed0: seed0, seed1: seed1,
+            initialAdvances: start, maxAdvances: count + 1,
+            filterTID: filterTID, hasTIDFilter: hasTIDFilter,
+            filterSID: filterSID, hasSIDFilter: hasSIDFilter,
+            filterDisplayTID: filterDisplayTID, hasDisplayFilter: hasDisplayFilter)
+        for r in results {
+            onResult(StaticSearchResult(
+                seed: 0, pid: 0,
+                ivHP: 0, ivAtk: 0, ivDef: 0, ivSpA: 0, ivSpD: 0, ivSpe: 0,
+                nature: 0, ability: 0, gender: 0, shiny: false,
+                advances: r.advances, method: .method1,
+                resultTID: r.tid, resultSID: r.sid,
+                resultTSV: r.tsv, resultDisplayTID: r.displayTID
+            ))
+        }
+        return results.count
     }
 }
 
@@ -1751,34 +1819,36 @@ nonisolated func raidGenerateGen8Streaming(
     raidIndex: UInt8, level: UInt8,
     filterGender: UInt8 = 255, filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
+    onProgress: (Double) -> Void = { _ in },
     onResult: (StaticSearchResult) -> Void
 ) {
     var natArr = [Bool](repeating: natures.isEmpty, count: 25)
     for n in natures { natArr[Int(n)] = true }
     let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
-    let results = PFBridge.raidGenerate8(
-        seed: seed,
-        initialAdvances: initialAdvance, maxAdvances: maxAdvance,
-        tid: tid, sid: sid, game: game,
-        shinyCharm: shinyCharm,
-        denIndex: denIndex, rarity: rarity,
-        raidIndex: raidIndex, level: level,
-        filterGender: filterGender, filterAbility: filterAbility,
-        filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
-
-    for r in results {
-        if Task.isCancelled { return }
-        onResult(StaticSearchResult(
-            seed: r.ec, pid: r.pid,
-            ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
-            ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
-            nature: r.nature, ability: r.ability,
-            gender: r.gender, shiny: r.shiny > 0,
-            advances: r.advances, method: .method1,
-            hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength,
-            level: r.level
-        ))
+    generateInChunks(initialAdvance: initialAdvance, maxAdvance: maxAdvance, onProgress: onProgress) { start, count in
+        let results = PFBridge.raidGenerate8(
+            seed: seed,
+            initialAdvances: start, maxAdvances: count,
+            tid: tid, sid: sid, game: game,
+            shinyCharm: shinyCharm,
+            denIndex: denIndex, rarity: rarity,
+            raidIndex: raidIndex, level: level,
+            filterGender: filterGender, filterAbility: filterAbility,
+            filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
+        for r in results {
+            onResult(StaticSearchResult(
+                seed: r.ec, pid: r.pid,
+                ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
+                ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
+                nature: r.nature, ability: r.ability,
+                gender: r.gender, shiny: r.shiny > 0,
+                advances: r.advances, method: .method1,
+                hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength,
+                level: r.level
+            ))
+        }
+        return results.count
     }
 }
 
@@ -1799,6 +1869,7 @@ nonisolated func undergroundGenerateGen8Streaming(
     diglett: Bool, storyFlag: Int32, levelFlag: UInt8 = 0,
     filterGender: UInt8 = 255, filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
+    onProgress: (Double) -> Void = { _ in },
     onResult: (StaticSearchResult) -> Void
 ) {
     let pfLead = lead.pfGeneratorLead(syncNature: syncNature)
@@ -1806,30 +1877,31 @@ nonisolated func undergroundGenerateGen8Streaming(
     for n in natures { natArr[Int(n)] = true }
     let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
 
-    let results = PFBridge.undergroundGenerate8(
-        seed0: seed0, seed1: seed1,
-        initialAdvances: initialAdvance, maxAdvances: maxAdvance,
-        lead: pfLead,
-        diglett: diglett, levelFlag: levelFlag,
-        tid: tid, sid: sid, game: game,
-        shinyCharm: shinyCharm,
-        storyFlag: storyFlag,
-        filterGender: filterGender, filterAbility: filterAbility,
-        filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
-
-    for r in results {
-        if Task.isCancelled { return }
-        onResult(StaticSearchResult(
-            seed: r.ec, pid: r.pid,
-            ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
-            ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
-            nature: r.nature, ability: r.ability,
-            gender: r.gender, shiny: r.shiny > 0,
-            advances: r.advances, method: .method1,
-            hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength,
-            item: r.item, specie: r.specie,
-            eggMove: r.eggMove
-        ))
+    generateInChunks(initialAdvance: initialAdvance, maxAdvance: maxAdvance, onProgress: onProgress) { start, count in
+        let results = PFBridge.undergroundGenerate8(
+            seed0: seed0, seed1: seed1,
+            initialAdvances: start, maxAdvances: count,
+            lead: pfLead,
+            diglett: diglett, levelFlag: levelFlag,
+            tid: tid, sid: sid, game: game,
+            shinyCharm: shinyCharm,
+            storyFlag: storyFlag,
+            filterGender: filterGender, filterAbility: filterAbility,
+            filterShiny: shinyFilter, natures: natArr, powers: hiddenPowers)
+        for r in results {
+            onResult(StaticSearchResult(
+                seed: r.ec, pid: r.pid,
+                ivHP: r.ivs[0], ivAtk: r.ivs[1], ivDef: r.ivs[2],
+                ivSpA: r.ivs[3], ivSpD: r.ivs[4], ivSpe: r.ivs[5],
+                nature: r.nature, ability: r.ability,
+                gender: r.gender, shiny: r.shiny > 0,
+                advances: r.advances, method: .method1,
+                hiddenPower: r.hiddenPower, hiddenPowerStrength: r.hiddenPowerStrength,
+                item: r.item, specie: r.specie,
+                eggMove: r.eggMove
+            ))
+        }
+        return results.count
     }
 }
 
@@ -2080,10 +2152,11 @@ nonisolated func runWildSearch(
 
     if mode == .generator {
         onProgress(0)
+        generateInChunks(initialAdvance: initAdv, maxAdvance: maxAdv, onProgress: onProgress) { start, count in
         let results: [StaticSearchResult]
         if gen == .gen3 {
             results = PFBridge.wildGenerate3(
-                seed: seed, initialAdvances: initAdv, maxAdvances: maxAdv,
+                seed: seed, initialAdvances: start, maxAdvances: count,
                 method: pfMethod, lead: pfLead,
                 tid: tid, sid: sid, game: pfGame,
                 deadBattery: deadBattery,
@@ -2107,7 +2180,7 @@ nonisolated func runWildSearch(
             }
         } else {
             results = PFBridge.wildGenerate4(
-                seed: seed, initialAdvances: initAdv, maxAdvances: maxAdv,
+                seed: seed, initialAdvances: start, maxAdvances: count,
                 method: pfMethod, lead: pfLead,
                 tid: tid, sid: sid, game: pfGame,
                 encounter: pfEnc, location: locationID,
@@ -2130,11 +2203,8 @@ nonisolated func runWildSearch(
                     call: r.call, chatot: r.chatot)
             }
         }
-        let total = max(results.count, 1)
-        for (i, r) in results.enumerated() {
-            if Task.isCancelled { return }
-            onResult(r)
-            if i % 500 == 0 { onProgress(Double(i) / Double(total) * 100) }
+        results.forEach(onResult)
+        return results.count
         }
         onProgress(100)
     } else {
@@ -3703,11 +3773,45 @@ struct FinderRootView: View {
     private var activeResults: [StaticSearchResult] {
         mode == .searcher ? searcherResults : generatorResults
     }
+
+    /// The filters that are set, by their names on screen, for when a
+    /// search finds nothing.
+    private var setFilterNames: [String] {
+        if encounterMode == .id && generation == .gen8 {
+            return [("TID", gen8FilterTIDText), ("SID", gen8FilterSIDText), ("display TID", gen8FilterDisplayTIDText)]
+                .filter { !$0.1.trimmingCharacters(in: .whitespaces).isEmpty }.map(\.0)
+        }
+        var names: [String] = []
+        // Only the Searcher shows the IV ranges.
+        if mode == .searcher && ([minHP, minAtk, minDef, minSpA, minSpD, minSpe].contains { $0 > 0 }
+                                 || [maxHP, maxAtk, maxDef, maxSpA, maxSpD, maxSpe].contains { $0 < 31 }) {
+            names.append("IVs")
+        }
+        if !selectedNatures.isEmpty { names.append("natures") }
+        if shinyOnly { names.append("Shiny Only") }
+        if filterGender != 255 { names.append("gender") }
+        if filterAbility != 255 { names.append("ability") }
+        if !selectedHiddenPowers.isEmpty { names.append("Hidden Power") }
+        if encounterMode == .wild && selectedSpeciesFilter != 0 { names.append("species") }
+        return names
+    }
+
+    /// The range a search covers, if it has one to widen.
+    private var rangeToWiden: String? {
+        if mode == .generator { return "the advances" }
+        return switch generation {
+        case .gen4: "the delays or advances"
+        case .gen5: "the dates or advances"
+        default: nil
+        }
+    }
     @State private var searchTask: Task<Void, Never>?
     @State private var searchWorkTask: Task<Void, Never>?
     @State private var searchProgressValue: Double = -1
     /// The last search stopped at `searchResultLimit`.
     @State private var stoppedAtLimit = false
+    /// The mode whose last search ran to the end, for saying it found nothing.
+    @State private var finishedMode: FinderMode?
     private var isSearching: Bool { searchTask != nil }
     @State private var selectedResult: StaticSearchResult?
 
@@ -4135,6 +4239,11 @@ struct FinderRootView: View {
                             .font(.caption).foregroundStyle(.orange)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    if finishedMode == mode && activeResults.isEmpty {
+                        Text(noResultsText(filters: setFilterNames, widen: rangeToWiden))
+                            .font(.caption).foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     if needsStaticEncounter {
                         Text("Choose the Pokémon under Encounter: Gen 5 and 8 searches need its template.")
                             .font(.caption).foregroundStyle(.orange)
@@ -4228,6 +4337,11 @@ struct FinderRootView: View {
         .onChange(of: generation) { fixLead() }
         .onChange(of: encounterMode) { fixLead() }
         .onChange(of: selectedGame) { fixLead() }
+        // Results found for another game, encounter or method would open
+        // as this one's.
+        .onChange(of: resultsKey) { clearResults() }
+        // Each mode keeps its own list; a search running in the other stops.
+        .onChange(of: mode) { stopSearch() }
         .leaveWarning(isSearching ? "The search in progress will stop." : nil)
         #if DEBUG && os(macOS)
         // With `-finder_game FireRed -finder_encounterCategory Gifts`: opens
@@ -4911,11 +5025,26 @@ struct FinderRootView: View {
         searchTask = nil
     }
 
+    /// What the results were found for.
+    private var resultsKey: [String] {
+        [generation, selectedGame, encounterMode, encounterCategory, selectedEncounter?.id as Any,
+         selectedLocation, selectedEncounterType, method].map { String(describing: $0) }
+    }
+
+    private func clearResults() {
+        stopSearch()
+        searcherResults = []
+        generatorResults = []
+        stoppedAtLimit = false
+        finishedMode = nil
+    }
+
     private func startSearch() {
         stopSearch()
         if mode == .searcher { searcherResults = [] } else { generatorResults = [] }
         searchProgressValue = -1
         stoppedAtLimit = false
+        finishedMode = nil
 
         // Capture all @State values before entering task
         let gen = generation
@@ -5069,7 +5198,8 @@ struct FinderRootView: View {
                     shinyOnly: shiny, game: pfGameVal,
                     shinyCharm: g8ShinyCharm, ovalCharm: g8OvalCharm,
                     filterGender: genderFilter, filterAbility: abilityFilter,
-                    hiddenPowers: hpFilter
+                    hiddenPowers: hpFilter,
+                    onProgress: { continuation.yield(.progress($0)) }
                 ) { continuation.yield(.result($0)) }
                 continuation.yield(.progress(100))
             } else if encMode == .id && gen == .gen8 {
@@ -5078,7 +5208,8 @@ struct FinderRootView: View {
                     initialAdvance: initAdv, maxAdvance: maxAdv,
                     filterTID: g8FilterTID, hasTIDFilter: g8HasTIDFilter,
                     filterSID: g8FilterSID, hasSIDFilter: g8HasSIDFilter,
-                    filterDisplayTID: g8FilterDisplayTID, hasDisplayFilter: g8HasDisplayFilter
+                    filterDisplayTID: g8FilterDisplayTID, hasDisplayFilter: g8HasDisplayFilter,
+                    onProgress: { continuation.yield(.progress($0)) }
                 ) { continuation.yield(.result($0)) }
                 continuation.yield(.progress(100))
             } else if encMode == .raid && gen == .gen8 {
@@ -5091,7 +5222,8 @@ struct FinderRootView: View {
                     denIndex: g8RaidDen, rarity: g8RaidRarity,
                     raidIndex: g8RaidIndex, level: g8RaidLevel,
                     filterGender: genderFilter, filterAbility: abilityFilter,
-                    hiddenPowers: hpFilter
+                    hiddenPowers: hpFilter,
+                    onProgress: { continuation.yield(.progress($0)) }
                 ) { continuation.yield(.result($0)) }
                 continuation.yield(.progress(100))
             } else if encMode == .underground && gen == .gen8 {
@@ -5103,7 +5235,8 @@ struct FinderRootView: View {
                     shinyCharm: g8ShinyCharm,
                     diglett: g8Diglett, storyFlag: g8StoryFlag, levelFlag: g8LevelFlag,
                     filterGender: genderFilter, filterAbility: abilityFilter,
-                    hiddenPowers: hpFilter
+                    hiddenPowers: hpFilter,
+                    onProgress: { continuation.yield(.progress($0)) }
                 ) { continuation.yield(.result($0)) }
                 continuation.yield(.progress(100))
             } else if encMode == .wild {
@@ -5138,7 +5271,8 @@ struct FinderRootView: View {
                         memoryLink: g5MemoryLink, shinyCharm: g5ShinyCharm,
                         dsType: g5DSType, language: g5Language,
                         filterGender: genderFilter, filterAbility: abilityFilter,
-                        hiddenPowers: hpFilter
+                        hiddenPowers: hpFilter,
+                        onProgress: { continuation.yield(.progress($0)) }
                     ) { continuation.yield(.result($0)) }
                     continuation.yield(.progress(100))
                 } else if gen == .gen8 {
@@ -5150,15 +5284,19 @@ struct FinderRootView: View {
                         shinyCharm: g8ShinyCharm,
                         encounter: pfEncVal, location: locationIDVal,
                         filterGender: genderFilter, filterAbility: abilityFilter,
-                        hiddenPowers: hpFilter
+                        hiddenPowers: hpFilter,
+                        onProgress: { continuation.yield(.progress($0)) }
                     ) { continuation.yield(.result($0)) }
                     continuation.yield(.progress(100))
                 } else {
+                    // Only the Searcher shows the IV ranges, so the
+                    // Generator doesn't filter by them.
+                    let generating = m == .generator
                     runWildSearch(gen: gen, mode: m, method: meth,
                                   natures: natFilter, tid: tID, sid: sID,
                                   shinyOnly: shiny,
-                                  minIVs: (hpMin, atkMin, defMin, spaMin, spdMin, speMin),
-                                  maxIVs: (hpMax, atkMax, defMax, spaMax, spdMax, speMax),
+                                  minIVs: generating ? (0, 0, 0, 0, 0, 0) : (hpMin, atkMin, defMin, spaMin, spdMin, speMin),
+                                  maxIVs: generating ? (31, 31, 31, 31, 31, 31) : (hpMax, atkMax, defMax, spaMax, spdMax, speMax),
                                   seed: seedVal, initAdv: initAdv, maxAdv: maxAdv,
                                   searcherMinAdv: srcMinAdv, searcherMaxAdv: srcMaxAdv,
                                   minDelay: UInt32(delMin), maxDelay: UInt32(delMax),
@@ -5230,7 +5368,8 @@ struct FinderRootView: View {
                         shinyOnly: shiny, method: meth,
                         game: pfGameVal, template: gen3Template,
                         filterGender: genderFilter, filterAbility: abilityFilter,
-                        hiddenPowers: hpFilter
+                        hiddenPowers: hpFilter,
+                        onProgress: { continuation.yield(.progress($0)) }
                     ) { continuation.yield(.result($0)) }
                 } else if gen == .gen5 {
                     // Gen 5 and 8 need the Pokémon: the Finder doesn't
@@ -5248,7 +5387,8 @@ struct FinderRootView: View {
                             dsType: g5DSType, language: g5Language,
                             filterGender: genderFilter, filterAbility: abilityFilter,
                             hiddenPowers: hpFilter,
-                            staticType: staticTemplate.type, staticIndex: staticTemplate.index
+                            staticType: staticTemplate.type, staticIndex: staticTemplate.index,
+                            onProgress: { continuation.yield(.progress($0)) }
                         ) { continuation.yield(.result($0)) }
                     }
                 } else if gen == .gen8 {
@@ -5261,7 +5401,8 @@ struct FinderRootView: View {
                             shinyCharm: g8ShinyCharm,
                             staticType: staticTemplate.type, staticIndex: staticTemplate.index,
                             filterGender: genderFilter, filterAbility: abilityFilter,
-                            hiddenPowers: hpFilter
+                            hiddenPowers: hpFilter,
+                            onProgress: { continuation.yield(.progress($0)) }
                         ) { continuation.yield(.result($0)) }
                     }
                 } else {
@@ -5272,7 +5413,8 @@ struct FinderRootView: View {
                         shinyOnly: shiny, method: meth,
                         lead: ld, syncNature: sNat, game: pfGameVal, template: staticTemplate,
                         filterGender: genderFilter, filterAbility: abilityFilter,
-                        hiddenPowers: hpFilter
+                        hiddenPowers: hpFilter,
+                        onProgress: { continuation.yield(.progress($0)) }
                     ) { continuation.yield(.result($0)) }
                 }
                 continuation.yield(.progress(100))
@@ -5304,6 +5446,7 @@ struct FinderRootView: View {
             // whose list the rest of this one's would land in.
             guard !Task.isCancelled else { return }
             stoppedAtLimit = keep(buffer, searcher: isSearcherMode)
+            finishedMode = isSearcherMode ? .searcher : .generator
             searchWorkTask = nil
             searchTask = nil
         }
