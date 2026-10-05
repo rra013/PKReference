@@ -926,11 +926,21 @@ struct SeedToTimeResult3: Identifiable, Hashable {
     let id = UUID()
     let originSeed: UInt16
     let advances: UInt32
+    /// The game's day count: Day 1 is 1 January 2000.
     let day: Int
     let hour: Int
     let minute: Int
+    /// The same day in 2000, for an emulator's clock.
+    let month: Int
+    let dayOfMonth: Int
 
-    var displayTime: String { String(format: "Day %d  %02d:%02d", day + 1, hour, minute) }
+    var displayTime: String { String(format: "Day %d  %02d:%02d", day, hour, minute) }
+
+    var dateText: String {
+        let components = DateComponents(calendar: Calendar(identifier: .gregorian), year: 2000,
+                                        month: month, day: dayOfMonth)
+        return components.date?.formatted(.dateTime.day().month(.wide).year()) ?? ""
+    }
 }
 
 struct SeedToTimeResult4: Identifiable, Hashable {
@@ -1217,7 +1227,8 @@ nonisolated func seedToTimeGen3(seed: UInt32) -> (originSeed: UInt16, advances: 
     let dateTimes = PFBridge.seedToTime3(seed: UInt32(origin.originSeed), year: 2000)
     let times = dateTimes.prefix(200).map { dt in
         SeedToTimeResult3(originSeed: origin.originSeed, advances: origin.advances,
-                          day: (dt.month - 1) * 31 + dt.day - 1, hour: dt.hour, minute: dt.minute)
+                          day: RSClock.dayNumber(month: dt.month, day: dt.day), hour: dt.hour, minute: dt.minute,
+                          month: dt.month, dayOfMonth: dt.day)
     }
     return (origin.originSeed, origin.advances, times)
 }
@@ -2037,7 +2048,7 @@ nonisolated func runWildSearch(
     minDelay: UInt32, maxDelay: UInt32,
     pfGame: PFGame, pfEnc: PFEncounter, locationID: UInt8,
     slotSpecies: [UInt16],
-    speciesFilter: UInt16, lead: FinderLead, syncNature: UInt8 = 0, isEmerald: Bool,
+    speciesFilter: UInt16, lead: FinderLead, syncNature: UInt8 = 0, deadBattery: Bool,
     filterGender: UInt8 = 255, filterAbility: UInt8 = 255,
     hiddenPowers: [Bool] = Array(repeating: false, count: 16),
     onResult: @Sendable (StaticSearchResult) -> Void,
@@ -2066,7 +2077,6 @@ nonisolated func runWildSearch(
 
     // Generators take Synchronize's nature; searchers take any.
     let pfLead = mode == .generator ? lead.pfGeneratorLead(syncNature: syncNature) : lead.pfLead
-    let deadBattery = isEmerald
 
     if mode == .generator {
         onProgress(0)
@@ -2257,6 +2267,8 @@ final class FinderTimerBridge {
     /// FireRed and LeafGreen: the final press's calibration, in ms.
     var pendingCalibration: Int?
     var pendingConsole: RNGConsole?
+    /// Gen 3: Standard for a target counted from boot.
+    var pendingGen3Mode: Gen3TimerMode?
     var pendingTargetDelay: Int?
     var pendingTargetSecond: Int?
     var shouldSwitchToTimer: Bool = false
@@ -2276,6 +2288,7 @@ final class FinderTimerBridge {
         pendingPreTimer = nil
         pendingCalibration = nil
         pendingConsole = nil
+        pendingGen3Mode = nil
         pendingTargetDelay = nil
         pendingTargetSecond = nil
         shouldSwitchToTimer = false
@@ -2284,6 +2297,18 @@ final class FinderTimerBridge {
         pendingSeedTime = nil
         pendingHGSS = nil
         pendingHit = nil
+    }
+
+    /// A Ruby, Sapphire or Emerald target: its frames, on the GBA's frame
+    /// rate, and Standard mode when they count from boot.
+    func sendGen3(_ start: Gen3TargetStart, time: String, seed: String) {
+        pendingGen = .gen3
+        pendingTargetFrame = start.frame
+        pendingConsole = .gba
+        pendingGen3Mode = start.fromBoot ? .standard : nil
+        selectedTime = time
+        selectedSeed = seed
+        shouldSwitchToTimer = true
     }
 }
 
@@ -3052,6 +3077,9 @@ struct RNGTimerView: View {
                 if gen == .gen3, let calibration = bridge.pendingCalibration {
                     gen3Calibration = calibration
                 }
+                if gen == .gen3, let mode = bridge.pendingGen3Mode {
+                    gen3Mode = mode
+                }
                 if let console = bridge.pendingConsole {
                     consoleType = console
                 } else if gen != .gen3 && consoleType == .gba {
@@ -3589,7 +3617,7 @@ struct FinderRootView: View {
     @AppStorage("finder_filterGender") private var filterGender: UInt8 = 255
     @AppStorage("finder_filterAbility") private var filterAbility: UInt8 = 255
     @AppStorage("finder_hiddenPowers") private var selectedHiddenPowers: Set<UInt8> = []
-    @AppStorage("finder_deadBattery") private var deadBattery: Bool = true
+    @AppStorage("finder_deadBattery") private var deadBattery: Bool = false
 
     // Gen 5 DS parameters
     @AppStorage("finder_gen5mac") private var gen5MacText: String = ""
@@ -4014,9 +4042,14 @@ struct FinderRootView: View {
                         }
                     }
 
-                    if generation == .gen3 && (selectedGame == .emerald || selectedGame == .ruby || selectedGame == .sapphire) {
+                    // Emerald boots on seed 0000 either way.
+                    if generation == .gen3 && (selectedGame == .ruby || selectedGame == .sapphire) {
                         Toggle("Dead Battery", isOn: $deadBattery)
                             .font(.subheadline)
+                            .onChange(of: deadBattery) {
+                                // Every boot starts on 05A0, as PokéFinder's Generators take it.
+                                if deadBattery { genSeedText = "05A0" }
+                            }
                     }
                     }
                 }
@@ -4912,7 +4945,7 @@ struct FinderRootView: View {
             for p in selectedHiddenPowers { arr[Int(p)] = true }
             return arr
         }()
-        let isDeadBattery = deadBattery && (selectedGame == .emerald)
+        let isDeadBattery = deadBattery && (selectedGame == .ruby || selectedGame == .sapphire)
 
         // Gen 5 profile params
         let g5Mac = UInt64(gen5MacText.replacingOccurrences(of: ":", with: ""), radix: 16) ?? 0
@@ -5133,7 +5166,7 @@ struct FinderRootView: View {
                                   locationID: locationIDVal,
                                   slotSpecies: slotSpecies,
                                   speciesFilter: speciesFilter,
-                                  lead: ld, syncNature: sNat, isEmerald: isDeadBattery,
+                                  lead: ld, syncNature: sNat, deadBattery: isDeadBattery,
                                   filterGender: genderFilter, filterAbility: abilityFilter,
                                   hiddenPowers: hpFilter,
                                   onResult: { continuation.yield(.result($0)) },
@@ -5314,8 +5347,9 @@ struct SeedToTimeView: View {
 
     @State private var timeResults3: [SeedToTimeResult3] = []
     @State private var timeResults4: [SeedToTimeResult4] = []
-    @State private var originSeed: UInt16 = 0
-    @State private var advances: UInt32 = 0
+    /// Gen 3 (not FireRed and LeafGreen's seed list): where the target's
+    /// frames count from.
+    @State private var gen3Start: Gen3TargetStart?
     @State private var isComputing = false
 
     /// The FireRed or LeafGreen seed being calibrated.
@@ -5343,7 +5377,7 @@ struct SeedToTimeView: View {
             .padding()
         }
         .dismissesKeyboard()
-        .navigationTitle(frlg == nil ? "Seed to Time" : "Initial Seeds")
+        .navigationTitle(frlg != nil ? "Initial Seeds" : generation == .gen3 && gen3Start?.kind != .clock ? "Target" : "Seed to Time")
         .navigationDestination(item: $calibrating) { seed in
             if let frlg, let calibration {
                 FRLGCalibrationView(target: result, attempted: seed, search: frlg, context: calibration) {
@@ -5406,12 +5440,8 @@ struct SeedToTimeView: View {
                 }
             }
 
-            if generation == .gen3 && frlg == nil {
-                SectionCard(title: "Origin Seed", icon: "arrow.uturn.backward") {
-                    LabeledContent("16-bit Seed", value: String(format: "%04X", originSeed))
-                        .font(.system(.body, design: .monospaced))
-                    LabeledContent("Advances", value: "\(advances)")
-                }
+            if generation == .gen3, let gen3Start {
+                gen3StartCard(gen3Start)
             }
         }
     }
@@ -5422,7 +5452,7 @@ struct SeedToTimeView: View {
             ProgressView("Computing times...").padding()
         }
 
-        if generation == .gen3 && !timeResults3.isEmpty {
+        if generation == .gen3 && gen3Start?.kind == .clock && !timeResults3.isEmpty {
             gen3TimeSection
         }
 
@@ -5434,7 +5464,7 @@ struct SeedToTimeView: View {
             Text("Seed-to-time is not applicable for Gen 5.")
                 .foregroundStyle(.secondary)
         } else if !isComputing && (
-            (generation == .gen3 && timeResults3.isEmpty) ||
+            (generation == .gen3 && gen3Start?.kind == .clock && timeResults3.isEmpty) ||
             (generation == .gen4 && timeResults4.isEmpty)
         ) {
             Text("No date/time combos found for this seed.")
@@ -5467,17 +5497,73 @@ struct SeedToTimeView: View {
     /// The seed a Gen 3 game starts on: Emerald's is always 0, a dead
     /// battery's 0x5A0; otherwise the 16-bit seed before the target's.
     private var gen3InitialSeed: UInt32 {
-        if game == .emerald { return 0 }
-        if deadBattery && (game == .ruby || game == .sapphire) { return 0x5A0 }
-        return UInt32(PFBridge.seedToTimeOriginSeed3(seed: result.seed).originSeed)
+        gen3Start?.seed ?? UInt32(PFBridge.seedToTimeOriginSeed3(seed: result.seed).originSeed)
     }
 
     private var gen3TimeSection: some View {
         SeedToTimeListGen3(
             times: timeResults3,
             totalCount: timeResults3.count,
-            onSelect: { timeText in sendToTimerGen3(advances: advances, timeText: timeText) }
+            onSelect: { timeText in
+                if let gen3Start { sendToTimerGen3(gen3Start, timeText: timeText) }
+            }
         )
+    }
+
+    /// The seed the target's frames count from, the frames, and how long
+    /// they take; the clock's times follow in their own list.
+    private func gen3StartCard(_ start: Gen3TargetStart) -> some View {
+        let seedText = String(format: "%04X", start.seed)
+        let title = switch start.kind {
+        case .boot: "From Boot"
+        case .clock, .origin: "Origin Seed"
+        case .generatorSeed: "From the Generator's Seed"
+        }
+        let note: String? = switch start.kind {
+        case .boot where game == .emerald:
+            "Emerald starts on seed 0000 every time, so the target is a frame count from boot, not a clock time."
+        case .boot:
+            "With a dead battery, Ruby and Sapphire start on seed 05A0 every time, so the target is a frame count from boot, not a clock time."
+        case .clock:
+            "Ruby and Sapphire's clock makes the seed: load the game at one of the times below."
+        case .generatorSeed:
+            "Counted from the Generator's seed, which the game doesn't boot on. For a seed learnt in game, such as a new game's Trainer ID, use the Timer's Variable Target."
+        case .origin:
+            "FireRed and LeafGreen's seed depends on when you load the game. Turn on Only targets I can reach to find the seeds you can hit."
+        }
+        let minutes = Double(start.frame) / GBA_FRAMERATE / 60
+        return SectionCard(title: title, icon: "arrow.uturn.backward") {
+            if let note {
+                Text(note).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            LabeledContent(start.kind == .clock || start.kind == .origin ? "16-bit Seed" : "Seed", value: seedText)
+                .font(.system(.body, design: .monospaced))
+            LabeledContent("Frames", value: start.frame.formatted())
+            LabeledContent("Wait", value: Self.waitText(frames: start.frame))
+            if start.kind != .clock && start.kind != .origin {
+                if minutes > 60 {
+                    Text("That's a long wait. The Generator from \(seedText) lists the targets within the frames you can wait for.")
+                        .font(.caption).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Button {
+                    sendToTimerGen3(start, timeText: "frame \(start.frame.formatted()) from seed \(seedText)")
+                } label: {
+                    Label("Send to Timer", systemImage: "timer")
+                }
+            }
+        }
+    }
+
+    /// How long `frames` take on a GBA: "41.9 s", "12 min 5 s", "3 h 20 min".
+    static func waitText(frames: Int) -> String {
+        let seconds = Double(frames) / GBA_FRAMERATE
+        if seconds < 60 { return String(format: "%.1f s", seconds) }
+        let whole = Int(seconds.rounded())
+        if whole < 3600 { return "\(whole / 60) min \(whole % 60) s" }
+        if whole < 86400 { return "\(whole / 3600) h \(whole % 3600 / 60) min" }
+        return "\((whole / 86400).formatted()) days"
     }
 
     private var gen4TimeSection: some View {
@@ -5493,12 +5579,15 @@ struct SeedToTimeView: View {
         let gen = generation
         let seedVal = result.seed
         if gen == .gen3 {
-            let r = await Task.detached {
-                return seedToTimeGen3(seed: seedVal)
-            }.value
-            originSeed = r.originSeed
-            advances = r.advances
-            timeResults3 = r.times
+            let start = Gen3TargetStart.of(seed: seedVal, advances: result.advances, fromGenerator: fromGenerator,
+                                           game: game, deadBattery: deadBattery)
+            gen3Start = start
+            if start.kind == .clock {
+                let clockSeed = start.seed
+                timeResults3 = await Task.detached {
+                    seedToTimeGen3(seed: clockSeed).times
+                }.value
+            }
         } else {
             let r = await Task.detached {
                 return seedToTimeGen4(seed: seedVal)
@@ -5508,13 +5597,8 @@ struct SeedToTimeView: View {
         isComputing = false
     }
 
-    private func sendToTimerGen3(advances: UInt32, timeText: String) {
-        let bridge = FinderTimerBridge.shared
-        bridge.pendingGen = .gen3
-        bridge.pendingTargetFrame = Int(advances)
-        bridge.selectedTime = timeText
-        bridge.selectedSeed = result.seedHex
-        bridge.shouldSwitchToTimer = true
+    private func sendToTimerGen3(_ start: Gen3TargetStart, timeText: String) {
+        FinderTimerBridge.shared.sendGen3(start, time: timeText, seed: result.seedHex)
         close()
     }
 
@@ -5592,8 +5676,13 @@ private struct SeedToTimeRow3: View {
     var body: some View {
         Button { onSelect(time.displayTime) } label: {
             HStack {
-                Text(time.displayTime)
-                    .font(.system(.body, design: .monospaced))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(time.displayTime)
+                        .font(.system(.body, design: .monospaced))
+                    // For an emulator's clock.
+                    Text(time.dateText)
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Spacer()
                 Image(systemName: "timer")
                     .foregroundColor(.accentColor)

@@ -1,8 +1,8 @@
 # RNG tools fixes: plan
 
-Status: **PRs 1–6 and 11 merged** (2026-10-03 to 05); PR 11b built, PRs
-7–10 and 12 planned (§7). From
-the RNG audit's 45 findings, and seven found since (46–52). Findings 1–10
+Status: **PRs 1–6, 11 and 11b merged** (2026-10-03 to 05); PR 7 built,
+PRs 8–10 and 12 planned (§7). From
+the RNG audit's 45 findings, and nine found since (46–54). Findings 1–10
 are §2–§5, as four PRs; the rest are §7, as eight more. The owner took
 every recommendation in §8, and in §9 for PRs 5–12.
 
@@ -267,7 +267,7 @@ reported to the owner.
 |---|---|---|
 | 5 | 11, 15, 16, 46 | Leads, methods and modes follow PokéFinder |
 | 6 | 27–30, 32, 33 | The Timer keeps time and settings |
-| 7 | 12, 13, 31, 39 | Gen 3 targets: Ruby/Sapphire days, Emerald, Dead Battery |
+| 7 | 12, 13, 31, 39, 53, 54 | Gen 3 targets: Ruby/Sapphire days, Emerald, Dead Battery |
 | 8 | 36, 37, 48 | Finder results: generators in chunks, empty and stale results |
 | 9 | 19, 20, 24, 25, 44, 49 | Wild areas from PokéFinder's tables |
 | 10 | 17 (Gen 8), 35, 40 | Gen 4 tools: years, delays, TSV |
@@ -401,26 +401,50 @@ Gen 3 Trainer ID lookup (§7.7). PRs 7–10 and 12 follow.
   a drag; a passed frame shows its note. The beep can't be heard from here
   (simulator or the owner's Mac): the owner listens.
 
-### 7.3 PR 7: Gen 3 targets (12, 13, 31, 39)
+### 7.3 PR 7: Gen 3 targets (12, 13, 31, 39, 53, 54), built
 
-- **Ruby/Sapphire Day N (12):** count real calendar days from 1 January
-  2000 (a leap year), not `(month - 1) * 31 + day - 1`. PokéFinder's
-  dates are already right.
-- **Emerald (13):** the target page learns the game. Emerald boots from
-  seed 0, so it shows the advances from 0 (`LCRNG::distance`, bridged)
-  and sends them to the Timer, in place of Ruby/Sapphire clock times.
-- **Dead Battery (39):** PokéFinder's Core only stores the flag, and the
-  app passes it only for Emerald. With a dead battery, Ruby and Sapphire
-  boot from seed 0x5A0 (PokéFinder's Gen 3 wild screen sets its seed to
-  5a0 for a dead-battery profile), so the page shows the advances from
-  0x5A0, as for Emerald. The toggle shows for Ruby and Sapphire only.
+`Gen3TargetStart` works out where a Gen 3 target's frames count from, and
+the target page shows it, with the frames, the wait at the GBA's frame rate
+and Send to Timer:
+
+- **Ruby/Sapphire Day N (12):** real days from 1 January 2000, a leap year
+  (PokéFinder's `daysTo` + 1), not `(month - 1) * 31 + day`. Dates from
+  March on were two to six days late. Each time now also shows its
+  date, for an emulator's clock.
+- **Emerald (13):** boots on seed 0000, so its target is the frames from
+  0000 (`pf_lcrngDistance`, from PR 11), not Ruby/Sapphire clock times.
+  When that's over an hour (most Searcher targets), the page points to the
+  Generator from 0000.
+- **Dead Battery (39):** Ruby and Sapphire boot on 05A0, which is Day 1,
+  00:00 on their clock. The switch shows for Ruby and Sapphire only, as in
+  PokéFinder's profile editor, and turning it on sets the Generator's seed
+  to 05A0, as PokéFinder's Static3 and Wild3 screens do. Its default is
+  now off, PokéFinder's. The searches pass the flag for Ruby and Sapphire
+  (PokéFinder's Core only stores it), and the Eggs tool no longer marks
+  every Emerald profile as a dead battery.
 - **Handoff on GBA (31):** Ruby, Sapphire and Emerald's Send to Timer sets
-  the GBA console, as FireRed/LeafGreen's does; today it stays on NDS
-  Slot 1, about 17 frames off per 10,000.
-- **Tests:** every Day N, hour and minute rebuilds its seed by the
-  audit's independent Ruby/Sapphire clock formula; Emerald's count of N
-  gives the target seed from 0, and the dead battery's from 0x5A0; the
-  handoffs set GBA.
+  the GBA console, and Standard mode when the frames count from boot.
+- **Generator targets (53):** the page treated the Generator's seed as the
+  target's, so Ruby/Sapphire sent the Timer the frames to the Generator's
+  seed and not the target's frames after it (0 when that seed was the
+  clock's). Now: frames from a boot seed are the Generator's; from a
+  live-battery seed, its clock times plus the frames to it; any other seed
+  is one learnt in game (a new game's Trainer ID), counted from itself,
+  with a pointer to Variable Target.
+- **FireRed/LeafGreen without the seed list (54):** the page listed
+  Ruby/Sapphire clock times. It shows the 16-bit seed and frames, and
+  points to Only targets I can reach.
+- **Tests:** every Day N, hour and minute of four seeds rebuilds its seed by
+  the clock formula, and its date is that many days into 2000; Emerald's
+  frames from 0000 and a dead battery's from 05A0 regenerate the target;
+  the Generator cases and the Searcher's clock and FireRed cases; the
+  handoff sets GBA and Standard; the wait's wording.
+- **On the simulator:** Emerald from 2DA6 (From the Generator's Seed,
+  9,660 frames) and from 0000 (From Boot, 9,620, sent to the Timer, which
+  switched from Variable Target to Standard on GBA); Ruby's Dead Battery
+  switch setting 05A0, a target From Boot; with it off, the clock times
+  from Day 1 00:00 to Day 365 with their dates, and Day 92 00:22 sent to
+  the Timer with 9,749 frames.
 
 ### 7.4 PR 8: Finder results (36, 37, 48)
 
@@ -630,6 +654,10 @@ Delay Hit and Frame Hit had to come from elsewhere.
 - 51: the old IV Calc ignored its EVs (PR 11b).
 - 52: number fields used the number from before when a button was tapped
   straight after typing (PR 11b).
+- 53: Ruby/Sapphire Generator targets sent the Timer the frames to the
+  Generator's seed, not the target's (PR 7).
+- 54: FireRed/LeafGreen targets without the seed list showed Ruby/Sapphire
+  clock times (PR 7).
 
 ---
 
