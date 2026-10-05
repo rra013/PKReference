@@ -1,8 +1,8 @@
 # RNG tools fixes: plan
 
-Status: **PRs 1–6 merged** (2026-10-03/04); PR 11 built, PRs 7–10, 11b
-and 12 planned (§7). From
-the RNG audit's 45 findings, and four found since (46–49). Findings 1–10
+Status: **PRs 1–6 and 11 merged** (2026-10-03 to 05); PR 11b built, PRs
+7–10 and 12 planned (§7). From
+the RNG audit's 45 findings, and seven found since (46–52). Findings 1–10
 are §2–§5, as four PRs; the rest are §7, as eight more. The owner took
 every recommendation in §8, and in §9 for PRs 5–12.
 
@@ -272,7 +272,7 @@ reported to the owner.
 | 9 | 19, 20, 24, 25, 44, 49 | Wild areas from PokéFinder's tables |
 | 10 | 17 (Gen 8), 35, 40 | Gen 4 tools: years, delays, TSV |
 | 11 | 14 (and 38) | What you hit: Gen 4's seed check, Gen 3's frame and seed |
-| 11b | 21, 42, 43 | IV Calc with each game's base stats, IV fields |
+| 11b | 21, 42, 43, 50–52 | IV Calc with each game's base stats, IV fields, number fields |
 | 12 | 17 (Gen 5), 26, 34 | Gen 5 profiles, calibrator, IDs and Timer |
 
 PR 5 is small and fixes results that are wrong today, so it goes first.
@@ -487,7 +487,7 @@ tables: generation, encounter type, location ID and settings.
   filter keeps only matches; a coin flip one second off is found; a 2010
   delay is the 2000 one less 10.
 
-### 7.7 PR 11: what you hit (14), and PR 11b: IV Calc (21, 42, 43)
+### 7.7 PR 11: what you hit (14), and PR 11b: IV Calc (21, 42, 43, 50–52)
 
 PR 11 is split, so the part the owner asked for comes first.
 
@@ -548,23 +548,55 @@ Delay Hit and Frame Hit had to come from elsewhere.
   ID 11686 gives seed 2DA6; a HP 19 / Attack 31 Docile is frame 9,613,
   4 late; Frame Hit 9,595 calibrates 0 → −67 ms.
 
-**PR 11b, planned: IV Calc and the IV fields (21, 42, 43).**
+**PR 11b, built: IV Calc and the IV fields (21, 42, 43, 50–52).**
 
-- **Bridge:** PokéFinder's `IVChecker::calculateIVRange` for any species,
-  with that game's base stats (`pf_calcIVs`, `pf_baseStats`, built in PR 11
-  and tested there).
-- **IV Calc (21):** a game choice. Gen 3–5 and BDSP games use PokéFinder's
-  base stats and checker (a fresh catch has no EVs); today's games keep
-  the current stats and EV inputs (§9). Dozens of species' stats changed
-  in Gen 6.
-- **IV→PID's nature (42):** a picker with names, not "Nature (0-24)".
-- **IV fields (43):** the Eggs parent IVs show blank capsules. They're
-  `IVSliderRow8`, a stepped slider (20 uses); confirm on the simulator
-  that it's the slider's tick marks, then replace it with a 0–31 number
-  field everywhere. The number fields have no way to dismiss the keyboard
-  on iOS (seen in PR 11's run); add one.
-- **Tests:** IVs from known stats in a Gen 3 and a Gen 6+ game differ where
-  the base stats did.
+- **IV Calc (21):** a game choice, as PokéFinder's IV calculator offers
+  them: Ruby/Sapphire/Emerald/FireRed/LeafGreen, Diamond/Pearl/Platinum,
+  HeartGold/SoulSilver, Black/White/Black 2/White 2, BDSP and Sword/Shield,
+  each with PokéFinder's base stats and checker (a fresh catch, no EVs),
+  or Today's Games, with the current stats and EVs (§9).
+  - The species are those the game's table has (386 in Gen 3, 493 in Gen
+    4), with a form picker where it has forms (Deoxys, Rotom, …).
+  - Nature, characteristic (not Gen 3) and Hidden Power narrow the IVs;
+    stats at more levels narrow them further.
+  - Each stat says the level at which it next narrows (PokéFinder's
+    `IVChecker::nextLevel`).
+  - Bridge: `pf_formCount`, `pf_presentSpecies`, `pf_nextLevel`,
+    `pf_getCharacteristic`.
+- **IV→PID's nature (42):** a picker with names in PokéFinder's order
+  (pid % 25), not "Nature (0-24)". It now says when nothing fits: its
+  "No results found" could never show.
+- **IV fields (43):** the Eggs parent IVs' blank capsules were sliders in
+  a three-column grid with no room for a track. Every IV slider is now a
+  0–31 number field with the number pad. Tapping or scrolling off a field
+  puts the keyboard away, as the number pad has no Return key.
+- **Nature order (50):** the old IV Calc listed natures in `allNatures`'
+  order but calculated in PokéFinder's, so most natures were wrong
+  (Modest calculated as Jolly). Both pickers now use PokéFinder's order,
+  with each nature's effect.
+- **Today's EVs (51):** the old IV Calc had EV fields but never used them.
+- **Number fields (52):** SwiftUI's `TextField(value:format:)` only takes
+  its number when the field loses focus. A button tapped straight after
+  typing used the number from before: on the simulator, Find IVs said
+  "Enter its Speed." with the Speed typed. The Timer's Update Calibration
+  and Start read their fields the same way.
+  `LiveIntField` takes the number as you type. The shared fields
+  (`RNGIntField`, `RNGOptIntField`, `IVField`) and the other number fields
+  in the RNG tools use it, and select their number on focus, so typing
+  replaces a 31. Fields that can't go negative get the number pad.
+- **Smaller fixes:** Hidden Power's Grass preset was Fire's IVs; its base
+  power was labelled Gen 5–6 (it's Gen 3–5; Gen 6 made it 60 always).
+- **Tests:** Pikachu's IVs differ between Emerald and Sword; Modest is
+  PokéFinder's 15; a characteristic, Hidden Power and a Lv 100 line narrow
+  a Platinum catch to one spread; Gen 3 has 386 species and Deoxys four
+  forms; today's EVs count; the Hidden Power presets give their types; the
+  number fields keep digits and a leading minus only.
+- **On the simulator:** Deoxys-Attack in Gen 3 (form picker, no
+  characteristic); Garchomp in Platinum, with Find IVs tapped while Speed
+  was still being typed; the Timer's Gen 5 Second Hit used as typed
+  (calibration −95 → −125) and its Calibration field's minus; IV→PID's
+  Modest spread from seed 12345678 finds PID 84EA0B71; the Eggs fields and
+  the Hidden Power presets.
 
 ### 7.8 PR 12: Gen 5 profiles (17 Gen 5, 26, 34)
 
@@ -594,6 +626,10 @@ Delay Hit and Frame Hit had to come from elsewhere.
   each area of the Grand Underground and returns them together, without
   saying which; PokéFinder's screen picks a location. Found while
   building PR 5; it goes with the wild areas (PR 9), as a location picker.
+- 50: the old IV Calc's natures were in the wrong order (PR 11b).
+- 51: the old IV Calc ignored its EVs (PR 11b).
+- 52: number fields used the number from before when a button was tapped
+  straight after typing (PR 11b).
 
 ---
 

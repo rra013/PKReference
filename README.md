@@ -233,7 +233,7 @@ Objective-C++ bridge (`PFBridge.mm`).
 | **Eggs** | Egg generation with parents, Everstone, Destiny Knot, Power items and compatibility. |
 | **TID/SID** | Trainer ID manipulation, and seed-to-time for DS clocks. |
 | **GameCube** | Colosseum and XD: shadow templates, Poké Spot, Jirachi pattern and seed finding. |
-| **IV Calc** | IVs from stats, with characteristic and Hidden Power filtering. |
+| **IV Calc** | IVs from stats, with each game's own base stats for Gen 3–5, Brilliant Diamond/Shining Pearl and Sword/Shield (or today's, with EVs), and the forms each game has. Narrows by nature, characteristic and Hidden Power, takes stats at more levels, and says the level at which each stat next narrows. |
 | **IV→PID** | Reverses IVs to PIDs using LCRNG meet-in-the-middle techniques. |
 | **HP** | Hidden Power type and power. |
 | **Credits** | The sources the tools are ported from. |
@@ -474,7 +474,7 @@ project has no Swift package dependencies.
    later launches work offline, except for Tournaments. The Mac app is
    sandboxed, with outgoing network access.
 
-**Tests:** 1,218 tests written with Swift Testing. They cover the damage engines
+**Tests:** 1,226 tests written with Swift Testing. They cover the damage engines
 and the port, the battle engine by mechanic tier, the EV and two-hit solvers,
 speed tiers, paste parsing and import, Champions filters and legality, RNG
 tools, ML parity, the tournament import and data store, Team Search's parser,

@@ -2070,6 +2070,40 @@ nonisolated enum PFBridge {
         return pf_baseStats(game.rawValue, specie, form, &out) ? out : nil
     }
 
+    /// The forms `specie` has in `game` (1 for just its base form, 0 when it
+    /// isn't in the game).
+    static func formCount(game: PFGame, specie: UInt16) -> Int {
+        Int(pf_formCount(game.rawValue, specie))
+    }
+
+    /// The species `game`'s table marks present.
+    static func presentSpecies(game: PFGame) -> [UInt16] {
+        var count: Int32 = 0
+        guard let ptr = pf_presentSpecies(game.rawValue, &count) else { return [] }
+        defer { pf_freeResults(ptr) }
+        return Array(UnsafeBufferPointer(start: ptr, count: Int(count)))
+    }
+
+    /// Per stat, the first level above `level` at which two of these IVs give
+    /// different stats (`level` when the IV is known or no level up to 100
+    /// does), PokéFinder's `IVChecker::nextLevel`. Any nature counts as Hardy.
+    static func nextLevel(game: PFGame, specie: UInt16, form: UInt8 = 0, ivs: [[UInt8]],
+                          level: UInt8, nature: UInt8) -> [UInt8]? {
+        let masks = ivs.map { set in set.reduce(UInt32(0)) { $0 | (1 << UInt32($1)) } }
+        var out = [UInt8](repeating: 0, count: 6)
+        return pf_nextLevel(game.rawValue, specie, form, masks, level, nature, &out) ? out : nil
+    }
+
+    /// PokéFinder's 30 characteristics, in its order: index / 5 is the stat
+    /// (HP, Atk, Def, Spe, SpA, SpD) with the highest IV, index % 5 that
+    /// IV mod 5.
+    static let characteristics: [String] = (0..<30).map { index in
+        initTranslator()
+        guard let cStr = pf_getCharacteristic(UInt8(index)) else { return "" }
+        defer { pf_freeString(cStr) }
+        return String(cString: cStr)
+    }
+
     // MARK: - Gen 8 Result Types
 
     struct Gen8StaticResult: Identifiable {

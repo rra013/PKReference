@@ -669,6 +669,7 @@ struct FRLGCalibrationView: View {
             }
             .padding()
         }
+        .dismissesKeyboard()
         .navigationTitle("Calibrate")
         .onAppear {
             guard template == nil, let encounter = context.encounter, encounter.generation == .gen3 else { return }

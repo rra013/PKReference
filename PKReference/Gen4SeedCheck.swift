@@ -261,6 +261,7 @@ struct Gen4SeedCheckView: View {
             }
             .padding()
         }
+        .dismissesKeyboard()
         .navigationTitle("Check Your Seed")
     }
 

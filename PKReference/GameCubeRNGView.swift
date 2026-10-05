@@ -227,7 +227,7 @@ struct GameCubeRNGView: View {
             }
             .padding()
         }
-        .scrollDismissesKeyboard(.interactively)
+        .dismissesKeyboard()
         #if os(iOS)
         .onTapGesture { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
         #endif
@@ -839,7 +839,7 @@ struct SeedSearcherView: View {
             }
             .padding()
         }
-        .scrollDismissesKeyboard(.interactively)
+        .dismissesKeyboard()
         .onDisappear { cancelSearch() }
         .leaveWarning(searching ? "The search in progress will stop." : nil)
     }
@@ -868,19 +868,19 @@ struct SeedSearcherView: View {
             HStack {
                 Text("Enemy HP")
                 Spacer()
-                TextField("Min", value: $galesEnemyHP0, format: .number)
+                LiveIntField("Min", value: $galesEnemyHP0)
                     .textFieldStyle(.roundedBorder).scaledWidth(60)
                 Text("-")
-                TextField("Max", value: $galesEnemyHP1, format: .number)
+                LiveIntField("Max", value: $galesEnemyHP1)
                     .textFieldStyle(.roundedBorder).scaledWidth(60)
             }
             HStack {
                 Text("Player HP")
                 Spacer()
-                TextField("Min", value: $galesPlayerHP0, format: .number)
+                LiveIntField("Min", value: $galesPlayerHP0)
                     .textFieldStyle(.roundedBorder).scaledWidth(60)
                 Text("-")
-                TextField("Max", value: $galesPlayerHP1, format: .number)
+                LiveIntField("Max", value: $galesPlayerHP1)
                     .textFieldStyle(.roundedBorder).scaledWidth(60)
             }
             Picker("Enemy Lead", selection: $galesEnemyIndex) {
@@ -1045,7 +1045,7 @@ struct JirachiPatternView: View {
             }
             .padding()
         }
-        .scrollDismissesKeyboard(.interactively)
+        .dismissesKeyboard()
     }
 
     private func calculate() {

@@ -2223,6 +2223,49 @@ extern "C" bool pf_baseStats(uint32_t game, uint16_t specie, uint8_t form, uint8
     return true;
 }
 
+extern "C" uint8_t pf_formCount(uint32_t game, uint16_t specie)
+{
+    // As PokéFinder's IV calculator lists them: forms without their own
+    // stats read the base form's (PersonalLoader::getPersonal).
+    const PersonalInfo *info = personal(game, specie, 0);
+    return info ? std::max<uint8_t>(1, info->getFormCount()) : 0;
+}
+
+extern "C" uint16_t *pf_presentSpecies(uint32_t game, int *outCount)
+{
+    Game version = static_cast<Game>(game);
+    const PersonalInfo *info = PersonalLoader::getPersonal(version);
+    std::vector<u16> species;
+    for (u16 specie = 1; specie <= maxSpecie(version); specie++)
+    {
+        if (info[specie].getPresent()) species.push_back(specie);
+    }
+    *outCount = static_cast<int>(species.size());
+    if (species.empty()) return nullptr;
+    auto *out = static_cast<uint16_t *>(malloc(sizeof(uint16_t) * species.size()));
+    std::copy(species.begin(), species.end(), out);
+    return out;
+}
+
+extern "C" bool pf_nextLevel(uint32_t game, uint16_t specie, uint8_t form, const uint32_t masks[6],
+                             uint8_t level, uint8_t nature, uint8_t out[6])
+{
+    const PersonalInfo *info = personal(game, specie, form);
+    if (!info) return false;
+    std::array<std::vector<u8>, 6> ivs;
+    for (int i = 0; i < 6; i++)
+        for (u8 iv = 0; iv < 32; iv++)
+            if (masks[i] & (1u << iv)) ivs[i].push_back(iv);
+    auto levels = IVChecker::nextLevel(info->getStats(), ivs, level, nature);
+    std::copy(levels.begin(), levels.end(), out);
+    return true;
+}
+
+extern "C" char *pf_getCharacteristic(uint8_t characteristic)
+{
+    return copyString(Translator::getCharacteristic(characteristic));
+}
+
 extern "C" bool pf_calcIVs(uint32_t game, uint16_t specie, uint8_t form,
                            const uint8_t *levels, const uint16_t *stats, int count,
                            uint8_t nature, uint8_t characteristic, uint8_t hiddenPower,
