@@ -393,7 +393,8 @@ enum PokiiFeaturizer {
     /// The app's species "Tapu Koko" / "Vulpix-Alola" → vocab "tapu-koko" /
     /// "vulpix-alola". Lowercases, converts spaces to hyphens, and **collapses
     /// Mega / Primal / Stance Change forms to their base species** to match
-    /// the v2 model contract (per pokii_xcode_integration_guide §3 / §6).
+    /// the v2 model contract (per pokii_xcode_integration_guide §3 / §6;
+    /// that guide isn't in the repository).
     /// Regional and split-form names (Urshifu-Rapid-Strike, Calyrex-Shadow,
     /// Vulpix-Alola, Indeedee-F) are left intact.
     static func encodeSpecies(_ name: String) -> String {

@@ -3086,7 +3086,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				AbilityReference.md,
-				CompartmentalizationPlan.md,
 				Core/External/CMakeLists.txt,
 				Core/Resources/embed.py,
 				Core/Resources/Embed/__init__.py,

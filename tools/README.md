@@ -162,12 +162,13 @@ whitelist cache, and the Settings picker are all derived automatically.
 
 Only if the regulation introduces Megas not already in `MegaForms.all`.
 
-- `PKReference/PokemonStatsModels.swift` — add a `HeldItem` case per new stone
-  (`rawValue` = the exact stone name used in `mega_stones`).
-- `PKReference/MegaForms.swift` — add a `MegaForm` to `MegaForms.all` with the scraped
-  type / stats / ability. `speciesKey` is `BattleSimSeed.normalize(species)`
-  (lowercase). Extra Megas on an existing species (X/Y/Z) are just additional
-  entries with the same `speciesKey` and a different `stone`.
+- `PKReference/mega_forms.json` — add an entry per new Mega (the file's
+  `about` explains each key) with the scraped type / stats / ability.
+  `species_key` is `BattleSimSeed.normalize(species)` (lowercase). Its `stone`
+  becomes a held item from that entry; there's no Swift to add. Extra Megas on
+  an existing species (X/Y/Z) are just additional entries with the same
+  `species_key` and a different `stone`. A stone named like a built-in item
+  fails the file.
 
 Novel abilities (e.g. `aura-guard`) get an identifier but have **no engine
 effect** until `computeAbilityModifiers` ports them — this is expected and

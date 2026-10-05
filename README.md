@@ -453,10 +453,8 @@ the git history.
   which retries after rate limits and server errors).
 
 More internal documentation:
-[`HANDOFF.md`](HANDOFF.md) (where the code lives, conventions, known
-limitations and what's next),
-[`PKReference/CompartmentalizationPlan.md`](PKReference/CompartmentalizationPlan.md)
-(moving game data into JSON), and
+[`HANDOFF.md`](HANDOFF.md) (where the code lives, conventions, design
+notes, known limitations and what's next), and
 [`PKReference/ShowdownPort-NOTES.md`](PKReference/ShowdownPort-NOTES.md).
 
 ---
@@ -474,7 +472,7 @@ project has no Swift package dependencies.
    later launches work offline, except for Tournaments. The Mac app is
    sandboxed, with outgoing network access.
 
-**Tests:** 1,237 tests written with Swift Testing. They cover the damage engines
+**Tests:** 1,241 tests written with Swift Testing. They cover the damage engines
 and the port, the battle engine by mechanic tier, the EV and two-hit solvers,
 speed tiers, paste parsing and import, Champions filters and legality, RNG
 tools, ML parity, the tournament import and data store, Team Search's parser,
