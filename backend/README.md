@@ -28,11 +28,9 @@ Players type items, abilities and moves by hand, so `NameStandardizer` canonical
 ("MIRACLE SEED" / "Fake-out" / "Darkest Larient" -> "Miracle Seed" / "Fake Out" / "Darkest Lariat").
 It reads the repo-root `champions-*.json` regulation files, their learnsets,
 `PKReference/showdown-champions-data.json` (bundled onto the classpath at build time) and
-`reference/champions-items.json`, a snapshot of Serebii's Champions item page (spelling only, not
-per-regulation). It fixes spelling and casing and never drops a value: the regulation item lists omit real
-items that tournament teams use (Life Orb, Wide Lens, Expert Belt, Light Clay, ...), and two Mega stones are
-spelled differently in the files (`Golisopodite`, `Baxcaliburite`) than in the game (`Golisopite`,
-`Baxcalibrite`); the Serebii spelling wins. Names matching nothing are kept, title-cased.
+`reference/champions-items.json`, a snapshot of Serebii's Champions item page (every Champions item, not
+per regulation). It fixes spelling and casing and never drops a value, since decklists also come from formats
+with no regulation file (fan formats, older or newer regulations); names matching nothing are kept, title-cased.
 After upgrading, delete `backend/data/` so counters are rebuilt with the new spellings.
 
 ## Notes

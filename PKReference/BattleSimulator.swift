@@ -5126,7 +5126,7 @@ enum ChampionsFormat {
         return PokemonSet(
             species: canonicalChampionsSpecies(slot.pokemonName),
             ability: abilityDisplay,
-            item: slot.itemRawValue,
+            item: slot.itemRawValue.map(HeldItem.currentName),
             nature: natureDisplay,
             teraType: slot.teraType,
             moves: slot.moveSlots.map { $0.moveName },

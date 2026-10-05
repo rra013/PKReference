@@ -474,7 +474,7 @@ private struct TeamSlotCard: View {
                         .font(.caption2)
                         .foregroundStyle(ColorRole.ability.color)
                     if let item = slot.itemRawValue {
-                        Text(item)
+                        Text(HeldItem.currentName(item))
                             .font(.caption2)
                             .foregroundStyle(ColorRole.item.color)
                     }

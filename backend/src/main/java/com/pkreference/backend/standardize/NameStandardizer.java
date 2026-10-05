@@ -20,14 +20,13 @@ import java.util.Map;
  * natures, Tera types), so "MIRACLE SEED", "Miracle seed" and "miracle seed" count as one.
  *
  * <p>Item spellings also come from {@code reference/champions-items.json}, a snapshot of Serebii's
- * Champions item page, which wins over the regulation files where they differ (the files hold
- * best-effort guesses for some new Mega stones, e.g. "Golisopodite" vs the game's "Golisopite").
+ * Champions item page (every Champions item, not per regulation).
  *
  * <p>Names come from the repo-root regulation files ({@code champions-m-*.json} and their
  * learnsets) plus {@code showdown-champions-data.json}, copied onto the classpath under
  * {@code regulations/} at build time. Those lists are used to fix spelling and casing only, never
- * to drop a value: the regulation item lists are incomplete (Life Orb, Wide Lens and others are
- * missing but widely used), so a name that matches nothing is kept, title-cased.
+ * to drop a value: decklists come from formats with no regulation file (fan formats, older or
+ * newer regulations), so a name that matches nothing is kept, title-cased.
  */
 @Component
 public class NameStandardizer {
@@ -64,7 +63,7 @@ public class NameStandardizer {
             });
             showdown.path("species").forEach(s -> s.path("abilities").forEach(a -> allAbilities.add(a.asText())));
 
-            // Serebii's Champions item page: the game's own spellings (not per regulation).
+            // Serebii's Champions item page: every Champions item (not per regulation).
             var serebii = read(mapper, resolver.getResource("classpath:reference/champions-items.json"));
             serebii.path("items").forEach(n -> allItems.add(n.asText()));
 

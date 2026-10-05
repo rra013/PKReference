@@ -32,19 +32,27 @@ class NameStandardizerTest {
     }
 
     @Test
-    void namesMissingFromTheRegulationListAreKeptNotDropped() {
-        // Life Orb and Wide Lens are heavily used in M-C but absent from champions-m-c.json.
+    void itemsMBAddedResolveForMC() {
+        // Added in M-B; champions-m-b.json and champions-m-c.json list them since 2026-10-05.
         assertThat(std.item("M-C", "LIFE ORB")).isEqualTo("Life Orb");
         assertThat(std.item("M-C", "life orb")).isEqualTo("Life Orb");
         assertThat(std.item("M-C", "Wide Lens")).isEqualTo("Wide Lens");
-        assertThat(std.item("M-C", "Expert Belt")).isEqualTo("Expert Belt");
+        assertThat(std.item("M-C", "expert belt")).isEqualTo("Expert Belt");
     }
 
     @Test
-    void serebiiSpellingsBeatTheRegulationFilesGuesses() {
+    void namesInNoListAreKeptNotDropped() {
+        // Not Champions items at all, but decklists in fan formats use them.
+        assertThat(std.item("M-C", "ASSAULT VEST")).isEqualTo("Assault Vest");
+        assertThat(std.item("CUSTOM", "safety goggles")).isEqualTo("Safety Goggles");
+    }
+
+    @Test
+    void megaStonesUseTheGamesNames() {
+        // The regulation files guessed "Golisopodite" and "Baxcaliburite" until 2026-10-05.
         assertThat(std.item("M-C", "Golisopite")).isEqualTo("Golisopite");
         assertThat(std.item("M-C", "baxcalibrite")).isEqualTo("Baxcalibrite");
-        // Items real tournament teams use that no regulation file lists.
+        assertThat(std.item("M-C", "Golisopodite")).isEqualTo("Golisopite");
         assertThat(std.item("M-C", "light clay")).isEqualTo("Light Clay");
         assertThat(std.item("M-C", "Wise Glasses")).isEqualTo("Wise Glasses");
         assertThat(std.item("M-C", "Muscle  Band")).isEqualTo("Muscle Band");

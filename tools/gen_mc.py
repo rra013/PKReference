@@ -111,8 +111,8 @@ NEW_ITEMS = [
 
 NEW_MEGA_STONES = {
     "Salamence": "Salamencite",
-    "Golisopod": "Golisopodite",
-    "Baxcalibur": "Baxcaliburite",
+    "Golisopod": "Golisopite",
+    "Baxcalibur": "Baxcalibrite",
     "Garchomp-Z": "Garchompite Z",
     "Lucario-Z": "Lucarionite Z",
     "Absol-Z": "Absolite Z",
