@@ -2016,7 +2016,7 @@ struct RNGFilterAndLeadTests {
                       minIVs: minIVs, maxIVs: maxIVs, seed: seed, initAdv: 0, maxAdv: maxAdvance,
                       searcherMinAdv: 0, searcherMaxAdv: 20, minDelay: 600, maxDelay: 620,
                       pfGame: game, pfEnc: .grass, locationID: location, slotSpecies: [], speciesFilter: 0,
-                      lead: lead, syncNature: syncNature, isEmerald: false, onResult: { box.append($0) })
+                      lead: lead, syncNature: syncNature, deadBattery: false, onResult: { box.append($0) })
         return box.results
     }
 
@@ -2296,5 +2296,99 @@ struct Gen4IDSeedVerificationTests {
         }
         #expect(first != nil)
         #expect(first!.delay == 591)
+    }
+}
+
+// MARK: - Gen 3 targets: Ruby/Sapphire days, Emerald, Dead Battery
+
+@MainActor
+struct Gen3TargetTests {
+    /// The seed `frames` steps of the GBA's RNG after `seed`.
+    private func advance(_ seed: UInt32, _ frames: Int) -> UInt32 {
+        (0..<frames).reduce(seed) { s, _ in s &* 0x41C64E6D &+ 0x6073 }
+    }
+
+    /// Every Day N, hour and minute rebuilds its seed by Ruby and Sapphire's
+    /// clock formula, and Day N is that many days into 2000 (a leap year),
+    /// not months of 31 days.
+    @Test func rubySapphireDays() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let newYear = try #require(DateComponents(calendar: calendar, year: 2000, month: 1, day: 1).date)
+        var afterJanuary = 0
+        for seed: UInt32 in [0x0005, 0x372B, 0x9C1F, 0xE0A4] {
+            let times = seedToTimeGen3(seed: seed).times
+            #expect(!times.isEmpty)
+            for t in times {
+                let v = 1440 * t.day + 960 * (t.hour / 10) + 60 * (t.hour % 10) + 16 * (t.minute / 10) + t.minute % 10
+                #expect(UInt32((v >> 16) ^ (v & 0xFFFF)) == seed, "\(t.displayTime)")
+                let date = try #require(calendar.date(byAdding: .day, value: t.day - 1, to: newYear))
+                #expect(calendar.component(.month, from: date) == t.month && calendar.component(.day, from: date) == t.dayOfMonth)
+                if t.month > 1 { afterJanuary += 1 }
+            }
+        }
+        #expect(afterJanuary > 0)
+        #expect(RSClock.dayNumber(month: 3, day: 1) == 61 && RSClock.dayNumber(month: 12, day: 31) == 366)
+    }
+
+    /// Emerald counts from 0000 and a dead battery's Ruby or Sapphire from
+    /// 05A0, and the frames there make the target.
+    @Test func bootSeeds() throws {
+        let emerald = Gen3TargetStart.of(seed: advance(0, 1234), advances: 0, fromGenerator: false,
+                                         game: .emerald, deadBattery: false)
+        #expect(emerald == Gen3TargetStart(kind: .boot, seed: 0, frame: 1234))
+        // Emerald boots on 0000 with a dead battery too.
+        #expect(Gen3TargetStart.of(seed: advance(0, 1234), advances: 0, fromGenerator: false,
+                                   game: .emerald, deadBattery: true).seed == 0)
+        let ruby = Gen3TargetStart.of(seed: advance(0x5A0, 777), advances: 0, fromGenerator: false,
+                                      game: .ruby, deadBattery: true)
+        #expect(ruby == Gen3TargetStart(kind: .boot, seed: 0x5A0, frame: 777) && ruby.fromBoot)
+
+        let target = try #require(PFBridge.staticGenerate3(seed: advance(0x5A0, 777), initialAdvances: 0, maxAdvances: 0,
+                                                           method: .method1, tid: 0, sid: 0).first)
+        let fromBoot = try #require(PFBridge.staticGenerate3(seed: ruby.seed, initialAdvances: UInt32(ruby.frame), maxAdvances: 0,
+                                                             method: .method1, tid: 0, sid: 0).first)
+        #expect(fromBoot.pid == target.pid && fromBoot.ivs == target.ivs)
+    }
+
+    /// A Generator's frames count from its seed: a boot seed's from boot, a
+    /// live battery's clock seed with the frames before it, and any other
+    /// seed (learnt in game) as it is.
+    @Test func generatorTargets() {
+        #expect(Gen3TargetStart.of(seed: 0, advances: 500, fromGenerator: true, game: .emerald, deadBattery: false)
+                == Gen3TargetStart(kind: .boot, seed: 0, frame: 500))
+        let trainerID = Gen3TargetStart.of(seed: 0x2DA6, advances: 500, fromGenerator: true, game: .emerald, deadBattery: false)
+        #expect(trainerID == Gen3TargetStart(kind: .generatorSeed, seed: 0x2DA6, frame: 500) && !trainerID.fromBoot)
+        #expect(Gen3TargetStart.of(seed: 0x1234, advances: 500, fromGenerator: true, game: .sapphire, deadBattery: false)
+                == Gen3TargetStart(kind: .clock, seed: 0x1234, frame: 500))
+        // Before, the Timer got the frames to the Generator's seed and not the 500 after it.
+        #expect(Gen3TargetStart.of(seed: advance(0x372B, 100), advances: 500, fromGenerator: true, game: .ruby, deadBattery: false)
+                == Gen3TargetStart(kind: .clock, seed: 0x372B, frame: 600))
+    }
+
+    /// A Searcher's target with a live battery is the clock's seed before
+    /// it; FireRed and LeafGreen's, without their seed list, the 16-bit seed.
+    @Test func searcherTargets() {
+        #expect(Gen3TargetStart.of(seed: 0x12345678, advances: 0, fromGenerator: false, game: .ruby, deadBattery: false)
+                == Gen3TargetStart(kind: .clock, seed: 0x372B, frame: 57823))
+        let fireRed = Gen3TargetStart.of(seed: 0x12345678, advances: 0, fromGenerator: false, game: .fireRed, deadBattery: true)
+        #expect(fireRed == Gen3TargetStart(kind: .origin, seed: 0x372B, frame: 57823) && !fireRed.fromBoot)
+    }
+
+    /// The handoff runs the Timer at the GBA's frame rate, in Standard mode
+    /// when the frames count from boot.
+    @Test func handoffSetsGBA() {
+        let bridge = FinderTimerBridge()
+        bridge.sendGen3(Gen3TargetStart(kind: .boot, seed: 0, frame: 1234), time: "frame 1,234", seed: "ABCD1234")
+        #expect(bridge.pendingGen == .gen3 && bridge.pendingTargetFrame == 1234)
+        #expect(bridge.pendingConsole == .gba && bridge.pendingGen3Mode == .standard && bridge.shouldSwitchToTimer)
+        bridge.clear()
+        bridge.sendGen3(Gen3TargetStart(kind: .generatorSeed, seed: 0x2DA6, frame: 500), time: "", seed: "")
+        #expect(bridge.pendingConsole == .gba && bridge.pendingGen3Mode == nil)
+    }
+
+    @Test func waitText() {
+        #expect(SeedToTimeView.waitText(frames: 2500) == "41.9 s")
+        #expect(SeedToTimeView.waitText(frames: Int(GBA_FRAMERATE * 725)) == "12 min 5 s")
+        #expect(SeedToTimeView.waitText(frames: Int(GBA_FRAMERATE * 3600 * 3.5)) == "3 h 30 min")
     }
 }

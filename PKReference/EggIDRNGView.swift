@@ -381,7 +381,6 @@ struct EggRNGView: View {
         let spec = UInt16(clamping: eggSpecie)
         let mas = masuda
         let gameVal = selectedGame.pfGame
-        let isDeadBattery = selectedGame == .emerald
         let shiny = shinyOnly
         var natArr = [Bool](repeating: selectedNatures.isEmpty, count: 25)
         for n in selectedNatures { natArr[Int(n)] = true }
@@ -404,7 +403,7 @@ struct EggRNGView: View {
                     parentANature: pAN, parentBNature: pBN,
                     eggSpecie: spec, masuda: mas,
                     tid: tID, sid: sID,
-                    game: gameVal, deadBattery: isDeadBattery,
+                    game: gameVal,
                     filterShiny: shinyFilter, natures: natArr)
                 await MainActor.run { results3 = r }
             } else {
