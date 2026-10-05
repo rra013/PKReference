@@ -64,8 +64,15 @@ struct EggRNGView: View {
     @State private var results3: [PFBridge.EggResult3] = []
     @State private var results4: [PFBridge.EggResult4] = []
     @State private var searchTask: Task<Void, Never>?
+    /// The last generate ran to the end, for saying it found nothing.
+    @State private var finished = false
 
     static let generations: [FinderGeneration] = [.gen3, .gen4]
+
+    /// The filters that are set, for when nothing's found.
+    private var setFilterNames: [String] {
+        (selectedNatures.isEmpty ? [] : ["natures"]) + (shinyOnly ? ["Shiny Only"] : [])
+    }
 
     /// PokéFinder pairs every held egg with every pickup advance and keeps
     /// them all, so wide ranges run out of memory: 10,000 by 10,000 is 100
@@ -219,6 +226,12 @@ struct EggRNGView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
+                if finished && (generation == .gen3 ? results3.isEmpty : results4.isEmpty) {
+                    Text(noResultsText(filters: setFilterNames, widen: "the held or pickup advances"))
+                        .font(.caption).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 if generation == .gen3 && !results3.isEmpty {
                     eggResults3Section
                 }
@@ -229,9 +242,14 @@ struct EggRNGView: View {
             .padding()
         }
         .dismissesKeyboard()
-        #if os(iOS)
-        .onTapGesture { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
-        #endif
+        // Eggs from another game would read as this one's.
+        .onChange(of: ["\(generation)", selectedGame.rawValue]) {
+            searchTask?.cancel()
+            searchTask = nil
+            results3 = []
+            results4 = []
+            finished = false
+        }
     }
 
     private func parentSection(label: String,
@@ -388,6 +406,10 @@ struct EggRNGView: View {
 
         let eggMethod: PFMethod = (selectedGame == .emerald) ? .eBred : .rsFRLGBred
 
+        searchTask?.cancel()
+        finished = false
+        results3 = []
+        results4 = []
         searchTask = Task.detached {
             if gen == .gen3 {
                 let r = PFBridge.eggGenerate3(
@@ -405,7 +427,11 @@ struct EggRNGView: View {
                     tid: tID, sid: sID,
                     game: gameVal,
                     filterShiny: shinyFilter, natures: natArr)
-                await MainActor.run { results3 = r }
+                await MainActor.run {
+                    guard !Task.isCancelled else { return }
+                    results3 = r
+                    finished = true
+                }
             } else {
                 let r = PFBridge.eggGenerate4(
                     seedHeld: seedH, seedPickup: seedP,
@@ -420,7 +446,11 @@ struct EggRNGView: View {
                     tid: tID, sid: sID,
                     game: gameVal,
                     filterShiny: shinyFilter, natures: natArr)
-                await MainActor.run { results4 = r }
+                await MainActor.run {
+                    guard !Task.isCancelled else { return }
+                    results4 = r
+                    finished = true
+                }
             }
         }
     }
@@ -517,6 +547,12 @@ struct IDRNGView: View {
                     gen4SearchButton
                 }
 
+                if finished && (generation == .gen3 ? results3.isEmpty : results4.isEmpty) {
+                    Text(noResultsText(filters: setFilterNames, widen: generation == .gen3 ? "the advances" : "the delays"))
+                        .font(.caption).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 if generation == .gen3 && !results3.isEmpty {
                     idResults3Section
                 }
@@ -533,14 +569,32 @@ struct IDRNGView: View {
             .padding()
         }
         .dismissesKeyboard()
-        #if os(iOS)
-        .onTapGesture { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
-        #endif
         .onDisappear { cancelSearch() }
+        // IDs from another game or mode would read as this one's.
+        .onChange(of: ["\(generation)", selectedGame.rawValue, "\(gen4Mode)"]) {
+            cancelSearch()
+            searchTask?.cancel()
+            searchTask = nil
+            results3 = []
+            results4 = []
+            selectedResult = nil
+            finished = false
+        }
         .leaveWarning(gen4Searching ? "The search in progress will stop." : nil)
     }
 
     @State private var gen3IsGameCube: Bool = false
+    /// The last generate or search ran to the end, for saying it found
+    /// nothing.
+    @State private var finished = false
+
+    /// Gen 4's filters that are set, for when nothing's found (Gen 3 lists
+    /// every ID).
+    private var setFilterNames: [String] {
+        guard generation == .gen4 else { return [] }
+        return [("TID", gen4FilterTID), ("SID", gen4FilterSID), ("TSV", gen4FilterTSV && gen4Mode == 1)]
+            .filter(\.1).map(\.0)
+    }
 
     private var gen3Inputs: some View {
         SectionCard(title: "Gen 3 ID Generation", icon: "number") {
@@ -943,6 +997,10 @@ struct IDRNGView: View {
         let targetSID = gen4TargetSID, fSID = gen4FilterSID
 
         selectedResult = nil
+        searchTask?.cancel()
+        finished = false
+        results3 = []
+        results4 = []
         searchTask = Task.detached {
             if gen == .gen3 {
                 let r: [PFBridge.IDResult]
@@ -961,7 +1019,11 @@ struct IDRNGView: View {
                                                     initialAdvances: initAdv,
                                                     maxAdvances: maxAdv)
                 }
-                await MainActor.run { results3 = r }
+                await MainActor.run {
+                    guard !Task.isCancelled else { return }
+                    results3 = r
+                    finished = true
+                }
             } else {
                 let r = PFBridge.idGenerate4(
                     minDelay: minDel, maxDelay: maxDel,
@@ -969,7 +1031,11 @@ struct IDRNGView: View {
                     hour: hr, minute: mn,
                     targetTID: targetTID, filterTID: fTID,
                     targetSID: targetSID, filterSID: fSID)
-                await MainActor.run { results4 = r }
+                await MainActor.run {
+                    guard !Task.isCancelled else { return }
+                    results4 = r
+                    finished = true
+                }
             }
         }
     }
@@ -985,6 +1051,7 @@ struct IDRNGView: View {
 
         results4 = []
         selectedResult = nil
+        finished = false
         gen4Searching = true
         gen4SearchProgress = 0
 
@@ -1011,6 +1078,7 @@ struct IDRNGView: View {
                 gen4SearchProgress = PFBridge.idSearch4Progress(handle)
                 gen4SearchHandle = nil
                 gen4Searching = false
+                finished = true
             }
             PFBridge.idSearch4Free(handle)
         }
