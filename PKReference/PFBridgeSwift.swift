@@ -149,6 +149,35 @@ struct PFEncounterAreaSwift: Identifiable {
     var locationName: String = ""
 }
 
+/// What changes a Gen 4 area's slots, as PokéFinder's EncounterSettings4
+/// (`PFEncounterSettings4`). Each game reads its own: Diamond, Pearl and
+/// Platinum the dual slot, daily Pokémon, Feebas tile and radar;
+/// HeartGold and SoulSilver the radio and the Safari Zone's blocks.
+nonisolated struct Gen4EncounterSettings: Hashable, Sendable {
+    /// 0 morning, 1 day, 2 night.
+    var time: Int32 = 0
+    var swarm = false
+    /// The GBA game in Slot 2.
+    var dual: PFGame = .none
+    /// The Great Marsh's daily Pokémon, or the Trophy Garden's two.
+    var replacement0: UInt16 = 0
+    var replacement1: UInt16 = 0
+    var feebasTile = false
+    var radar = false
+    /// 0 off, 1 Hoenn Sound, 2 Sinnoh Sound, 3 the Mysterious Transmission.
+    var radio: Int32 = 0
+    /// The Safari Zone's blocks: Plains, Forest, Peak, Water.
+    var blocks: [UInt8] = [0, 0, 0, 0]
+
+    var pf: PFEncounterSettings4 {
+        let b = (0..<4).map { $0 < blocks.count ? blocks[$0] : 0 }
+        return PFEncounterSettings4(time: time, swarm: swarm, dual: dual.rawValue,
+                                    replacement: (replacement0, replacement1),
+                                    feebasTile: feebasTile, radar: radar, radio: radio,
+                                    blocks: (b[0], b[1], b[2], b[3]))
+    }
+}
+
 struct PFStaticTemplateSwift: Identifiable {
     let id = UUID()
     let game: UInt32
@@ -822,19 +851,13 @@ nonisolated enum PFBridge {
     }
 
     static func getEncounters4(encounter: PFEncounter, game: PFGame,
-                                tid: UInt16, sid: UInt16,
-                                time: Int32 = 0, swarm: Bool = false,
-                                dual: PFGame = .none,
-                                replacement0: UInt16 = 0, replacement1: UInt16 = 0,
-                                feebasTile: Bool = false, radar: Bool = false,
-                                radio: Int32 = 0,
-                                blocks: [UInt8] = [0,0,0,0,0]) -> [PFEncounterAreaSwift] {
+                                tid: UInt16 = 0, sid: UInt16 = 0,
+                                settings: Gen4EncounterSettings = .init()) -> [PFEncounterAreaSwift] {
         initTranslator()
         var count: Int32 = 0
+        var pfSettings = settings.pf
         guard let ptr = pf_getEncounters4(encounter.rawValue, game.rawValue,
-                                           tid, sid, time, swarm,
-                                           dual.rawValue, replacement0, replacement1,
-                                           feebasTile, radar, radio, blocks, &count) else { return [] }
+                                           tid, sid, &pfSettings, &count) else { return [] }
         defer { pf_freeResults(ptr) }
 
         var areas = (0..<Int(count)).map { i -> PFEncounterAreaSwift in
@@ -929,46 +952,6 @@ nonisolated enum PFBridge {
         }
     }
 
-    static func wildSearch3(method: PFMethod,
-                             lead: PFLead = .none,
-                             tid: UInt16, sid: UInt16,
-                             game: PFGame,
-                             deadBattery: Bool = false,
-                             feebasTile: Bool = false,
-                             encounter: PFEncounter,
-                             location: UInt8,
-                             filterGender: UInt8 = 255,
-                             filterAbility: UInt8 = 255,
-                             filterShiny: UInt8 = 255,
-                             ivMin: [UInt8] = [0,0,0,0,0,0],
-                             ivMax: [UInt8] = [31,31,31,31,31,31],
-                             natures: [Bool] = Array(repeating: true, count: 25),
-                             powers: [Bool] = Array(repeating: true, count: 16),
-                             encounterSlots: [Bool] = Array(repeating: true, count: 12)) -> [PFWildSearcherStateSwift] {
-        var count: Int32 = 0
-        let ptr = pf_wildSearch3(method.rawValue, lead.rawValue, tid, sid,
-                                  game.rawValue, deadBattery, feebasTile,
-                                  encounter.rawValue, location,
-                                  filterGender, filterAbility, filterShiny,
-                                  ivMin, ivMax, natures, powers, encounterSlots, &count)
-        guard let ptr else { return [] }
-        defer { pf_freeResults(ptr) }
-
-        return (0..<Int(count)).map { i in
-            let r = ptr[i]
-            let ivs = [r.ivs.0, r.ivs.1, r.ivs.2, r.ivs.3, r.ivs.4, r.ivs.5]
-            return PFWildSearcherStateSwift(seed: r.seed, pid: r.pid,
-                                             ivs: ivs, nature: r.nature, ability: r.ability,
-                                             gender: r.gender, shiny: r.shiny,
-                                             hiddenPower: r.hiddenPower,
-                                             hiddenPowerStrength: r.hiddenPowerStrength,
-                                             encounterSlot: r.encounterSlot, level: r.level,
-                                             item: r.item, specie: r.specie, form: r.form)
-        }
-    }
-
-    // MARK: Wild Gen 4
-
     static func wildGenerate4(seed: UInt32,
                                initialAdvances: UInt32,
                                maxAdvances: UInt32,
@@ -977,9 +960,10 @@ nonisolated enum PFBridge {
                                lead: PFLead = .none,
                                tid: UInt16, sid: UInt16,
                                game: PFGame,
-                               feebasTile: Bool = false,
                                encounter: PFEncounter,
                                location: UInt8,
+                               settings: Gen4EncounterSettings = .init(),
+                               radarShiny: Bool = false, happiness: UInt8 = 0, fixedSlot: UInt8 = 0,
                                filterGender: UInt8 = 255,
                                filterAbility: UInt8 = 255,
                                filterShiny: UInt8 = 255,
@@ -989,10 +973,12 @@ nonisolated enum PFBridge {
                                powers: [Bool] = Array(repeating: true, count: 16),
                                encounterSlots: [Bool] = Array(repeating: true, count: 12)) -> [PFWildGeneratorState4Swift] {
         var count: Int32 = 0
+        var pfSettings = settings.pf
         let ptr = pf_wildGenerate4(seed, initialAdvances, maxAdvances, offset,
                                     method.rawValue, lead.rawValue, tid, sid,
-                                    game.rawValue, feebasTile,
+                                    game.rawValue,
                                     encounter.rawValue, location,
+                                    &pfSettings, radarShiny, happiness, fixedSlot,
                                     filterGender, filterAbility, filterShiny,
                                     ivMin, ivMax, natures, powers, encounterSlots, &count)
         guard let ptr else { return [] }
@@ -1012,48 +998,6 @@ nonisolated enum PFBridge {
         }
     }
 
-    static func wildSearch4(minAdvance: UInt32 = 0,
-                             maxAdvance: UInt32 = 0,
-                             minDelay: UInt32 = 0,
-                             maxDelay: UInt32 = 10000,
-                             method: PFMethod,
-                             lead: PFLead = .none,
-                             tid: UInt16, sid: UInt16,
-                             game: PFGame,
-                             feebasTile: Bool = false,
-                             encounter: PFEncounter,
-                             location: UInt8,
-                             filterGender: UInt8 = 255,
-                             filterAbility: UInt8 = 255,
-                             filterShiny: UInt8 = 255,
-                             ivMin: [UInt8] = [0,0,0,0,0,0],
-                             ivMax: [UInt8] = [31,31,31,31,31,31],
-                             natures: [Bool] = Array(repeating: true, count: 25),
-                             powers: [Bool] = Array(repeating: true, count: 16),
-                             encounterSlots: [Bool] = Array(repeating: true, count: 12)) -> [PFWildSearcherState4Swift] {
-        var count: Int32 = 0
-        let ptr = pf_wildSearch4(minAdvance, maxAdvance, minDelay, maxDelay,
-                                  method.rawValue, lead.rawValue, tid, sid,
-                                  game.rawValue, feebasTile,
-                                  encounter.rawValue, location,
-                                  filterGender, filterAbility, filterShiny,
-                                  ivMin, ivMax, natures, powers, encounterSlots, &count)
-        guard let ptr else { return [] }
-        defer { pf_freeResults(ptr) }
-
-        return (0..<Int(count)).map { i in
-            let r = ptr[i]
-            let ivs = [r.ivs.0, r.ivs.1, r.ivs.2, r.ivs.3, r.ivs.4, r.ivs.5]
-            return PFWildSearcherState4Swift(seed: r.seed, pid: r.pid, advances: r.advances,
-                                              ivs: ivs, nature: r.nature, ability: r.ability,
-                                              gender: r.gender, shiny: r.shiny,
-                                              hiddenPower: r.hiddenPower,
-                                              hiddenPowerStrength: r.hiddenPowerStrength,
-                                              encounterSlot: r.encounterSlot, level: r.level,
-                                              item: r.item, specie: r.specie, form: r.form)
-        }
-    }
-
     // MARK: Async Wild Search
 
     static func wildSearch3Async(method: PFMethod, lead: PFLead = .none,
@@ -1064,33 +1008,36 @@ nonisolated enum PFBridge {
                                   ivMin: [UInt8] = [0,0,0,0,0,0], ivMax: [UInt8] = [31,31,31,31,31,31],
                                   natures: [Bool] = Array(repeating: true, count: 25),
                                   powers: [Bool] = Array(repeating: true, count: 16),
-                                  encounterSlots: [Bool] = Array(repeating: true, count: 12)) -> OpaquePointer {
+                                  encounterSlots: [Bool] = Array(repeating: true, count: 12)) -> OpaquePointer? {
         let h = pf_wildSearch3_start(method.rawValue, lead.rawValue, tid, sid,
                                       game.rawValue, deadBattery, feebasTile,
                                       encounter.rawValue, location,
                                       filterGender, filterAbility, filterShiny,
-                                      ivMin, ivMax, natures, powers, encounterSlots)!
-        return OpaquePointer(h)
+                                      ivMin, ivMax, natures, powers, encounterSlots)
+        return h.map(OpaquePointer.init)
     }
 
     static func wildSearch4Async(minAdvance: UInt32 = 0, maxAdvance: UInt32 = 10000,
                                   minDelay: UInt32 = 500, maxDelay: UInt32 = 10000,
                                   method: PFMethod, lead: PFLead = .none,
                                   tid: UInt16, sid: UInt16, game: PFGame,
-                                  feebasTile: Bool = false,
                                   encounter: PFEncounter, location: UInt8,
+                                  settings: Gen4EncounterSettings = .init(),
+                                  radarShiny: Bool = false, happiness: UInt8 = 0, fixedSlot: UInt8 = 0,
                                   filterGender: UInt8 = 255, filterAbility: UInt8 = 255, filterShiny: UInt8 = 255,
                                   ivMin: [UInt8] = [0,0,0,0,0,0], ivMax: [UInt8] = [31,31,31,31,31,31],
                                   natures: [Bool] = Array(repeating: true, count: 25),
                                   powers: [Bool] = Array(repeating: true, count: 16),
-                                  encounterSlots: [Bool] = Array(repeating: true, count: 12)) -> OpaquePointer {
+                                  encounterSlots: [Bool] = Array(repeating: true, count: 12)) -> OpaquePointer? {
+        var pfSettings = settings.pf
         let h = pf_wildSearch4_start(minAdvance, maxAdvance, minDelay, maxDelay,
                                       method.rawValue, lead.rawValue, tid, sid,
-                                      game.rawValue, feebasTile,
+                                      game.rawValue,
                                       encounter.rawValue, location,
+                                      &pfSettings, radarShiny, happiness, fixedSlot,
                                       filterGender, filterAbility, filterShiny,
-                                      ivMin, ivMax, natures, powers, encounterSlots)!
-        return OpaquePointer(h)
+                                      ivMin, ivMax, natures, powers, encounterSlots)
+        return h.map(OpaquePointer.init)
     }
 
     static func searchProgress(_ handle: OpaquePointer) -> Int {
@@ -2361,7 +2308,8 @@ nonisolated enum PFBridge {
                                       diglett: Bool = false, levelFlag: UInt8 = 0,
                                       tid: UInt16, sid: UInt16, game: PFGame,
                                       nationalDex: Bool = true, shinyCharm: Bool = false, ovalCharm: Bool = false,
-                                      storyFlag: Int32 = 1,
+                                      storyFlag: Int32 = 1, location: UInt8,
+                                      species: [UInt16] = [],
                                       filterGender: UInt8 = 255, filterAbility: UInt8 = 255, filterShiny: UInt8 = 255,
                                       ivMin: [UInt8] = [0,0,0,0,0,0], ivMax: [UInt8] = [31,31,31,31,31,31],
                                       natures: [Bool] = Array(repeating: false, count: 25),
@@ -2371,7 +2319,7 @@ nonisolated enum PFBridge {
                                            lead.rawValue, diglett, levelFlag,
                                            tid, sid, game.rawValue,
                                            nationalDex, shinyCharm, ovalCharm,
-                                           storyFlag,
+                                           storyFlag, location, species, Int32(species.count),
                                            filterGender, filterAbility, filterShiny,
                                            ivMin, ivMax, natures, powers, &count)
         guard let ptr else { return [] }
@@ -2387,6 +2335,39 @@ nonisolated enum PFBridge {
                                           eggMove: r.eggMove, item: r.item,
                                           specie: r.specie, level: r.level)
         }
+    }
+
+    /// A Grand Underground area at a story stage: its location, name and
+    /// the species it can give.
+    struct UndergroundArea: Hashable, Sendable {
+        let location: UInt8
+        let name: String
+        let species: [UInt16]
+    }
+
+    /// The Grand Underground's areas, as PokéFinder's Underground screen
+    /// lists them (named as location + 181).
+    static func undergroundAreas8(storyFlag: Int32, diglett: Bool = false, game: PFGame) -> [UndergroundArea] {
+        initTranslator()
+        var count: Int32 = 0
+        guard let ptr = pf_getUndergroundAreas8(storyFlag, diglett, game.rawValue, true, &count) else { return [] }
+        defer { pf_freeResults(ptr) }
+        let areas = (0..<Int(count)).map { ptr[$0] }
+        let names = locationNames(areas.map { UInt16($0.location) + 181 }, game: game)
+        return areas.enumerated().map { i, a in
+            let species = withUnsafeBytes(of: a.species) { Array($0.bindMemory(to: UInt16.self).prefix(Int(a.speciesCount))) }
+            return UndergroundArea(location: a.location, name: i < names.count ? names[i] : "Location \(a.location)",
+                                   species: species)
+        }
+    }
+
+    /// Every Pokémon the Great Marsh (or, with `trophyGarden`, the Trophy
+    /// Garden) can show as its daily Pokémon in `game`, Gen 4 or BDSP, with
+    /// the National Pokédex or without.
+    static func dailyPokemon(game: PFGame, trophyGarden: Bool) -> [UInt16] {
+        var out = [UInt16](repeating: 0, count: 32)
+        let count = pf_getDailyPokemon(game.rawValue, trophyGarden, &out)
+        return Array(out.prefix(Int(count)))
     }
 
     // MARK: Gen 8 Encounter Data

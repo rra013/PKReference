@@ -1,8 +1,8 @@
 # RNG tools fixes: plan
 
 Status: **PRs 1–8, 11 and 11b merged** (2026-10-04 and 05, #74–#83);
-**PRs 9, 10 and 12 planned** (§5–§7). From the RNG audit's 45 findings, and
-ten found since (46–55). The owner took every recommendation in §9, and in
+**PR 9 built** (§5); **PRs 10 and 12 planned** (§6, §7). From the RNG
+audit's 45 findings, and twelve found since (46–57). The owner took every recommendation in §9, and in
 §10 for PRs 5–12. When PR 12 merges, what's still true here moves into
 `HANDOFF.md` and this file goes.
 
@@ -37,7 +37,7 @@ history has that version.
 | 11b | 21, 42, 43, 50–52 | IV Calc with each game's base stats, IV fields, number fields | [#81](https://github.com/rra013/PKReference/pull/81), merged 2026-10-05 |
 | 7 | 12, 13, 31, 39, 53, 54 | Gen 3 targets: Ruby/Sapphire days, Emerald, Dead Battery | [#82](https://github.com/rra013/PKReference/pull/82), merged 2026-10-05 |
 | 8 | 36, 37, 48, 55 | Finder results: generators in chunks, empty and stale results | [#83](https://github.com/rra013/PKReference/pull/83), merged 2026-10-05 |
-| 9 | 19, 20, 24, 25, 44, 49 | Wild areas from PokéFinder's tables | Planned (§5) |
+| 9 | 19, 20, 24, 25, 44, 49, 56, 57 | Wild areas from PokéFinder's tables | Built (§5) |
 | 10 | 17 (Gen 8), 35, 40 | Gen 4 tools: years, delays, TSV | Planned (§6) |
 | 12 | 17 (Gen 5), 26, 34 | Gen 5 profiles, calibrator, IDs and Timer | Planned (§7) |
 
@@ -103,7 +103,7 @@ PR left in the code, and where it went beyond the plan.
 | 12, 13, 31, 39, 53, 54 | 7 |
 | 14, 38 | 11 |
 | 17 | 10 (Gen 8), 12 (Gen 5) |
-| 19, 20, 24, 25, 44, 49 | 9 |
+| 19, 20, 24, 25, 44, 49, 56, 57 | 9 |
 | 21, 42, 43, 50–52 | 11b |
 | 26, 34 | 12 |
 | 27–30, 32, 33 | 6 |
@@ -128,7 +128,7 @@ are the ones reported to the owner.
 
 ---
 
-## 5. PR 9: wild areas from PokéFinder (19, 20, 24, 25, 44, 49)
+## 5. PR 9: wild areas from PokéFinder (19, 20, 24, 25, 44, 49; 56, 57)
 
 As PR 3 did for statics, a wild area becomes a reference into PokéFinder's
 tables: generation, encounter type, location ID and settings.
@@ -156,6 +156,48 @@ tables: generation, encounter type, location ID and settings.
 - **Tests:** every PokéFinder area is offered once, by ID; the two National
   Parks search different tables; winter Route 7 has Cubchoo; a Gen 4
   night route differs from morning; every label set sums to 100.
+
+**Built (2026-10-05).** `WildArea` and `WildAreaData` (`EncounterData.swift`)
+list each game's areas from PokéFinder, by ID, with each slot's chance; the
+Finder and the Routes browser both use them, and `WildEncounterData.swift`
+is gone.
+
+- **By ID (19):** no game's list repeats an ID (checked for every game,
+  encounter type, time and season), so the bridge finds the area by ID and
+  gives nothing when there's none, where it fell back to the list's first.
+  Names that repeat get their number: "National Park (1)" and "(2)" in
+  HeartGold/SoulSilver, "Turnback Cave (1)" to "(3)" in BDSP. Locations are
+  listed by ID, which is each game's map order.
+- **Settings (20, 24):** a `WildSettings` with what PokéFinder's Wild3, Wild4,
+  Wild5 and Wild8 screens show, each where its game and encounter show it:
+  Gen 5's season (moved from DS Parameters to the encounter); Gen 4 and
+  BDSP's time of day and swarm; Diamond, Pearl and Platinum's dual slot,
+  Poké Radar, Great Marsh and Trophy Garden daily Pokémon and Mt. Coronet's
+  Feebas tile; HeartGold and SoulSilver's radio, Safari Zone blocks and
+  fishing happiness bonus; Ruby, Sapphire and Emerald's Route 119 Feebas
+  tile. The bridge takes Gen 4's as one struct (`PFEncounterSettings4`).
+- **Slot rates (25):** from the thresholds of PokéFinder's `EncounterSlot.cpp`
+  (hSlot, jSlot, kSlot, bwSlot, bdspSlot), the Safari Zone's ten even slots,
+  and a Feebas tile's half. Diamond's Old Rod, for one, has five slots, and
+  HeartGold's rods their own rates.
+- **Underground (49):** an Area picker and a Pokémon picker; the bridge
+  generates one area, with that area's species as the filter's
+  (`pf_getUndergroundAreas8`).
+- **Changed from the plan:**
+  - The Poké Radar is PokéFinder's own method from one slot, not only the
+    radar's slots: turning it on generates and searches by
+    `Method::PokeRadar` from the chosen Radar Pokémon, with a Shiny Patch
+    switch, and drops the leads that set the slot or level, as PokéFinder's
+    screen does. The radar's slots alone with Method J would have been wrong.
+  - BDSP's grass gets the same time, swarm, radar and daily Pokémon, which
+    its generator already took and was never given.
+  - The Safari Zone's Pokémon reroll until an IV is 31, so its Searcher needs
+    one IV at 31; Search says so and stays off until there is, as
+    PokéFinder's does.
+  - Switching games keeps the location by name: IDs are each game's own.
+  - The Routes browser lists by the same model, with BDSP, a time picker
+    for Gen 4 and BDSP, and Gen 5's season.
+  - The unused blocking Gen 3 and 4 wild searchers are gone from the bridge.
 
 ---
 
@@ -218,6 +260,12 @@ tables: generation, encounter type, location ID and settings.
   clock times (PR 7).
 - 55: the Gen 3/4 wild Generator filtered by the Searcher's hidden IV
   ranges (PR 8).
+- 56: Gen 4 wild offered Method 1, which PokéFinder's wild generator and
+  searcher don't have (they gave nothing), and each game the other's method
+  (Method K for Diamond, Pearl and Platinum, J for HeartGold and
+  SoulSilver). Wild offers its game's own (PR 9).
+- 57: Gen 5 and BDSP wild searches ignored the Pokémon picker: the slots it
+  allows were never passed (PR 9).
 
 ---
 

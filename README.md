@@ -227,8 +227,8 @@ Objective-C++ bridge (`PFBridge.mm`).
 | Sub-tab | What it does |
 |---|---|
 | **Timer** | Precise multi-phase timers for Gen 3/4/5 and custom setups, with calibration, console-specific frame rates, Gen 3's Variable Target, and a run of lead-in beeps on each target that plays with the silent switch on. Settings are saved. Ported from EonTimer. |
-| **Finder** | Seed searching and generators, including Method 1 / 1R / 2 / 4, XD/Colo, Channel and Cute Charm. After an attempt it finds what you hit: in Gen 4 the seed and delay, from the Pokétch's coin flips or the roamers and Elm's or Irwin's calls, for the Timer's calibration; in Gen 3 the frame, from what you caught, and a seed learnt in game, from a new game's Trainer ID or a caught Pokémon. A Gen 3 target shows where its frames count from: Emerald's seed 0000, a dead battery's 05A0, or Ruby and Sapphire's clock times with their dates. Also has Chatot pitches, and Gen 5 keypresses and SHA-1 seeds. For FireRed and LeafGreen (GBA, mGBA and Switch), it narrows a search to targets reachable from a seed you can hit, by your sound, button mode and held buttons and the advances you can wait, with each seed's time, Teachy TV, and Send to Timer. After an attempt, Calibrate works out the IVs from the caught Pokémon's stats and nature, finds which seed and frame you hit, and corrects the timer. Ported from Ten Lines, with the community's farmed seed lists bundled and updatable. |
-| **Routes** | Wild encounter tables by game and location, with slot rates and levels. |
+| **Finder** | Seed searching and generators, including Method 1 / 1R / 2 / 4, XD/Colo, Channel and Cute Charm. After an attempt it finds what you hit: in Gen 4 the seed and delay, from the Pokétch's coin flips or the roamers and Elm's or Irwin's calls, for the Timer's calibration; in Gen 3 the frame, from what you caught, and a seed learnt in game, from a new game's Trainer ID or a caught Pokémon. A Gen 3 target shows where its frames count from: Emerald's seed 0000, a dead battery's 05A0, or Ruby and Sapphire's clock times with their dates. Wild searches take what changes each game's slots: time of day, swarms, the Poké Radar (with shiny patches), the dual slot, the Great Marsh and Trophy Garden's daily Pokémon, the radio, Safari Zone blocks, Feebas tiles and Gen 5's seasons. Brilliant Diamond and Shining Pearl's Grand Underground searches one area at a time. Also has Chatot pitches, and Gen 5 keypresses and SHA-1 seeds. For FireRed and LeafGreen (GBA, mGBA and Switch), it narrows a search to targets reachable from a seed you can hit, by your sound, button mode and held buttons and the advances you can wait, with each seed's time, Teachy TV, and Send to Timer. After an attempt, Calibrate works out the IVs from the caught Pokémon's stats and nature, finds which seed and frame you hit, and corrects the timer. Ported from Ten Lines, with the community's farmed seed lists bundled and updatable. |
+| **Routes** | Wild encounter tables for Gen 3–5 and Brilliant Diamond/Shining Pearl, by location, with each slot's chance (from PokéFinder's slot code) and levels, by time of day or season. |
 | **Statics** | Static and gift encounters. |
 | **Eggs** | Egg generation with parents, Everstone, Destiny Knot, Power items and compatibility. |
 | **TID/SID** | Trainer ID manipulation, and seed-to-time for DS clocks. |
@@ -472,7 +472,7 @@ project has no Swift package dependencies.
    later launches work offline, except for Tournaments. The Mac app is
    sandboxed, with outgoing network access.
 
-**Tests:** 1,241 tests written with Swift Testing. They cover the damage engines
+**Tests:** 1,253 tests written with Swift Testing. They cover the damage engines
 and the port, the battle engine by mechanic tier, the EV and two-hit solvers,
 speed tiers, paste parsing and import, Champions filters and legality, RNG
 tools, ML parity, the tournament import and data store, Team Search's parser,

@@ -1,5 +1,7 @@
 #import "PFBridge.h"
 
+#include <optional>
+
 #include <Core/Util/IVToPIDCalculator.hpp>
 #include <Core/Util/IVChecker.hpp>
 #include <Core/Parents/PersonalLoader.hpp>
@@ -335,8 +337,12 @@ static PFEncounterArea convertEncounterArea(const EncounterArea &area)
     return r;
 }
 
-static EncounterArea3 findEncounterArea3(Encounter encounter, const EncounterSettings3 &settings,
-                                          Game version, uint8_t location)
+// A wild area is found by its location ID. Within one game, encounter type
+// and set of settings no ID repeats, so the match is the area; with no
+// match there's no area (it used to fall back to the list's first, so a
+// search ran on the wrong location without saying so).
+static std::optional<EncounterArea3> findEncounterArea3(Encounter encounter, const EncounterSettings3 &settings,
+                                                        Game version, uint8_t location)
 {
     auto areas = Encounters3::getEncounters(encounter, settings, version);
     for (const auto &area : areas) {
@@ -344,12 +350,11 @@ static EncounterArea3 findEncounterArea3(Encounter encounter, const EncounterSet
             return area;
         }
     }
-    if (!areas.empty()) return areas[0];
-    return EncounterArea3(0, 0, Encounter::Grass, {});
+    return std::nullopt;
 }
 
-static EncounterArea4 findEncounterArea4(Encounter encounter, const EncounterSettings4 &settings,
-                                          const Profile4 &profile, uint8_t location)
+static std::optional<EncounterArea4> findEncounterArea4(Encounter encounter, const EncounterSettings4 &settings,
+                                                        const Profile4 &profile, uint8_t location)
 {
     auto areas = Encounters4::getEncounters(encounter, settings, &profile);
     for (const auto &area : areas) {
@@ -357,8 +362,26 @@ static EncounterArea4 findEncounterArea4(Encounter encounter, const EncounterSet
             return area;
         }
     }
-    if (!areas.empty()) return areas[0];
-    return EncounterArea4(0, 0, Encounter::Grass, {});
+    return std::nullopt;
+}
+
+/// PokéFinder's Gen 4 encounter settings from the app's. The Safari Zone's
+/// block counts are indexed by block type, 1 to 4 (0 is unused).
+static EncounterSettings4 makeSettings4(const PFEncounterSettings4 *in, Game version)
+{
+    EncounterSettings4 settings = {};
+    settings.time = in->time;
+    settings.swarm = in->swarm;
+    if ((version & Game::DPPt) != Game::None) {
+        settings.dppt.dual = static_cast<Game>(in->dual);
+        settings.dppt.replacement = { in->replacement[0], in->replacement[1] };
+        settings.dppt.feebasTile = in->feebasTile;
+        settings.dppt.radar = in->radar;
+    } else {
+        settings.hgss.radio = in->radio;
+        settings.hgss.blocks = { 0, in->blocks[0], in->blocks[1], in->blocks[2], in->blocks[3] };
+    }
+    return settings;
 }
 
 static PFWildGeneratorState4 convertWildGenState4(const WildGeneratorState4 &s)
@@ -978,28 +1001,11 @@ extern "C" PFEncounterArea *pf_getEncounters3(uint8_t encounter, uint32_t game,
 
 extern "C" PFEncounterArea *pf_getEncounters4(uint8_t encounter, uint32_t game,
                                                 uint16_t tid, uint16_t sid,
-                                                int time, bool swarm,
-                                                uint32_t dual,
-                                                uint16_t replacement0, uint16_t replacement1,
-                                                bool feebasTile, bool radar,
-                                                int radio,
-                                                const uint8_t blocks[5],
+                                                const PFEncounterSettings4 *encounterSettings,
                                                 int *outCount)
 {
     Profile4 profile("-", static_cast<Game>(game), tid, sid, false);
-    EncounterSettings4 settings;
-    settings.time = time;
-    settings.swarm = swarm;
-
-    if ((static_cast<Game>(game) & Game::DPPt) != Game::None) {
-        settings.dppt.dual = static_cast<Game>(dual);
-        settings.dppt.replacement = { replacement0, replacement1 };
-        settings.dppt.feebasTile = feebasTile;
-        settings.dppt.radar = radar;
-    } else {
-        settings.hgss.radio = radio;
-        for (int i = 0; i < 5; i++) settings.hgss.blocks[i] = blocks[i];
-    }
+    EncounterSettings4 settings = makeSettings4(encounterSettings, static_cast<Game>(game));
 
     auto areas = Encounters4::getEncounters(static_cast<Encounter>(encounter),
                                              settings, &profile);
@@ -1011,6 +1017,37 @@ extern "C" PFEncounterArea *pf_getEncounters4(uint8_t encounter, uint32_t game,
         out[i] = convertEncounterArea(areas[i]);
     }
     return out;
+}
+
+extern "C" int pf_getDailyPokemon(uint32_t game, bool trophyGarden, uint16_t out[32])
+{
+    Game version = static_cast<Game>(game);
+    std::vector<u16> species;
+    auto add = [&species](u16 specie) {
+        if (specie != 0 && std::ranges::find(species, specie) == species.end()) species.push_back(specie);
+    };
+    if ((version & Game::BDSP) != Game::None) {
+        if (trophyGarden) {
+            for (u16 specie : Encounters8::getTrophyGardenPokemon()) add(specie);
+        } else {
+            for (bool dex : { false, true }) {
+                Profile8 profile("-", version, 0, 0, dex, false, false);
+                for (u16 specie : Encounters8::getGreatMarshPokemon(&profile)) add(specie);
+            }
+        }
+    } else if ((version & Game::DPPt) != Game::None) {
+        for (bool dex : { false, true }) {
+            Profile4 profile("-", version, 0, 0, dex);
+            if (trophyGarden) {
+                for (u16 specie : Encounters4::getTrophyGardenPokemon(&profile)) add(specie);
+            } else {
+                for (u16 specie : Encounters4::getGreatMarshPokemon(&profile)) add(specie);
+            }
+        }
+    }
+    int count = static_cast<int>(std::min<size_t>(species.size(), 32));
+    std::copy_n(species.begin(), count, out);
+    return count;
 }
 
 extern "C" PFStaticTemplate *pf_getStaticEncounters3(int type, int *outCount)
@@ -1077,18 +1114,20 @@ extern "C" PFWildGeneratorState *pf_wildGenerate3(uint32_t seed,
                                                     const bool encounterSlots[12],
                                                     int *outCount)
 {
+    *outCount = 0;
     Profile3 profile("-", static_cast<Game>(game), tid, sid, deadBattery);
     WildStateFilter filter = makeWildFilter(filterGender, filterAbility, filterShiny,
                                              ivMin, ivMax, natures, powers, encounterSlots);
 
     EncounterSettings3 settings;
     settings.feebasTile = feebasTile;
-    EncounterArea3 area = findEncounterArea3(static_cast<Encounter>(encounter), settings,
-                                              static_cast<Game>(game), location);
+    auto area = findEncounterArea3(static_cast<Encounter>(encounter), settings,
+                                   static_cast<Game>(game), location);
+    if (!area) return nullptr;
 
     WildGenerator3 generator(initialAdvances, maxAdvances, offset,
                               static_cast<Method>(method), static_cast<Lead>(lead),
-                              feebasTile, area, profile, filter);
+                              feebasTile, *area, profile, filter);
 
     auto results = generator.generate(seed);
     *outCount = static_cast<int>(results.size());
@@ -1097,51 +1136,6 @@ extern "C" PFWildGeneratorState *pf_wildGenerate3(uint32_t seed,
     auto *out = static_cast<PFWildGeneratorState *>(malloc(sizeof(PFWildGeneratorState) * results.size()));
     for (size_t i = 0; i < results.size(); i++) {
         out[i] = convertWildGenState(results[i]);
-    }
-    return out;
-}
-
-// MARK: - Wild Searcher Gen 3
-
-extern "C" PFWildSearcherState *pf_wildSearch3(uint8_t method,
-                                                 uint8_t lead,
-                                                 uint16_t tid, uint16_t sid,
-                                                 uint32_t game,
-                                                 bool deadBattery,
-                                                 bool feebasTile,
-                                                 uint8_t encounter,
-                                                 uint8_t location,
-                                                 uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
-                                                 const uint8_t ivMin[6], const uint8_t ivMax[6],
-                                                 const bool natures[25], const bool powers[16],
-                                                 const bool encounterSlots[12],
-                                                 int *outCount)
-{
-    Profile3 profile("-", static_cast<Game>(game), tid, sid, deadBattery);
-    WildStateFilter filter = makeWildFilter(filterGender, filterAbility, filterShiny,
-                                             ivMin, ivMax, natures, powers, encounterSlots);
-
-    EncounterSettings3 settings;
-    settings.feebasTile = feebasTile;
-    EncounterArea3 area = findEncounterArea3(static_cast<Encounter>(encounter), settings,
-                                              static_cast<Game>(game), location);
-
-    WildSearcher3 searcher(static_cast<Method>(method), static_cast<Lead>(lead),
-                            feebasTile, area, profile, filter);
-
-    std::array<u8, 6> min, max;
-    std::copy(ivMin, ivMin + 6, min.begin());
-    std::copy(ivMax, ivMax + 6, max.begin());
-
-    searcher.startSearch(min, max);
-
-    auto results = searcher.getResults();
-    *outCount = static_cast<int>(results.size());
-    if (results.empty()) return nullptr;
-
-    auto *out = static_cast<PFWildSearcherState *>(malloc(sizeof(PFWildSearcherState) * results.size()));
-    for (size_t i = 0; i < results.size(); i++) {
-        out[i] = convertWildSearchState(results[i]);
     }
     return out;
 }
@@ -1156,104 +1150,40 @@ extern "C" PFWildGeneratorState4 *pf_wildGenerate4(uint32_t seed,
                                                      uint8_t lead,
                                                      uint16_t tid, uint16_t sid,
                                                      uint32_t game,
-                                                     bool feebasTile,
                                                      uint8_t encounter,
                                                      uint8_t location,
+                                                     const PFEncounterSettings4 *encounterSettings,
+                                                     bool radarShiny, uint8_t happiness, uint8_t fixedSlot,
                                                      uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
                                                      const uint8_t ivMin[6], const uint8_t ivMax[6],
                                                      const bool natures[25], const bool powers[16],
                                                      const bool encounterSlots[12],
                                                      int *outCount)
 {
+    *outCount = 0;
     Profile4 profile("-", static_cast<Game>(game), tid, sid, false);
     WildStateFilter filter = makeWildFilter(filterGender, filterAbility, filterShiny,
                                              ivMin, ivMax, natures, powers, encounterSlots);
 
-    EncounterSettings4 settings;
-    settings.time = 0;
-    settings.swarm = false;
-    if ((static_cast<Game>(game) & Game::DPPt) != Game::None) {
-        settings.dppt.dual = Game::None;
-        settings.dppt.replacement = { 0, 0 };
-        settings.dppt.feebasTile = feebasTile;
-        settings.dppt.radar = false;
-    } else {
-        settings.hgss.radio = 0;
-        for (int i = 0; i < 5; i++) settings.hgss.blocks[i] = 0;
-    }
+    EncounterSettings4 settings = makeSettings4(encounterSettings, static_cast<Game>(game));
+    auto area = findEncounterArea4(static_cast<Encounter>(encounter), settings, profile, location);
+    if (!area) return nullptr;
 
-    EncounterArea4 area = findEncounterArea4(static_cast<Encounter>(encounter), settings,
-                                              profile, location);
-
+    // PokéFinder's Wild4 screen: the radio's third station (the Mysterious
+    // Transmission) is the Unown one.
+    bool unownRadio = encounterSettings->radio == 3;
     WildGenerator4 generator(initialAdvances, maxAdvances, offset,
                               static_cast<Method>(method), static_cast<Lead>(lead),
-                              feebasTile, false, false, 0, area, profile, filter);
+                              encounterSettings->feebasTile, radarShiny, unownRadio, happiness,
+                              *area, profile, filter);
 
-    auto results = generator.generate(seed, 0);
+    auto results = generator.generate(seed, fixedSlot);
     *outCount = static_cast<int>(results.size());
     if (results.empty()) return nullptr;
 
     auto *out = static_cast<PFWildGeneratorState4 *>(malloc(sizeof(PFWildGeneratorState4) * results.size()));
     for (size_t i = 0; i < results.size(); i++) {
         out[i] = convertWildGenState4(results[i]);
-    }
-    return out;
-}
-
-// MARK: - Wild Searcher Gen 4
-
-extern "C" PFWildSearcherState4 *pf_wildSearch4(uint32_t minAdvance, uint32_t maxAdvance,
-                                                  uint32_t minDelay, uint32_t maxDelay,
-                                                  uint8_t method,
-                                                  uint8_t lead,
-                                                  uint16_t tid, uint16_t sid,
-                                                  uint32_t game,
-                                                  bool feebasTile,
-                                                  uint8_t encounter,
-                                                  uint8_t location,
-                                                  uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
-                                                  const uint8_t ivMin[6], const uint8_t ivMax[6],
-                                                  const bool natures[25], const bool powers[16],
-                                                  const bool encounterSlots[12],
-                                                  int *outCount)
-{
-    Profile4 profile("-", static_cast<Game>(game), tid, sid, false);
-    WildStateFilter filter = makeWildFilter(filterGender, filterAbility, filterShiny,
-                                             ivMin, ivMax, natures, powers, encounterSlots);
-
-    EncounterSettings4 settings;
-    settings.time = 0;
-    settings.swarm = false;
-    if ((static_cast<Game>(game) & Game::DPPt) != Game::None) {
-        settings.dppt.dual = Game::None;
-        settings.dppt.replacement = { 0, 0 };
-        settings.dppt.feebasTile = feebasTile;
-        settings.dppt.radar = false;
-    } else {
-        settings.hgss.radio = 0;
-        for (int i = 0; i < 5; i++) settings.hgss.blocks[i] = 0;
-    }
-
-    EncounterArea4 area = findEncounterArea4(static_cast<Encounter>(encounter), settings,
-                                              profile, location);
-
-    WildSearcher4 searcher(minAdvance, maxAdvance, minDelay, maxDelay,
-                            static_cast<Method>(method), static_cast<Lead>(lead),
-                            feebasTile, false, false, 0, area, profile, filter);
-
-    std::array<u8, 6> min, max;
-    std::copy(ivMin, ivMin + 6, min.begin());
-    std::copy(ivMax, ivMax + 6, max.begin());
-
-    searcher.startSearch(min, max, 0);
-
-    auto results = searcher.getResults();
-    *outCount = static_cast<int>(results.size());
-    if (results.empty()) return nullptr;
-
-    auto *out = static_cast<PFWildSearcherState4 *>(malloc(sizeof(PFWildSearcherState4) * results.size()));
-    for (size_t i = 0; i < results.size(); i++) {
-        out[i] = convertWildSearchState4(results[i]);
     }
     return out;
 }
@@ -1275,11 +1205,12 @@ extern "C" PFSearchHandle pf_wildSearch3_start(uint8_t method, uint8_t lead,
 
     EncounterSettings3 settings;
     settings.feebasTile = feebasTile;
-    EncounterArea3 area = findEncounterArea3(static_cast<Encounter>(encounter), settings,
-                                              static_cast<Game>(game), location);
+    auto area = findEncounterArea3(static_cast<Encounter>(encounter), settings,
+                                   static_cast<Game>(game), location);
+    if (!area) return nullptr;
 
     auto *searcher = new WildSearcher3(static_cast<Method>(method), static_cast<Lead>(lead),
-                                        feebasTile, area, profile, filter);
+                                        feebasTile, *area, profile, filter);
 
     std::array<u8, 6> min, max;
     std::copy(ivMin, ivMin + 6, min.begin());
@@ -1301,8 +1232,10 @@ extern "C" PFSearchHandle pf_wildSearch4_start(uint32_t minAdvance, uint32_t max
                                                 uint32_t minDelay, uint32_t maxDelay,
                                                 uint8_t method, uint8_t lead,
                                                 uint16_t tid, uint16_t sid,
-                                                uint32_t game, bool feebasTile,
+                                                uint32_t game,
                                                 uint8_t encounter, uint8_t location,
+                                                const PFEncounterSettings4 *encounterSettings,
+                                                bool radarShiny, uint8_t happiness, uint8_t fixedSlot,
                                                 uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
                                                 const uint8_t ivMin[6], const uint8_t ivMax[6],
                                                 const bool natures[25], const bool powers[16],
@@ -1312,25 +1245,15 @@ extern "C" PFSearchHandle pf_wildSearch4_start(uint32_t minAdvance, uint32_t max
     WildStateFilter filter = makeWildFilter(filterGender, filterAbility, filterShiny,
                                              ivMin, ivMax, natures, powers, encounterSlots);
 
-    EncounterSettings4 settings;
-    settings.time = 0;
-    settings.swarm = false;
-    if ((static_cast<Game>(game) & Game::DPPt) != Game::None) {
-        settings.dppt.dual = Game::None;
-        settings.dppt.replacement = { 0, 0 };
-        settings.dppt.feebasTile = feebasTile;
-        settings.dppt.radar = false;
-    } else {
-        settings.hgss.radio = 0;
-        for (int i = 0; i < 5; i++) settings.hgss.blocks[i] = 0;
-    }
+    EncounterSettings4 settings = makeSettings4(encounterSettings, static_cast<Game>(game));
+    auto area = findEncounterArea4(static_cast<Encounter>(encounter), settings, profile, location);
+    if (!area) return nullptr;
 
-    EncounterArea4 area = findEncounterArea4(static_cast<Encounter>(encounter), settings,
-                                              profile, location);
-
+    bool unownRadio = encounterSettings->radio == 3;
     auto *searcher = new WildSearcher4(minAdvance, maxAdvance, minDelay, maxDelay,
                                         static_cast<Method>(method), static_cast<Lead>(lead),
-                                        feebasTile, false, false, 0, area, profile, filter);
+                                        encounterSettings->feebasTile, radarShiny, unownRadio, happiness,
+                                        *area, profile, filter);
 
     std::array<u8, 6> min, max;
     std::copy(ivMin, ivMin + 6, min.begin());
@@ -1339,8 +1262,8 @@ extern "C" PFSearchHandle pf_wildSearch4_start(uint32_t minAdvance, uint32_t max
     auto *handle = new PFAsyncSearch();
     handle->searcher = searcher;
     handle->isGen4 = true;
-    handle->thread = std::thread([searcher, min, max]() {
-        searcher->startSearch(min, max, 0);
+    handle->thread = std::thread([searcher, min, max, fixedSlot]() {
+        searcher->startSearch(min, max, fixedSlot);
     });
 
     return static_cast<PFSearchHandle>(handle);
@@ -2346,8 +2269,8 @@ static PFWildGeneratorState5 convertWildGenState5(const WildState5 &s)
     return r;
 }
 
-static EncounterArea5 findEncounterArea5(Encounter encounter, u8 season,
-                                          const Profile5 &profile, uint8_t location)
+static std::optional<EncounterArea5> findEncounterArea5(Encounter encounter, u8 season,
+                                                        const Profile5 &profile, uint8_t location)
 {
     auto areas = Encounters5::getEncounters(encounter, season, &profile);
     for (const auto &area : areas) {
@@ -2355,8 +2278,7 @@ static EncounterArea5 findEncounterArea5(Encounter encounter, u8 season,
             return area;
         }
     }
-    if (!areas.empty()) return areas[0];
-    return EncounterArea5(0, 0, false, Encounter::Grass, {});
+    return std::nullopt;
 }
 
 // MARK: - Gen 5 Static Generator
@@ -2438,12 +2360,12 @@ extern "C" PFWildGeneratorState5 *pf_wildGenerate5(uint64_t seed,
     WildStateFilter filter = makeWildFilter(filterGender, filterAbility, filterShiny,
                                              ivMin, ivMax, natures, powers, encounterSlots);
 
-    EncounterArea5 area = findEncounterArea5(static_cast<Encounter>(encounter), season,
-                                              profile, location);
+    auto area = findEncounterArea5(static_cast<Encounter>(encounter), season, profile, location);
+    if (!area) { *outCount = 0; return nullptr; }
 
     WildGenerator5 generator(initialAdvances, maxAdvances, offset,
                               static_cast<Method>(method), static_cast<Lead>(lead),
-                              0, area, profile, filter);
+                              0, *area, profile, filter);
 
     // Each PID advance pairs with each IV advance, as the static one.
     auto results = generator.generate(seed, ivInitialAdvances, ivMaxAdvances);
@@ -2758,12 +2680,12 @@ extern "C" PFSearch5Handle pf_wildSearch5_start(uint32_t initialAdvances, uint32
     WildStateFilter filter = makeWildFilter(filterGender, filterAbility, filterShiny,
                                              ivMin, ivMax, natures, powers, encounterSlots);
 
-    EncounterArea5 area = findEncounterArea5(static_cast<Encounter>(encounter), season,
-                                              profile, location);
+    auto area = findEncounterArea5(static_cast<Encounter>(encounter), season, profile, location);
+    if (!area) return nullptr;
 
     WildGenerator5 gen(initialAdvances, maxAdvances, offset,
                         static_cast<Method>(method), static_cast<Lead>(lead),
-                        0, area, profile, filter);
+                        0, *area, profile, filter);
 
     auto *searcher = new IVSearcher5<WildGenerator5, WildState5>(
         ivInitialAdvances, ivMaxAdvances, gen, profile);
@@ -2881,8 +2803,8 @@ static PFWildGeneratorState8 convertWildGenState8(const WildState8 &s)
     return r;
 }
 
-static EncounterArea8 findEncounterArea8(Encounter encounter, const EncounterSettings8 &settings,
-                                          const Profile8 &profile, uint8_t location)
+static std::optional<EncounterArea8> findEncounterArea8(Encounter encounter, const EncounterSettings8 &settings,
+                                                        const Profile8 &profile, uint8_t location)
 {
     auto areas = Encounters8::getEncounters(encounter, settings, &profile);
     for (const auto &area : areas) {
@@ -2890,8 +2812,7 @@ static EncounterArea8 findEncounterArea8(Encounter encounter, const EncounterSet
             return area;
         }
     }
-    if (!areas.empty()) return areas[0];
-    return EncounterArea8(0, 0, Encounter::Grass, {});
+    return std::nullopt;
 }
 
 // MARK: - Gen 8 Static Generator
@@ -2959,12 +2880,12 @@ extern "C" PFWildGeneratorState8 *pf_wildGenerate8(uint64_t seed0, uint64_t seed
     settings.radar = radar;
     settings.replacement = { replacement0, replacement1 };
 
-    EncounterArea8 area = findEncounterArea8(static_cast<Encounter>(encounter), settings,
-                                              profile, location);
+    auto area = findEncounterArea8(static_cast<Encounter>(encounter), settings, profile, location);
+    if (!area) { *outCount = 0; return nullptr; }
 
     WildGenerator8 generator(initialAdvances, maxAdvances, offset,
                               Method::None, static_cast<Lead>(lead),
-                              area, profile, filter);
+                              *area, profile, filter);
 
     auto results = generator.generate(seed0, seed1, 0);
     *outCount = static_cast<int>(results.size());
@@ -3121,12 +3042,14 @@ extern "C" PFUndergroundState *pf_undergroundGenerate8(uint64_t seed0, uint64_t 
                                                          uint16_t tid, uint16_t sid,
                                                          uint32_t game,
                                                          bool nationalDex, bool shinyCharm, bool ovalCharm,
-                                                         int storyFlag,
+                                                         int storyFlag, uint8_t location,
+                                                         const uint16_t *species, int speciesCount,
                                                          uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
                                                          const uint8_t ivMin[6], const uint8_t ivMax[6],
                                                          const bool natures[25], const bool powers[16],
                                                          int *outCount)
 {
+    *outCount = 0;
     Profile8 profile("-", static_cast<Game>(game), tid, sid, nationalDex, shinyCharm, ovalCharm);
 
     std::array<u8, 6> min, max;
@@ -3140,25 +3063,28 @@ extern "C" PFUndergroundState *pf_undergroundGenerate8(uint64_t seed0, uint64_t 
     // for stages 1–6.
     storyFlag = std::clamp(storyFlag, 1, 6);
     auto undergroundAreas = Encounters8::getUndergroundEncounters(storyFlag, diglett, &profile);
-    if (undergroundAreas.empty()) { *outCount = 0; return nullptr; }
+    // One area, as PokéFinder's Underground screen searches (it generated
+    // every area and returned them together, without saying which).
+    auto area = std::ranges::find_if(undergroundAreas, [location](const UndergroundArea &a) {
+        return a.getLocation() == location;
+    });
+    if (area == undergroundAreas.end()) return nullptr;
 
-    // The filter also checks the species against this list, so it holds
-    // every one the areas can give.
-    std::vector<u16> species;
-    for (const auto &area : undergroundAreas) {
-        auto areaSpecies = area.getSpecies();
-        species.insert(species.end(), areaSpecies.begin(), areaSpecies.end());
-    }
-    bool skip = filtersNothing(filterGender, filterAbility, filterShiny, min, max, natArr, powArr);
+    // The filter also checks the species against this list, so with none
+    // given it holds every one the area can give.
+    std::vector<u16> speciesFilter = speciesCount > 0 ? std::vector<u16>(species, species + speciesCount)
+                                                       : area->getSpecies();
+    bool skip = filtersNothing(filterGender, filterAbility, filterShiny, min, max, natArr, powArr)
+        && speciesCount == 0;
     UndergroundStateFilter filter(filterGender, filterAbility, filterShiny, 0, 255, 0, 255,
-                                   skip, min, max, natArr, powArr, species);
+                                   skip, min, max, natArr, powArr, speciesFilter);
 
     std::vector<PFUndergroundState> allResults;
 
-    for (const auto &area : undergroundAreas) {
+    {
         UndergroundGenerator generator(initialAdvances, maxAdvances, offset,
                                         static_cast<Lead>(lead), diglett, levelFlag,
-                                        area, profile, filter);
+                                        *area, profile, filter);
 
         auto results = generator.generate(seed0, seed1);
         for (const auto &s : results) {
@@ -3189,6 +3115,26 @@ extern "C" PFUndergroundState *pf_undergroundGenerate8(uint64_t seed0, uint64_t 
 
     auto *out = static_cast<PFUndergroundState *>(malloc(sizeof(PFUndergroundState) * allResults.size()));
     std::copy(allResults.begin(), allResults.end(), out);
+    return out;
+}
+
+extern "C" PFUndergroundArea *pf_getUndergroundAreas8(int storyFlag, bool diglett, uint32_t game,
+                                                      bool nationalDex, int *outCount)
+{
+    *outCount = 0;
+    Profile8 profile("-", static_cast<Game>(game), 0, 0, nationalDex, false, false);
+    auto areas = Encounters8::getUndergroundEncounters(std::clamp(storyFlag, 1, 6), diglett, &profile);
+    if (areas.empty()) return nullptr;
+
+    auto *out = static_cast<PFUndergroundArea *>(calloc(areas.size(), sizeof(PFUndergroundArea)));
+    for (size_t i = 0; i < areas.size(); i++) {
+        out[i].location = areas[i].getLocation();
+        auto species = areas[i].getSpecies();
+        size_t count = std::min(species.size(), sizeof(out[i].species) / sizeof(out[i].species[0]));
+        out[i].speciesCount = static_cast<uint8_t>(count);
+        std::copy_n(species.begin(), count, out[i].species);
+    }
+    *outCount = static_cast<int>(areas.size());
     return out;
 }
 

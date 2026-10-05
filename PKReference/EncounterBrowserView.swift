@@ -1,29 +1,21 @@
 import SwiftUI
 
+/// Every game's wild areas, as the Finder lists them (`WildAreaData`): by
+/// location, with each slot's chance.
 struct EncounterBrowserView: View {
-    @State private var generation: EncBrowserGen = .gen3
-    @State private var selectedGame: PFGame = .emerald
+    @State private var generation: FinderGeneration = .gen3
+    @State private var selectedGame: FinderGameVersion = .emerald
     @State private var selectedEncounter: PFEncounter = .grass
-    @State private var areas: [PFEncounterAreaSwift] = []
-    @State private var expandedArea: UUID?
+    @State private var expandedArea: String?
+    /// Gen 4 and BDSP: 0 morning, 1 day, 2 night.
+    @State private var time: Int32 = 0
+    /// Gen 5: 0 spring to 3 winter.
+    @State private var season: UInt8 = 0
 
-    // Gen 4 settings
-    @State private var tid: UInt16 = 0
-    @State private var sid: UInt16 = 0
+    private static let generations: [FinderGeneration] = [.gen3, .gen4, .gen5, .gen8]
 
-    enum EncBrowserGen: String, CaseIterable, Identifiable {
-        case gen3 = "Gen 3"
-        case gen4 = "Gen 4"
-        case gen5 = "Gen 5"
-        var id: String { rawValue }
-    }
-
-    private var availableGames: [PFGame] {
-        switch generation {
-        case .gen3: return [.ruby, .sapphire, .emerald, .fireRed, .leafGreen]
-        case .gen4: return [.diamond, .pearl, .platinum, .heartGold, .soulSilver]
-        case .gen5: return [.black, .white, .black2, .white2]
-        }
+    private var availableGames: [FinderGameVersion] {
+        FinderGameVersion.games(for: generation).filter { !$0.isSwSh }
     }
 
     private var availableEncounters: [PFEncounter] {
@@ -31,14 +23,33 @@ struct EncounterBrowserView: View {
         case .gen3: return [.grass, .surfing, .oldRod, .goodRod, .superRod, .rockSmash]
         case .gen4: return [.grass, .surfing, .oldRod, .goodRod, .superRod, .rockSmash, .headbutt]
         case .gen5: return [.grass, .grassDark, .grassRustling, .surfing, .surfingRippling, .superRod, .superRodRippling]
+        case .gen8: return [.grass, .surfing, .oldRod, .goodRod, .superRod]
         }
     }
 
+    private var settings: WildSettings {
+        WildSettings(time: time, season: season)
+    }
+
+    /// By location ID, the game's map order, as the Finder lists them.
+    private var areas: [WildArea] {
+        WildAreaData.areas(for: selectedGame, encounter: selectedEncounter, settings: settings)
+            .sorted { $0.location < $1.location }
+    }
+
+    /// Time of day changes Gen 4 and BDSP grass (and HeartGold and
+    /// SoulSilver's fishing).
+    private var showsTime: Bool {
+        guard let type = EncounterType(from: selectedEncounter) else { return false }
+        return WildAreaData.settingsShown(game: selectedGame, type: type, location: nil).contains(.time)
+    }
+
     var body: some View {
+        let areas = areas
         ScrollView {
             CardStack {
                 Picker("Generation", selection: $generation) {
-                    ForEach(EncBrowserGen.allCases) { g in Text(g.rawValue).tag(g) }
+                    ForEach(Self.generations) { g in Text(g == .gen8 ? "BDSP" : g.rawValue).tag(g) }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -47,13 +58,12 @@ struct EncounterBrowserView: View {
                     if !games.contains(selectedGame) { selectedGame = games[0] }
                     let encounters = availableEncounters
                     if !encounters.contains(selectedEncounter) { selectedEncounter = encounters[0] }
-                    loadEncounters()
                 }
 
                 HStack {
                     Picker("Game", selection: $selectedGame) {
-                        ForEach(availableGames, id: \.rawValue) { g in
-                            Text(gameName(g)).tag(g)
+                        ForEach(availableGames) { g in
+                            Text(g.rawValue).tag(g)
                         }
                     }
                     Picker("Type", selection: $selectedEncounter) {
@@ -62,8 +72,25 @@ struct EncounterBrowserView: View {
                         }
                     }
                 }
-                .onChange(of: selectedGame) { loadEncounters() }
-                .onChange(of: selectedEncounter) { loadEncounters() }
+
+                if generation == .gen5 {
+                    Picker("Season", selection: $season) {
+                        Text("Spring").tag(UInt8(0))
+                        Text("Summer").tag(UInt8(1))
+                        Text("Autumn").tag(UInt8(2))
+                        Text("Winter").tag(UInt8(3))
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                } else if showsTime {
+                    Picker("Time", selection: $time) {
+                        Text("Morning").tag(Int32(0))
+                        Text("Day").tag(Int32(1))
+                        Text("Night").tag(Int32(2))
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
 
                 if areas.isEmpty {
                     ContentUnavailableView("No Encounters",
@@ -88,44 +115,11 @@ struct EncounterBrowserView: View {
             }
             .padding()
         }
-        .onAppear { loadEncounters() }
-    }
-
-    private func loadEncounters() {
-        switch generation {
-        case .gen3:
-            areas = PFBridge.getEncounters3(encounter: selectedEncounter, game: selectedGame)
-        case .gen4:
-            areas = PFBridge.getEncounters4(encounter: selectedEncounter, game: selectedGame,
-                                             tid: tid, sid: sid)
-        case .gen5:
-            areas = PFBridge.getEncounters5(encounter: selectedEncounter, game: selectedGame)
-        }
-    }
-
-    private func gameName(_ game: PFGame) -> String {
-        switch game {
-        case .ruby: return "Ruby"
-        case .sapphire: return "Sapphire"
-        case .emerald: return "Emerald"
-        case .fireRed: return "FireRed"
-        case .leafGreen: return "LeafGreen"
-        case .diamond: return "Diamond"
-        case .pearl: return "Pearl"
-        case .platinum: return "Platinum"
-        case .heartGold: return "HeartGold"
-        case .soulSilver: return "SoulSilver"
-        case .black: return "Black"
-        case .white: return "White"
-        case .black2: return "Black 2"
-        case .white2: return "White 2"
-        default: return "Unknown"
-        }
     }
 }
 
 struct EncounterAreaCard: View {
-    let area: PFEncounterAreaSwift
+    let area: WildArea
     let isExpanded: Bool
     let onTap: () -> Void
 
@@ -134,9 +128,10 @@ struct EncounterAreaCard: View {
             Button(action: onTap) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(area.locationName.isEmpty ? "Location \(area.location)" : area.locationName)
+                        Text(area.name)
                             .font(.headline)
-                        Text("\(area.encounter.displayName) · Rate: \(area.rate)")
+                        Text(area.rate > 0 ? "\(area.encounter.displayName) · Rate: \(area.rate)"
+                                           : area.encounter.displayName)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -153,14 +148,15 @@ struct EncounterAreaCard: View {
             if isExpanded {
                 Divider()
                 VStack(spacing: 0) {
-                    ForEach(Array(area.slots.enumerated()), id: \.element.id) { index, slot in
+                    ForEach(area.slots) { slot in
                         HStack {
-                            Text("#\(index)")
+                            Text(slot.slotRate)
                                 .font(.caption2)
-                                .foregroundStyle(.tertiary)
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
                                 .lineLimit(1)
-                                .scaledWidth(24, relativeTo: .caption2, alignment: .trailing)
-                            Text(slot.specieName)
+                                .scaledWidth(40, relativeTo: .caption2, alignment: .trailing)
+                            Text(slot.speciesName)
                                 .font(.body)
                             Spacer()
                             if slot.minLevel == slot.maxLevel {
@@ -175,8 +171,8 @@ struct EncounterAreaCard: View {
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 4)
-                        if index < area.slots.count - 1 {
-                            Divider().padding(.leading, 48)
+                        if slot.index < area.slots.count - 1 {
+                            Divider().padding(.leading, 56)
                         }
                     }
                 }
