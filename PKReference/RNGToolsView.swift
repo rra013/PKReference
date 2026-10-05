@@ -948,12 +948,6 @@ struct SeedToTimeResult4: Identifiable, Hashable {
     }
 }
 
-struct SeedVerificationResult {
-    let actualSeed: UInt32
-    let targetSeed: UInt32
-    let delayDelta: Int
-}
-
 // ============================================================================
 // MARK: - PokeFinder Port: Finder Profiles
 // ============================================================================
@@ -2249,104 +2243,6 @@ nonisolated func findLocationID8(pfGame: PFGame, pfEnc: PFEncounter, locationNam
 }
 
 // ============================================================================
-// MARK: - Coin Flip Matching (Gen 4 Mersenne Twister)
-// ============================================================================
-
-nonisolated func matchesCoinFlips(seed: UInt32, observed: [Bool]) -> Bool {
-    var mt = [UInt32](repeating: 0, count: 624)
-    mt[0] = seed
-    for i in 1..<624 {
-        mt[i] = 1812433253 &* (mt[i - 1] ^ (mt[i - 1] >> 30)) &+ UInt32(i)
-    }
-
-    var idx = 624
-    func nextMT() -> UInt32 {
-        if idx >= 624 {
-            for i in 0..<624 {
-                let y = (mt[i] & 0x80000000) | (mt[(i + 1) % 624] & 0x7fffffff)
-                mt[i] = mt[(i + 397) % 624] ^ (y >> 1)
-                if y & 1 != 0 { mt[i] ^= 0x9908b0df }
-            }
-            idx = 0
-        }
-        var y = mt[idx]
-        y ^= (y >> 11)
-        y ^= (y << 7) & 0x9d2c5680
-        y ^= (y << 15) & 0xefc60000
-        y ^= (y >> 18)
-        idx += 1
-        return y
-    }
-
-    for isHeads in observed {
-        let isH = (nextMT() & 1) != 0
-        if isH != isHeads { return false }
-    }
-    return true
-}
-
-nonisolated func matchesCalls(seed: UInt32, observed: [UInt8], skips: UInt8) -> Bool {
-    var rngState = seed
-    func nextRNG() -> UInt16 {
-        rngState = rngState &* 0x41C64E6D &+ 0x6073
-        return UInt16(rngState >> 16)
-    }
-
-    // Skip roamer advances
-    for _ in 0..<skips {
-        _ = nextRNG()
-    }
-
-    for expected in observed {
-        let call = nextRNG() % 3
-        if call != UInt16(expected) { return false }
-    }
-    return true
-}
-
-// ============================================================================
-// MARK: - PokeFinder Port: Seed Verification
-// ============================================================================
-
-/// Verify what seed was actually hit by reverse-calculating from caught Pokemon's IVs.
-/// Returns the delta between actual and target seeds.
-nonisolated func verifySeedFromIVs(
-    caughtHP: UInt8, caughtAtk: UInt8, caughtDef: UInt8,
-    caughtSpA: UInt8, caughtSpD: UInt8, caughtSpe: UInt8,
-    caughtNature: UInt8,
-    tid: UInt16,
-    targetSeed: UInt32,
-    method: FinderMethod
-) -> SeedVerificationResult? {
-    let pidResults = LCRNGReverse.calculatePIDs(
-        hp: caughtHP, atk: caughtAtk, def: caughtDef,
-        spa: caughtSpA, spd: caughtSpD, spe: caughtSpe,
-        nature: caughtNature, tid: tid
-    )
-
-    // Find the result whose method matches
-    let targetMethod: LCRNGReverse.RNGMethod
-    switch method {
-    case .method1, .methodJ, .methodK, .method5, .method5IVs, .method5CGear: targetMethod = .method1
-    case .method2: targetMethod = .method2
-    case .method4: targetMethod = .method4
-    }
-
-    let matching = pidResults.filter { $0.method == targetMethod }
-    guard let closest = matching.first else { return nil }
-
-    // Compute delay delta for Gen 4 seeds
-    let actualDelay = Int(closest.seed & 0xFFFF)
-    let targetDelay = Int(targetSeed & 0xFFFF)
-
-    return SeedVerificationResult(
-        actualSeed: closest.seed,
-        targetSeed: targetSeed,
-        delayDelta: actualDelay - targetDelay
-    )
-}
-
-// ============================================================================
 // MARK: - Finder Timer Bridge
 // ============================================================================
 
@@ -2366,6 +2262,13 @@ final class FinderTimerBridge {
     var shouldSwitchToTimer: Bool = false
     var selectedTime: String?
     var selectedSeed: String?
+    /// Gen 4: the target's whole clock time, and whether it's
+    /// HeartGold/SoulSilver (calls) or Diamond/Pearl/Platinum (coin flips).
+    var pendingSeedTime: Gen4SeedTime?
+    var pendingHGSS: Bool?
+    /// What you hit, from checking your seed or catch, for the Timer's
+    /// calibration. It doesn't replace the target.
+    var pendingHit: TimerHit?
 
     func clear() {
         pendingGen = nil
@@ -2378,7 +2281,23 @@ final class FinderTimerBridge {
         shouldSwitchToTimer = false
         selectedTime = nil
         selectedSeed = nil
+        pendingSeedTime = nil
+        pendingHGSS = nil
+        pendingHit = nil
     }
+}
+
+/// What you hit, for the Timer's calibration.
+struct TimerHit {
+    var generation: TimerGeneration
+    /// Gen 4: the delay you hit.
+    var delay: Int?
+    /// Gen 3: the frames you were off by (late is positive); the Timer adds
+    /// it to its target frame, as the targets may count from different
+    /// presses.
+    var frameOffset: Int?
+    /// Shown above the Timer.
+    var note: String
 }
 
 // ============================================================================
@@ -2938,6 +2857,11 @@ struct RNGTimerView: View {
     @AppStorage("timer_gen4CalibratedDelay") private var gen4CalibratedDelay = 500
     @AppStorage("timer_gen4CalibratedSecond") private var gen4CalibratedSecond = 14
     @State private var gen4DelayHit = 0
+    /// The last Gen 4 target's whole clock time, from the Finder, for
+    /// checking the seed you hit.
+    @AppStorage("timer_gen4SeedTime") private var gen4SeedTimeData = Data()
+    @AppStorage("timer_gen4HGSS") private var gen4HGSS = false
+    @State private var checkingSeed = false
 
     // Gen 5 (defaults from EonTimer store)
     @AppStorage("timer_gen5Mode") private var gen5Mode: Gen5TimerMode = .standard
@@ -3079,6 +3003,21 @@ struct RNGTimerView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             if engine.isRunning { runningPanel }
         }
+        .sheet(isPresented: $checkingSeed) {
+            NavigationStack {
+                Gen4SeedCheckView(target: seedCheckTarget, heartGoldSoulSilver: gen4HGSS) { candidate in
+                    gen4DelayHit = candidate.delay
+                    reminderText = "You hit delay \(candidate.delay)" + hitOffsetText(candidate.delayOffset)
+                        + ". Tap Update Calibration."
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") { checkingSeed = false }
+                    }
+                }
+            }
+            .sheetSize()
+        }
         #if DEBUG && os(macOS)
         // `-debugOpenSheet timerRunning` starts it, for a snapshot of the
         // running panel (pass `-timer_beepCount 0` to keep it quiet).
@@ -3086,6 +3025,10 @@ struct RNGTimerView: View {
         #endif
         .onAppear {
             let bridge = FinderTimerBridge.shared
+            if let hit = bridge.pendingHit {
+                takeHit(hit)
+                bridge.clear()
+            }
             if let gen = bridge.pendingGen {
                 // A new target replaces the running timer, whose phases are
                 // the old target's.
@@ -3103,6 +3046,9 @@ struct RNGTimerView: View {
                 }
                 if let console = bridge.pendingConsole {
                     consoleType = console
+                } else if gen != .gen3 && consoleType == .gba {
+                    // Left over from a GBA target: DS games don't run on one.
+                    consoleType = .ndsSlot1
                 }
                 if gen == .gen4 {
                     if let delay = bridge.pendingTargetDelay {
@@ -3111,6 +3057,8 @@ struct RNGTimerView: View {
                     if let second = bridge.pendingTargetSecond {
                         gen4TargetSecond = second
                     }
+                    gen4SeedTimeData = bridge.pendingSeedTime?.encoded ?? Data()
+                    if let hgss = bridge.pendingHGSS { gen4HGSS = hgss }
                 }
                 if let time = bridge.selectedTime {
                     let seed = bridge.selectedSeed ?? "?"
@@ -3121,6 +3069,27 @@ struct RNGTimerView: View {
                 bridge.clear()
             }
         }
+    }
+
+    /// The Gen 4 target to check around: the clock time the Finder handed
+    /// over, with the target delay and second as they are now.
+    private var seedCheckTarget: Gen4SeedTime {
+        var target = Gen4SeedTime.decoded(gen4SeedTimeData) ?? Gen4SeedTime()
+        target.delay = gen4TargetDelay
+        target.second = gen4TargetSecond
+        return target
+    }
+
+    /// What you hit, from the Finder: Gen 4's delay, Gen 3's frames off.
+    private func takeHit(_ hit: TimerHit) {
+        generation = hit.generation
+        if let delay = hit.delay { gen4DelayHit = delay }
+        if let offset = hit.frameOffset { gen3FrameHit = gen3TargetFrame + offset }
+        reminderText = hit.note
+    }
+
+    private func hitOffsetText(_ offset: Int) -> String {
+        offset == 0 ? ", the target" : offset > 0 ? ", \(offset) late" : ", \(-offset) early"
     }
 
     private func startTimer() {
@@ -3311,8 +3280,14 @@ struct RNGTimerView: View {
                     gen3Calibration += calibrateGen3(settings, targetFrame: gen3TargetFrame, frameHit: gen3FrameHit)
                 }
             case .gen4:
-                Text("Enter the delay you hit.")
+                Text("Enter the delay you hit. To find it, check your seed right after loading: the Pokétch's coin flips, or the roamers and Elm's or Irwin's calls.")
                     .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    checkingSeed = true
+                } label: {
+                    Label("Check Your Seed", systemImage: "checkmark.seal")
+                }
                 RNGIntField(label: "Delay Hit", value: $gen4DelayHit)
                 Button("Update Calibration") {
                     let delta = calibrateGen4(settings, targetDelay: gen4TargetDelay, delayHit: gen4DelayHit)
@@ -3832,18 +3807,11 @@ struct FinderRootView: View {
     @AppStorage("finder_gen8filterSID") private var gen8FilterSIDText: String = ""
     @AppStorage("finder_gen8filterDisplayTID") private var gen8FilterDisplayTIDText: String = ""
 
-    // Coin flip search (Gen 4)
-    @State private var flipInput: [Bool] = []
-    @State private var flipSearchResults: [(seed: UInt32, flips: String)] = []
-    @State private var flipSearching = false
-    @State private var flipSearchRange: Int = 200
-
-    // Call search (Elm/Irwin, Gen 4)
-    @State private var callInput: [UInt8] = []
-    @State private var callSearchResults: [(seed: UInt32, calls: String)] = []
-    @State private var callSearching = false
-    @State private var callSearchRange: Int = 200
-    @State private var roamerCount: UInt8 = 0
+    /// Gen 4: checking which seed near the Generator's you hit.
+    @State private var checkingSeed = false
+    /// Gen 3: the Generator's seed from a Trainer ID, or a caught Pokémon.
+    @State private var seedTrainerIDText = ""
+    @State private var findingSeedFromPokemon = false
 
     /// FireRed and LeafGreen initial seeds.
     @State private var frlg = FRLGSeedSearch()
@@ -4209,8 +4177,6 @@ struct FinderRootView: View {
 
                 if generation == .gen4 && mode == .generator {
                     seedVerificationSection
-                    coinFlipSearchSection
-                    callSearchSection
                 }
 
                 if encounterMode != .id {
@@ -4313,7 +4279,9 @@ struct FinderRootView: View {
         #endif
         .navigationDestination(item: $selectedResult) { result in
             SeedToTimeView(result: result, generation: generation,
-                           tid: tid, sid: sid, method: method, onUseInGenerator: { seed in
+                           tid: tid, sid: sid, method: method, game: selectedGame,
+                           fromGenerator: mode == .generator, deadBattery: deadBattery,
+                           staticTarget: encounterMode == .static_, onUseInGenerator: { seed in
                 genSeedText = String(format: "%08X", seed)
                 mode = .generator
             }, frlg: frlgFiltering ? frlg : nil,
@@ -4340,6 +4308,38 @@ struct FinderRootView: View {
             Text(verbatim: "Save profile for \(selectedGame.rawValue) TID \(tid) / SID \(sid)")
         }
         .onAppear { fixStoredSelections() }
+        .sheet(isPresented: $findingSeedFromPokemon) {
+            NavigationStack {
+                Gen3SeedFromPokemonView(method: method, tid: tid,
+                                        template: encounterMode == .static_ ? selectedEncounter?.template : nil,
+                                        level: encounterMode == .static_ ? selectedEncounter.map { Int($0.level) } : nil) { origin in
+                    genSeedText = String(format: "%04X", origin.seed)
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") { findingSeedFromPokemon = false }
+                    }
+                }
+            }
+            .sheetSize()
+        }
+        .sheet(isPresented: $checkingSeed) {
+            NavigationStack {
+                Gen4SeedCheckView(target: Gen4SeedTime(), bareSeed: UInt32(genSeedText, radix: 16) ?? 0,
+                                  heartGoldSoulSilver: selectedGame == .heartGold || selectedGame == .soulSilver) { candidate in
+                    let bridge = FinderTimerBridge.shared
+                    bridge.pendingHit = TimerHit(generation: .gen4, delay: candidate.delay,
+                                                 note: "You hit delay \(candidate.delay) (seed \(String(format: "%08X", candidate.seed))). Tap Update Calibration.")
+                    bridge.shouldSwitchToTimer = true
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") { checkingSeed = false }
+                    }
+                }
+            }
+            .sheetSize()
+        }
         .onChange(of: generation) { fixLead() }
         .onChange(of: encounterMode) { fixLead() }
         .onChange(of: selectedGame) { fixLead() }
@@ -4859,6 +4859,34 @@ struct FinderRootView: View {
 
     // MARK: Generator Inputs
 
+    /// Gen 3 seeds only learnt in game (Variable Target): a new game's is
+    /// its Trainer ID, and a caught Pokémon leads back to one.
+    @ViewBuilder
+    private var gen3SeedSources: some View {
+        HStack {
+            Text("From Trainer ID")
+            Spacer()
+            TextField("New game", text: $seedTrainerIDText)
+                .textFieldStyle(.roundedBorder).scaledWidth(110)
+                .multilineTextAlignment(.trailing)
+                #if os(iOS)
+                .keyboardType(.numberPad)
+                #endif
+            Button("Use") {
+                if let id = UInt16(seedTrainerIDText.filter(\.isNumber)) { genSeedText = Gen3SeedFinder.seed(trainerID: id) }
+            }
+            .disabled(UInt16(seedTrainerIDText.filter(\.isNumber)) == nil)
+        }
+        Button {
+            findingSeedFromPokemon = true
+        } label: {
+            Label("From a Pokémon You Caught", systemImage: "magnifyingglass")
+        }
+        Text("A new game seeds the RNG with the Trainer ID it makes; a Pokémon's nature and IVs lead back to its seed.")
+            .font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
     private var generatorInputs: some View {
         SectionCard(title: "Seed & Advances", icon: "number") {
             if generation == .gen8 {
@@ -4899,6 +4927,9 @@ struct FinderRootView: View {
                         .textInputAutocapitalization(.characters)
                         #endif
                 }
+                if generation == .gen3 {
+                    gen3SeedSources
+                }
             }
             if generation == .gen5 {
                 // Gen 5 draws IVs and the PID from separate RNGs; PokéFinder
@@ -4918,6 +4949,15 @@ struct FinderRootView: View {
         let seed = UInt32(genSeedText, radix: 16) ?? 0
         return SectionCard(title: "Seed Verification", icon: "checkmark.seal") {
             VStack(alignment: .leading, spacing: 8) {
+                Button {
+                    checkingSeed = true
+                } label: {
+                    Label("Check Which Seed You Hit", systemImage: "checkmark.seal")
+                }
+                Text("Near this seed, from the coin flips, roamers or calls after loading. A target from the Searcher's Seed to Time checks its own clock time in the Timer.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Divider()
                 Text("Coin Flips (Poketch)")
                     .font(.caption).foregroundStyle(.secondary)
                 let flips = PFBridge.coinFlips(seed).split(separator: ", ").map(String.init)
@@ -4973,273 +5013,6 @@ struct FinderRootView: View {
                 Text(label)
                     .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(label == "H" ? .red : label == "L" ? .blue : .primary)
-            }
-        }
-    }
-
-    // MARK: - Coin Flip Finder
-
-    private var coinFlipSearchSection: some View {
-        SectionCard(title: "Coin Flip Finder", icon: "circle.lefthalf.filled") {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Tap to record observed Poketch coin flips")
-                    .font(.caption).foregroundStyle(.secondary)
-
-                HStack(spacing: 6) {
-                    ForEach(Array(flipInput.enumerated()), id: \.offset) { idx, isHeads in
-                        Button {
-                            flipInput[idx].toggle()
-                        } label: {
-                            Text(isHeads ? "H" : "T")
-                                .font(.system(.caption, design: .monospaced)).bold()
-                                .foregroundStyle(isHeads ? .orange : .cyan)
-                                .frame(width: 24, height: 24)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .fill(isHeads ? Color.orange.opacity(0.15) : Color.cyan.opacity(0.15))
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    if flipInput.count < 15 {
-                        Button { flipInput.append(false) } label: {
-                            Image(systemName: "plus.circle").foregroundStyle(Color.accentColor)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-
-                HStack {
-                    Text("Range: \u{00B1}")
-                        .font(.caption)
-                    TextField("200", value: $flipSearchRange, format: .number)
-                        .clamping($flipSearchRange, to: RNGFieldRange.word)
-                        #if os(iOS)
-                        .keyboardType(.numberPad)
-                        #endif
-                        .textFieldStyle(.roundedBorder)
-                        .scaledWidth(80)
-                        .font(.caption)
-                }
-
-                HStack {
-                    if !flipInput.isEmpty {
-                        Button("Clear") {
-                            flipInput.removeAll()
-                            flipSearchResults.removeAll()
-                        }
-                        .font(.caption)
-                    }
-                    Spacer()
-                    Button { searchCoinFlips() } label: {
-                        Label("Search", systemImage: "magnifyingglass").font(.caption)
-                    }
-                    .disabled(flipInput.count < 5 || flipSearching)
-                }
-
-                if flipSearching {
-                    ProgressView().padding(.vertical, 4)
-                }
-
-                if !flipSearchResults.isEmpty {
-                    Divider()
-                    Text("Matching Seeds (\(flipSearchResults.count))")
-                        .font(.caption).foregroundStyle(.secondary)
-                    ForEach(Array(flipSearchResults.prefix(50).enumerated()), id: \.offset) { _, match in
-                        HStack {
-                            Text(String(format: "%08X", match.seed))
-                                .font(.system(.caption, design: .monospaced))
-                            Spacer()
-                            Text(match.flips)
-                                .font(.system(.caption2, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func searchCoinFlips() {
-        guard flipInput.count >= 5 else { return }
-        flipSearching = true
-        flipSearchResults = []
-
-        let observed = flipInput
-        let targetSeed = UInt32(genSeedText, radix: 16) ?? 0
-        let range = UInt32(clamping: flipSearchRange)
-        let lo = targetSeed &- range
-        let hi = targetSeed &+ range
-
-        Task.detached {
-            var found: [(seed: UInt32, flips: String)] = []
-
-            if lo <= hi {
-                for seed in lo...hi {
-                    if matchesCoinFlips(seed: seed, observed: observed) {
-                        found.append((seed: seed, flips: PFBridge.coinFlips(seed)))
-                    }
-                }
-            } else {
-                for seed in lo...UInt32.max {
-                    if matchesCoinFlips(seed: seed, observed: observed) {
-                        found.append((seed: seed, flips: PFBridge.coinFlips(seed)))
-                    }
-                }
-                for seed: UInt32 in 0...hi {
-                    if matchesCoinFlips(seed: seed, observed: observed) {
-                        found.append((seed: seed, flips: PFBridge.coinFlips(seed)))
-                    }
-                }
-            }
-
-            let results = found
-            await MainActor.run {
-                flipSearchResults = results
-                flipSearching = false
-            }
-        }
-    }
-
-    // MARK: - Elm/Irwin Call Finder
-
-    private var callSearchSection: some View {
-        SectionCard(title: "Elm/Irwin Call Finder", icon: "phone.fill") {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Tap to record observed Elm/Irwin calls")
-                    .font(.caption).foregroundStyle(.secondary)
-
-                HStack(spacing: 6) {
-                    ForEach(Array(callInput.enumerated()), id: \.offset) { idx, call in
-                        Button {
-                            callInput[idx] = (call + 1) % 3
-                        } label: {
-                            Text(callLabel(call))
-                                .font(.system(.caption, design: .monospaced)).bold()
-                                .foregroundStyle(callColor(call))
-                                .frame(width: 24, height: 24)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .fill(callColor(call).opacity(0.15))
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    if callInput.count < 15 {
-                        Button { callInput.append(0) } label: {
-                            Image(systemName: "plus.circle").foregroundStyle(Color.accentColor)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-
-                Text("E = Elm, K = Irwin, P = Pokemon (tap to cycle)")
-                    .font(.caption2).foregroundStyle(.tertiary)
-
-                HStack {
-                    Text("Range: \u{00B1}")
-                        .font(.caption)
-                    TextField("200", value: $callSearchRange, format: .number)
-                        .clamping($callSearchRange, to: RNGFieldRange.word)
-                        #if os(iOS)
-                        .keyboardType(.numberPad)
-                        #endif
-                        .textFieldStyle(.roundedBorder)
-                        .scaledWidth(80)
-                        .font(.caption)
-                }
-
-                Stepper("Roamers: \(roamerCount)", value: $roamerCount, in: 0...3)
-                    .font(.caption)
-
-                HStack {
-                    if !callInput.isEmpty {
-                        Button("Clear") {
-                            callInput.removeAll()
-                            callSearchResults.removeAll()
-                        }
-                        .font(.caption)
-                    }
-                    Spacer()
-                    Button { searchCalls() } label: {
-                        Label("Search", systemImage: "magnifyingglass").font(.caption)
-                    }
-                    .disabled(callInput.count < 3 || callSearching)
-                }
-
-                if callSearching {
-                    ProgressView().padding(.vertical, 4)
-                }
-
-                if !callSearchResults.isEmpty {
-                    Divider()
-                    Text("Matching Seeds (\(callSearchResults.count))")
-                        .font(.caption).foregroundStyle(.secondary)
-                    ForEach(Array(callSearchResults.prefix(50).enumerated()), id: \.offset) { _, match in
-                        HStack {
-                            Text(String(format: "%08X", match.seed))
-                                .font(.system(.caption, design: .monospaced))
-                            Spacer()
-                            Text(match.calls)
-                                .font(.system(.caption2, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func callLabel(_ call: UInt8) -> String {
-        switch call {
-        case 0: return "E"
-        case 1: return "K"
-        default: return "P"
-        }
-    }
-
-    private func callColor(_ call: UInt8) -> Color {
-        switch call {
-        case 0: return .green
-        case 1: return .orange
-        default: return .purple
-        }
-    }
-
-    private func searchCalls() {
-        guard callInput.count >= 3 else { return }
-        callSearching = true
-        callSearchResults = []
-
-        let observed = callInput
-        let targetSeed = UInt32(genSeedText, radix: 16) ?? 0
-        let range = UInt32(clamping: callSearchRange)
-        let skips = roamerCount
-        let lo = targetSeed &- range
-        let hi = targetSeed &+ range
-
-        Task.detached {
-            var found: [(seed: UInt32, calls: String)] = []
-
-            func check(_ seed: UInt32) {
-                if matchesCalls(seed: seed, observed: observed, skips: skips) {
-                    found.append((seed: seed, calls: PFBridge.getCalls(seed, skips: skips)))
-                }
-            }
-
-            if lo <= hi {
-                for seed in lo...hi { check(seed) }
-            } else {
-                for seed in lo...UInt32.max { check(seed) }
-                for seed: UInt32 in 0...hi { check(seed) }
-            }
-
-            let results = found
-            await MainActor.run {
-                callSearchResults = results
-                callSearching = false
             }
         }
     }
@@ -5667,6 +5440,13 @@ struct SeedToTimeView: View {
     let tid: UInt16
     let sid: UInt16
     let method: FinderMethod
+    /// The game searched, for what's checked after hitting the target.
+    var game: FinderGameVersion? = nil
+    /// The Generator's result, whose frames count from its seed.
+    var fromGenerator = false
+    var deadBattery = false
+    /// A static encounter (wild ones generate differently).
+    var staticTarget = false
     var onUseInGenerator: ((UInt32) -> Void)?
     /// FireRed and LeafGreen: the seeds the player can hit, in place of
     /// Ruby and Sapphire's clock times.
@@ -5685,17 +5465,6 @@ struct SeedToTimeView: View {
     @State private var originSeed: UInt16 = 0
     @State private var advances: UInt32 = 0
     @State private var isComputing = false
-
-    // Verification
-    @State private var showVerify = false
-    @State private var verifyHP: UInt8 = 0
-    @State private var verifyAtk: UInt8 = 0
-    @State private var verifyDef: UInt8 = 0
-    @State private var verifySpA: UInt8 = 0
-    @State private var verifySpD: UInt8 = 0
-    @State private var verifySpe: UInt8 = 0
-    @State private var verifyNature: UInt8 = 0
-    @State private var verificationResult: SeedVerificationResult?
 
     /// The FireRed or LeafGreen seed being calibrated.
     @State private var calibrating: FRLGInitialSeed?
@@ -5716,7 +5485,7 @@ struct SeedToTimeView: View {
                 } else {
                     timeResultsSection
                     // FireRed and LeafGreen calibrate from each seed instead.
-                    verifySection
+                    afterHittingSection
                 }
             }
             .padding()
@@ -5820,56 +5589,34 @@ struct SeedToTimeView: View {
         }
     }
 
-    private var verifySection: some View {
-        SectionCard(title: "Verify Catch", icon: "checkmark.shield") {
-            DisclosureGroup("Enter Caught Pokemon IVs", isExpanded: $showVerify) {
-                VStack(spacing: 8) {
-                    IVSliderRow8(label: "HP", value: $verifyHP)
-                    IVSliderRow8(label: "Attack", value: $verifyAtk)
-                    IVSliderRow8(label: "Defense", value: $verifyDef)
-                    IVSliderRow8(label: "Sp. Atk", value: $verifySpA)
-                    IVSliderRow8(label: "Sp. Def", value: $verifySpD)
-                    IVSliderRow8(label: "Speed", value: $verifySpe)
-
-                    Picker("Nature", selection: $verifyNature) {
-                        ForEach(0..<25, id: \.self) { i in
-                            Text(pfNatureNames[i]).tag(UInt8(i))
-                        }
-                    }
-
-                    Button {
-                        verificationResult = verifySeedFromIVs(
-                            caughtHP: verifyHP, caughtAtk: verifyAtk,
-                            caughtDef: verifyDef, caughtSpA: verifySpA,
-                            caughtSpD: verifySpD, caughtSpe: verifySpe,
-                            caughtNature: verifyNature,
-                            tid: tid, targetSeed: result.seed,
-                            method: method
-                        )
-                    } label: {
-                        Label("Verify", systemImage: "checkmark.circle")
-                    }
-                    .buttonStyle(.primaryAction)
-
-                    if let vr = verificationResult {
-                        VStack(alignment: .leading, spacing: 4) {
-                            LabeledContent("Actual Seed", value: String(format: "%08X", vr.actualSeed))
-                                .font(.system(.body, design: .monospaced))
-                            LabeledContent("Target Seed", value: String(format: "%08X", vr.targetSeed))
-                                .font(.system(.body, design: .monospaced))
-                            HStack {
-                                Text("Delay Delta")
-                                Spacer()
-                                Text("\(vr.delayDelta > 0 ? "+" : "")\(vr.delayDelta)")
-                                    .font(.system(.body, design: .monospaced))
-                                    .foregroundStyle(vr.delayDelta == 0 ? .green : .red)
-                            }
-                        }
-                        .padding(.top, 8)
-                    }
-                }
+    /// What tells you what you hit: Gen 3 from the catch, Gen 4 from the
+    /// seed check in the Timer.
+    @ViewBuilder
+    private var afterHittingSection: some View {
+        if generation == .gen3 && staticTarget {
+            Gen3WhatYouHitCard(target: result, fromGenerator: fromGenerator, suggestedInitialSeed: gen3InitialSeed,
+                               method: method, template: encounter?.template, level: encounter.map { Int($0.level) },
+                               game: game?.pfGame ?? .none, tid: tid, sid: sid) { hit in
+                let bridge = FinderTimerBridge.shared
+                bridge.pendingHit = hit
+                bridge.shouldSwitchToTimer = true
+                close()
+            }
+        } else if generation == .gen4 {
+            SectionCard(title: "After You Hit It", icon: "checkmark.seal") {
+                Text("Load your game and check your seed before going on: the Timer's Check Your Seed lists the seeds near this one with their coin flips, or roamers and Elm's or Irwin's calls, and gives the delay you hit for its calibration.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    /// The seed a Gen 3 game starts on: Emerald's is always 0, a dead
+    /// battery's 0x5A0; otherwise the 16-bit seed before the target's.
+    private var gen3InitialSeed: UInt32 {
+        if game == .emerald { return 0 }
+        if deadBattery && (game == .ruby || game == .sapphire) { return 0x5A0 }
+        return UInt32(PFBridge.seedToTimeOriginSeed3(seed: result.seed).originSeed)
     }
 
     private var gen3TimeSection: some View {
@@ -5884,7 +5631,7 @@ struct SeedToTimeView: View {
         SeedToTimeListGen4(
             times: timeResults4,
             totalCount: timeResults4.count,
-            onSelect: { delay, second, timeText in sendToTimerGen4(delay: delay, second: second, timeText: timeText) }
+            onSelect: { time in sendToTimerGen4(time) }
         )
     }
 
@@ -5933,12 +5680,17 @@ struct SeedToTimeView: View {
         close()
     }
 
-    private func sendToTimerGen4(delay: Int, second: Int, timeText: String) {
+    /// The Timer also keeps the whole clock time, for checking the seed you
+    /// hit (`Gen4SeedCheckView`).
+    private func sendToTimerGen4(_ time: SeedToTimeResult4) {
         let bridge = FinderTimerBridge.shared
         bridge.pendingGen = .gen4
-        bridge.pendingTargetDelay = delay
-        bridge.pendingTargetSecond = second
-        bridge.selectedTime = timeText
+        bridge.pendingTargetDelay = Int(time.delay)
+        bridge.pendingTargetSecond = time.second
+        bridge.pendingSeedTime = Gen4SeedTime(month: time.month, day: time.day, hour: Int(time.hour),
+                                              minute: time.minute, second: time.second, delay: Int(time.delay))
+        bridge.pendingHGSS = game == .heartGold || game == .soulSilver
+        bridge.selectedTime = time.displayTime
         bridge.selectedSeed = result.seedHex
         bridge.shouldSwitchToTimer = true
         close()
@@ -6002,7 +5754,7 @@ private struct SeedToTimeRow3: View {
 struct SeedToTimeListGen4: View {
     let times: [SeedToTimeResult4]
     let totalCount: Int
-    let onSelect: (Int, Int, String) -> Void
+    let onSelect: (SeedToTimeResult4) -> Void
 
     private var limited: ArraySlice<SeedToTimeResult4> {
         times.prefix(100)
@@ -6023,9 +5775,9 @@ struct SeedToTimeListGen4: View {
 
 private struct SeedToTimeRow4: View {
     let time: SeedToTimeResult4
-    let onSelect: (Int, Int, String) -> Void
+    let onSelect: (SeedToTimeResult4) -> Void
     var body: some View {
-        Button { onSelect(Int(time.delay), time.second, time.displayTime) } label: {
+        Button { onSelect(time) } label: {
             VStack(alignment: .leading, spacing: 2) {
                 Text(time.displayTime)
                     .font(.system(.caption, design: .monospaced))
