@@ -3,6 +3,7 @@ package com.pkreference.backend.usage;
 import com.pkreference.backend.model.Events.StandingsFetched;
 import com.pkreference.backend.model.Events.TeamMember;
 import com.pkreference.backend.model.Events.UsageUpdated;
+import com.pkreference.backend.standardize.NameStandardizer;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,10 +21,13 @@ import java.util.stream.Collectors;
 public class UsageAggregationService {
     private final UsageCounterRepository counters;
     private final ProcessedTournamentRepository processed;
+    private final NameStandardizer names;
 
-    public UsageAggregationService(UsageCounterRepository counters, ProcessedTournamentRepository processed) {
+    public UsageAggregationService(UsageCounterRepository counters, ProcessedTournamentRepository processed,
+                                   NameStandardizer names) {
         this.counters = counters;
         this.processed = processed;
+        this.names = names;
     }
 
     /**
@@ -54,12 +58,14 @@ public class UsageAggregationService {
                     bump(deltas, format, UsageCounter.SPECIES, species, "");
                     touchedSpecies.add(species);
                 }
-                bump(deltas, format, "ITEM", species, m.item());
-                bump(deltas, format, "ABILITY", species, m.ability());
-                bump(deltas, format, "TERA", species, m.tera());
-                bump(deltas, format, "NATURE", species, lower(m.nature())); // API casing is inconsistent
+                bump(deltas, format, "ITEM", species, names.item(format, m.item()));
+                bump(deltas, format, "ABILITY", species, names.ability(format, m.ability()));
+                bump(deltas, format, "TERA", species, names.tera(m.tera()));
+                bump(deltas, format, "NATURE", species, names.nature(m.nature()));
                 if (m.attacks() != null) {
-                    m.attacks().forEach(a -> bump(deltas, format, "MOVE", species, a));
+                    // A move listed twice on one set (typo or duplicate) still counts once.
+                    m.attacks().stream().map(a -> names.move(format, a)).filter(a -> a != null)
+                            .distinct().forEach(a -> bump(deltas, format, "MOVE", species, a));
                 }
             }
         }

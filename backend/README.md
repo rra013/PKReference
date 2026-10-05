@@ -23,6 +23,15 @@ Set `LIMITLESS_GAME` / `LIMITLESS_FORMAT` to pick the circuit (see `GET /games` 
 ## Test
 `mvn verify` runs the aggregation unit tests and an embedded-Kafka pipeline test.
 
+## Name standardization
+Players type items, abilities and moves by hand, so `NameStandardizer` canonicalizes them before counting
+("MIRACLE SEED" / "Fake-out" / "Darkest Larient" -> "Miracle Seed" / "Fake Out" / "Darkest Lariat").
+It reads the repo-root `champions-*.json` regulation files, their learnsets and
+`PKReference/showdown-champions-data.json` (bundled onto the classpath at build time) to fix spelling and
+casing. It never drops a value: the regulation item lists are incomplete (Life Orb, Wide Lens, Expert Belt
+and some mega stones are missing but widely used), so unknown names are kept, title-cased.
+After upgrading, delete `backend/data/` so counters are rebuilt with the new spellings.
+
 ## Notes
 - Aggregation is idempotent per tournament id: replays and duplicate deliveries are no-ops.
 - Failed records retry 3 times, then go to `<topic>.DLT`.
