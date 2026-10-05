@@ -18,8 +18,11 @@ import static org.awaitility.Awaitility.await;
 /** standings.fetched -> aggregator -> DB -> REST, against an in-JVM Kafka broker. */
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @EmbeddedKafka(partitions = 1, topics = {Topics.STANDINGS_FETCHED, Topics.POKEMON_USAGE})
-@TestPropertySource(properties = "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}")
-class UsagePipelineIT {
+@TestPropertySource(properties = {
+        "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
+        "spring.datasource.url=jdbc:h2:mem:it;DB_CLOSE_DELAY=-1",
+        "pkref.limitless.ingest-enabled=false"})
+class UsagePipelineTest {
     @Autowired KafkaTemplate<String, Object> kafka;
     @Autowired UsageCounterRepository counters;
     @Autowired TestRestTemplate rest;

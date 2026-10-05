@@ -1,5 +1,6 @@
 package com.pkreference.backend.usage;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
@@ -10,7 +11,7 @@ import jakarta.persistence.Table;
  * running the species), or ITEM / ABILITY / MOVE / TERA / NATURE (value = what they ran).
  */
 @Entity
-@Table(indexes = @Index(columnList = "format, category, species"))
+@Table(indexes = @Index(columnList = "fmt, category, species"))
 public class UsageCounter {
     public static final String TEAMS = "TEAMS";
     public static final String SPECIES = "SPECIES";
@@ -18,10 +19,13 @@ public class UsageCounter {
 
     @Id
     private String id;
+    @Column(name = "fmt")
     private String format;
     private String category;
     private String species;
+    @Column(name = "val")
     private String value;
+    @Column(name = "n")
     private long count;
 
     protected UsageCounter() {}
