@@ -303,7 +303,7 @@ extension IntentData {
             pokemon: spokenName(of: spread.pokemonID, among: pokemon, stored: spread.pokemonName),
             types: row.map { [$0.type1] + [$0.type2].compactMap { $0 } } ?? [],
             ability: spread.abilityName.map(formatAbilityName),
-            item: spread.itemRawValue,
+            item: spread.itemRawValue.map(HeldItem.currentName),
             nature: allNatures.first { $0.id == spread.natureID }?.name,
             level: spread.level,
             championsMode: spread.championsMode,
@@ -374,7 +374,7 @@ extension IntentData {
         let members = slots.map { slot in
             TeamAnswer.Member(name: spokenName(of: slot.pokemonID, among: pokemon, stored: slot.pokemonName),
                               types: [slot.type1] + [slot.type2].compactMap { $0 },
-                              item: slot.itemRawValue)
+                              item: slot.itemRawValue.map(HeldItem.currentName))
         }
         let regulation = ChampionsRegulation.current
         guard slots.contains(where: \.championsMode), let validator = ChampionsValidator(regulation: regulation) else {

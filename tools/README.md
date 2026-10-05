@@ -42,7 +42,11 @@ moment its JSON ships — no callsite changes.
 From the regulation page, note:
 - **Legal window** (`valid_from` / `valid_until`, `YYYY-MM-DD`).
 - **Newly available Pokémon** (base species, regional/alt forms, new Megas).
-- **Newly added items**.
+- **Newly added items** (the page's "Newly Added Items" table). Every item a
+  regulation adds stays legal in the later ones. M-B's fifteen (Life Orb, Light
+  Clay, Wide Lens, …) were missed until 2026-10-05, when M-B and M-C were
+  checked against Serebii's [item list](https://www.serebii.net/pokemonchampions/items.shtml);
+  the newest regulation's items should match that list.
 
 Then confirm each new species' Serebii **slug** resolves (punctuation names are
 fiddly — `farfetch'd`, `mr.mime`, `sirfetch'd` worked; `farfetchd` 404s). A quick
@@ -64,8 +68,10 @@ PY
 
 New Mega **stone names**: check Serebii itemdex (`/itemdex/<slug>.shtml`, e.g.
 `garchompitez` → "Garchompite Z"). If a stone isn't listed there, fall back to
-the `<Name>ite` convention and flag it as best-effort (that's what was done for
-`Golisopodite` / `Baxcaliburite`).
+the `<Name>ite` convention, flag it as best-effort, and recheck it once Serebii
+lists it. `Golisopodite` / `Baxcaliburite` were such guesses; the game's names are
+`Golisopite` / `Baxcalibrite` (fixed 2026-10-05). When a stone or item is renamed,
+add the old name to `HeldItem.renamed` so sets saved under it still load.
 
 ---
 

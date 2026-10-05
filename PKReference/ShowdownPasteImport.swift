@@ -369,7 +369,8 @@ struct PasteImporter {
         // Item.
         var item = HeldItem.none
         if let raw = set.item, !raw.isEmpty {
-            if let resolved = itemIndex.resolve(raw) {
+            // A paste exported before an item was renamed uses its old name.
+            if let resolved = itemIndex.resolve(HeldItem.currentName(raw)) {
                 item = resolved
             } else {
                 issues.append(.itemUnrecognized(raw: raw))

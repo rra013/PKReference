@@ -235,4 +235,61 @@ struct RegulationRulesTests {
         let vocabulary = try TeamSearchVocabulary.bundled(for: regulation)
         #expect(vocabulary.mega(heldItem: "Dragoninite", speciesID: "dragonite") != nil)
     }
+
+    /// Regulation M-B added these items (Serebii's M-B page, "Newly Added
+    /// Items"), but its item list was copied from M-A, so they were illegal
+    /// items and Battle Sim refused Champions teams holding them.
+    @Test("The items M-B added are legal from M-B on", arguments: ChampionsRegulation.allCases)
+    func itemsAddedInMB(regulation: ChampionsRegulation) throws {
+        let added = ["Wide Lens", "Muscle Band", "Wise Glasses", "Expert Belt", "Light Clay", "Life Orb",
+                     "Zoom Lens", "Metronome", "Iron Ball", "Icy Rock", "Smooth Rock", "Heat Rock",
+                     "Damp Rock", "Shed Shell", "Big Root"]
+        let validator = try #require(ChampionsValidator(regulation: regulation))
+        for item in added {
+            #expect(validator.itemWhitelist.contains(item) == (regulation != .mA),
+                    "\(item) in \(regulation.displayName)")
+        }
+        #expect(validator.choiceItems == ["Choice Scarf"])
+    }
+
+    /// The stones M-C added were first guessed as "Golisopodite" and
+    /// "Baxcaliburite"; tournament teams and pastes use the game's names.
+    @Test("Golisopod and Baxcalibur hold their stones by the game's names")
+    func mCStoneNames() throws {
+        let validator = try #require(ChampionsValidator(regulation: .mC))
+        let golisopod = PokemonSet(species: "Golisopod", ability: "Emergency Exit", item: "Golisopite",
+                                   nature: "Adamant", teraType: nil,
+                                   moves: ["First Impression", "Leech Life", "Liquidation", "Protect"],
+                                   statPoints: .init(hp: 32, atk: 32, def: 0, spa: 0, spd: 2, spe: 0), role: nil)
+        let baxcalibur = PokemonSet(species: "Baxcalibur", ability: "Thermal Exchange", item: "Baxcalibrite",
+                                    nature: "Adamant", teraType: nil,
+                                    moves: ["Glaive Rush", "Icicle Crash", "Ice Shard", "Protect"],
+                                    statPoints: .init(hp: 2, atk: 32, def: 0, spa: 0, spd: 0, spe: 32), role: nil)
+        for set in [golisopod, baxcalibur] {
+            #expect(categories(validator.validate(set: set)).isDisjoint(with: [.illegalItem, .wrongMegaStone]),
+                    "\(set.species)")
+        }
+        let vocabulary = try TeamSearchVocabulary.bundled(for: .mC)
+        #expect(vocabulary.mega(heldItem: "Golisopite", speciesID: "golisopod") != nil)
+        #expect(vocabulary.mega(heldItem: "Baxcalibrite", speciesID: "baxcalibur") != nil)
+    }
+
+    /// A team saved with an old stone name still validates: the name is
+    /// read as the current one before the validator sees it.
+    @Test("A saved team holding an old stone name isn't an illegal item")
+    func oldStoneNameInSavedTeam() throws {
+        let validator = try #require(ChampionsValidator(regulation: .mC))
+        let slot = TeamSlotInfo(
+            spreadName: "test",
+            pokemonID: 768, pokemonName: "Golisopod",
+            type1: "Bug", type2: "Water",
+            abilityName: "emergency-exit", itemRawValue: "Golisopodite",
+            championsMode: true, natureID: "adamant", level: 50,
+            evHP: 32, evAtk: 32, evDef: 0, evSpAtk: 0, evSpDef: 2, evSpeed: 0,
+            moveSlots: []
+        )
+        #expect(ChampionsFormat.pokemonSet(from: slot).item == "Golisopite")
+        let found = categories(ChampionsFormat.validate(slots: [slot], validator: validator))
+        #expect(found.isDisjoint(with: [.illegalItem, .wrongMegaStone]))
+    }
 }

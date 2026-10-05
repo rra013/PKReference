@@ -214,7 +214,7 @@ private struct SetRowView: View {
                             .background(ColorRole.ability.color.opacity(0.12), in: Capsule())
                     }
                     if let item = spread.itemRawValue, item != HeldItem.none.rawValue {
-                        Text(item)
+                        Text(HeldItem.currentName(item))
                             .font(.caption2)
                             .padding(.horizontal, 4).padding(.vertical, 1)
                             .foregroundStyle(ColorRole.item.color)

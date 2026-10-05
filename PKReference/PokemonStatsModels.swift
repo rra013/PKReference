@@ -406,9 +406,25 @@ nonisolated struct HeldItem: RawRepresentable, Hashable, CaseIterable, Identifia
     let rawValue: String
 
     /// A known item: a built-in one, or a Mega stone from `mega_forms.json`.
+    /// An item's old name (`renamed`) gives the item under its current name.
     init?(rawValue: String) {
-        guard Self.knownNames.contains(rawValue) else { return nil }
-        self.rawValue = rawValue
+        let name = Self.currentName(rawValue)
+        guard Self.knownNames.contains(name) else { return nil }
+        self.rawValue = name
+    }
+
+    /// Items whose names were corrected, old name to current. Saved sets and
+    /// teams keep the name they were saved with, so lookups go through
+    /// `currentName`. Golisopite and Baxcalibrite were guessed as
+    /// "Golisopodite" and "Baxcaliburite" before Serebii listed them.
+    static let renamed: [String: String] = [
+        "Golisopodite": "Golisopite",
+        "Baxcaliburite": "Baxcalibrite",
+    ]
+
+    /// `name`, or its current name if the item was renamed.
+    static func currentName(_ name: String) -> String {
+        renamed[name] ?? name
     }
 
     private init(_ name: String) { rawValue = name }

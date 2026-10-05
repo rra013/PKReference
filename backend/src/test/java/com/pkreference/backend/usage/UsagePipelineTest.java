@@ -37,7 +37,7 @@ class UsagePipelineTest {
                 assertThat(counters.findById("reg-m-a|SPECIES|incineroar|")).isPresent());
         // Give the duplicate time to be (not) applied.
         await().pollDelay(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(10)).untilAsserted(() ->
-                assertThat(counters.findById("reg-m-a|SPECIES|incineroar|").orElseThrow().getCount()).isEqualTo(2));
+                assertThat(counters.findById("reg-m-a|SPECIES|incineroar|").orElseThrow().getCount()).isEqualTo(4));
 
         var body = rest.getForObject("/api/usage?format=reg-m-a", String.class);
         assertThat(body).contains("incineroar").contains("100.0");

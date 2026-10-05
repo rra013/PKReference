@@ -67,6 +67,26 @@
   </dependencies>
 
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <!-- Regulation data lives at the repo root, shared with the iOS app; bundle it. -->
+      <resource>
+        <directory>..</directory>
+        <targetPath>regulations</targetPath>
+        <includes>
+          <include>champions-*.json</include>
+        </includes>
+      </resource>
+      <resource>
+        <directory>../PKReference</directory>
+        <targetPath>regulations</targetPath>
+        <includes>
+          <include>showdown-champions-data.json</include>
+        </includes>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>

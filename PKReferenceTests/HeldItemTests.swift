@@ -40,6 +40,24 @@ struct HeldItemTests {
         #expect(HeldItem(rawValue: "leftovers") == nil)
     }
 
+    /// Sets saved before Golisopite and Baxcalibrite were renamed hold the
+    /// old names; they still load as the stone, under its current name.
+    @Test("A renamed item's old name gives the item under its current name")
+    func renamedItems() {
+        let names = Set(HeldItem.allCases.map(\.rawValue))
+        for (old, current) in HeldItem.renamed {
+            #expect(!names.contains(old), "\(old)")
+            #expect(names.contains(current), "\(current)")
+            #expect(HeldItem(rawValue: old)?.rawValue == current)
+            #expect(HeldItem(rawValue: old)?.isMegaStone == true)
+            #expect(HeldItem.currentName(old) == current)
+        }
+        #expect(HeldItem(rawValue: "Golisopodite")?.rawValue == "Golisopite")
+        #expect(HeldItem(rawValue: "Baxcaliburite")?.rawValue == "Baxcalibrite")
+        #expect(HeldItem.currentName("Leftovers") == "Leftovers")
+        #expect(HeldItem.currentName("Not An Item") == "Not An Item")
+    }
+
     @Test("The item tables only use built-in items")
     func tablesUseBuiltIns() {
         let builtIns = Set(HeldItem.builtIns)

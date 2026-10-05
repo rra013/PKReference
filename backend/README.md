@@ -23,6 +23,16 @@ Set `LIMITLESS_GAME` / `LIMITLESS_FORMAT` to pick the circuit (see `GET /games` 
 ## Test
 `mvn verify` runs the aggregation unit tests and an embedded-Kafka pipeline test.
 
+## Name standardization
+Players type items, abilities and moves by hand, so `NameStandardizer` canonicalizes them before counting
+("MIRACLE SEED" / "Fake-out" / "Darkest Larient" -> "Miracle Seed" / "Fake Out" / "Darkest Lariat").
+It reads the repo-root `champions-*.json` regulation files, their learnsets,
+`PKReference/showdown-champions-data.json` (bundled onto the classpath at build time) and
+`reference/champions-items.json`, a snapshot of Serebii's Champions item page (every Champions item, not
+per regulation). It fixes spelling and casing and never drops a value, since decklists also come from formats
+with no regulation file (fan formats, older or newer regulations); names matching nothing are kept, title-cased.
+After upgrading, delete `backend/data/` so counters are rebuilt with the new spellings.
+
 ## Notes
 - Aggregation is idempotent per tournament id: replays and duplicate deliveries are no-ops.
 - Failed records retry 3 times, then go to `<topic>.DLT`.
