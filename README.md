@@ -262,6 +262,10 @@ newest events with their winners' teams. It replaced the Tournaments tab.
   predictor), its items, abilities, moves, natures and Mega Stones, its
   teammates and the cores it's in, and links to the Mon Index and Team
   Search.
+- **Teams to Beat:** the archetypes (teams built around a core of four) with
+  the most top-cut teams. An archetype's page has its usage, top-cut rate and
+  record, how it does against each other archetype (from the server), its
+  best-placed teams, each opening its team sheet, and **Search These Teams**.
 - **Definitions:** every number has an ⓘ saying exactly what it counts.
 
 - **Where the numbers come from:** with Settings → PK Reference Server (Beta)
@@ -511,7 +515,7 @@ project has no Swift package dependencies.
    later launches work offline, except for Events and Team Search's new
    events. The Mac app is sandboxed, with outgoing network access.
 
-**Tests:** 1,319 tests written with Swift Testing. They cover the damage engines
+**Tests:** 1,323 tests written with Swift Testing. They cover the damage engines
 and the port, the battle engine by mechanic tier, the EV and two-hit solvers,
 speed tiers, paste parsing and import, Champions filters and legality, RNG
 tools, ML parity, the tournament import and data store, Team Search's parser,

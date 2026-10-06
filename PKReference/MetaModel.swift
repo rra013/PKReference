@@ -36,6 +36,8 @@ final class MetaModel {
         let list: MetaAPI.PokemonList
         /// Newest first.
         let events: [MetaAPI.EventSummary]
+        /// Teams to beat; nil when the server's answer didn't come.
+        let archetypes: MetaAPI.Archetypes?
         /// When the newest data was fetched: by the server, or by Team
         /// Search's last look at the event list.
         let updated: Date?
@@ -177,6 +179,25 @@ final class MetaModel {
         }
     }
 
+    /// An archetype's page from the snapshot's source: the server's, with
+    /// its matchups, or the device's. nil when the server can't answer, or
+    /// the window has no archetype with that id.
+    nonisolated static func archetype(_ id: String, in snapshot: Snapshot) async -> MetaAPI.ArchetypeDetail? {
+        switch snapshot.pages {
+        case .server(let insights):
+            try? await insights.load(MetaAPI.archetype(format: snapshot.regulation.limitlessFormat, id: id,
+                                                       window: snapshot.window)).value
+        case .device(let device):
+            await deviceArchetype(id, device, snapshot.window)
+        }
+    }
+
+    @concurrent
+    nonisolated private static func deviceArchetype(_ id: String, _ device: MetaDeviceInsights,
+                                                    _ window: MetaAPI.Window) async -> MetaAPI.ArchetypeDetail? {
+        device.archetype(id: id, window: window)
+    }
+
     @concurrent
     nonisolated private static func devicePage(_ key: String, _ device: MetaDeviceInsights,
                                                _ window: MetaAPI.Window) async -> Page? {
@@ -207,8 +228,10 @@ final class MetaModel {
         }
         let list = try await insights.load(MetaAPI.pokemon(format: format, window: window), force: force)
         let events = try? await insights.load(MetaAPI.events(format: format), force: force)
+        let archetypes = try? await insights.load(MetaAPI.archetypes(format: format, window: window), force: force)
         let snapshot = Snapshot(source: .server, regulation: regulation, window: window, list: list.value,
-                                events: events?.value.events ?? [], updated: stored.lastFetched,
+                                events: events?.value.events ?? [], archetypes: archetypes?.value,
+                                updated: stored.lastFetched,
                                 allEvents: stored.events, pages: .server(insights))
         return Shown(snapshot: snapshot, warning: Self.emptyWindow(snapshot),
                      problem: formats.refreshError ?? list.refreshError)
@@ -238,7 +261,8 @@ final class MetaModel {
               let names = try? MetaNames.bundled(for: regulation) else { return nil }
         let device = MetaDeviceInsights(corpus: corpus, vocabulary: vocabulary, names: names, now: now)
         return Snapshot(source: .device, regulation: regulation, window: window, list: device.pokemon(window: window),
-                        events: device.events(limit: 10).events, updated: corpus.listFetchedAt,
+                        events: device.events(limit: 10).events, archetypes: device.archetypes(window: window),
+                        updated: corpus.listFetchedAt,
                         allEvents: Set(device.teams.map(\.tournament.id)).count, pages: .device(device))
     }
 
@@ -290,6 +314,24 @@ nonisolated struct MetaSetRequest: Hashable, Sendable {
     var member: LimitlessStanding.TeamMember {
         LimitlessStanding.TeamMember(name: name, limitlessID: key.replacingOccurrences(of: ":", with: "-"),
                                      item: item, ability: ability, attacks: moves, nature: nature, tera: nil)
+    }
+}
+
+extension MetaAPI.ExampleTeam {
+    /// The team as Limitless's standings list it, for the team sheet Events
+    /// shows, with its save buttons. The members' names are the server's
+    /// standardized ones; their species slugs come from their keys.
+    var standing: LimitlessStanding {
+        LimitlessStanding(
+            player: "\(eventId)/\(player ?? "")", name: player ?? "Unnamed player", country: nil, placing: placing,
+            record: LimitlessStanding.Record(wins: wins, losses: losses, ties: ties), deck: nil,
+            decklist: members.map { member in
+                LimitlessStanding.TeamMember(
+                    name: member.name, limitlessID: member.key?.replacingOccurrences(of: ":", with: "-"),
+                    item: member.item == MetaNames.noItem ? nil : member.item, ability: member.ability,
+                    attacks: member.moves, nature: member.nature, tera: nil)
+            },
+            drop: nil)
     }
 }
 
@@ -455,6 +497,27 @@ nonisolated enum MetaText {
             parts.append("No trend yet.")
         }
         return parts.joined(separator: " ")
+    }
+
+    /// "Rillaboom + Incineroar", from the server's "rillaboom+incineroar".
+    static func archetypeName(_ archetype: MetaAPI.Archetype, name: (String) -> String) -> String {
+        archetype.name.split(separator: "+").map { name(String($0)) }.joined(separator: " + ")
+    }
+
+    /// "19th of 83".
+    static func placing(_ placing: Int?, of players: Int) -> String {
+        guard let placing else { return "Unplaced" }
+        return "\(placing)\(ordinal(placing)) of \(players.formatted())"
+    }
+
+    private static func ordinal(_ n: Int) -> String {
+        if (11...13).contains(n % 100) { return "th" }
+        switch n % 10 {
+        case 1: return "st"
+        case 2: return "nd"
+        case 3: return "rd"
+        default: return "th"
+        }
     }
 
     /// "1 event", "46 events".

@@ -12,10 +12,21 @@ import Charts
 import SwiftData
 import SwiftUI
 
+/// A link row's chevron, as a list's.
+struct MetaChevron: View {
+    var body: some View {
+        Image(systemName: "chevron.right")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.tertiary)
+            .accessibilityHidden(true)
+    }
+}
+
 /// Where the Meta tab's links go.
 enum MetaRoute: Hashable {
     case pokemon(String)
     case allPokemon
+    case archetype(String)
 }
 
 /// Names the server's species keys: "arcanine:hisui" → "Arcanine (Hisui)".
@@ -93,6 +104,7 @@ struct MetaRisingCard: View {
                             Text(MetaText.trend(p.trend) ?? "")
                                 .monospacedDigit()
                                 .foregroundStyle(.secondary)
+                            MetaChevron()
                         }
                         .contentShape(Rectangle())
                     }
@@ -111,6 +123,8 @@ struct MetaPokemonRow: View {
     let pokemon: MetaAPI.PokemonUsage
     let name: String
     let source: MetaModel.Source
+    /// In a card; a List draws its own.
+    var showsChevron = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -120,6 +134,7 @@ struct MetaPokemonRow: View {
                 Spacer()
                 Text(MetaText.percent(pokemon.usage))
                     .font(.body.monospacedDigit())
+                if showsChevron { MetaChevron() }
             }
             FlowLayout(spacing: 10) {
                 if let top = pokemon.topCutUsage {
@@ -191,7 +206,8 @@ struct MetaPokemonListView: View {
             Section {
                 ForEach(shown, id: \.key) { p in
                     NavigationLink(value: MetaRoute.pokemon(p.key)) {
-                        MetaPokemonRow(pokemon: p, name: namer.name(p.key), source: snapshot.source)
+                        MetaPokemonRow(pokemon: p, name: namer.name(p.key), source: snapshot.source,
+                                       showsChevron: false)
                     }
                 }
             }

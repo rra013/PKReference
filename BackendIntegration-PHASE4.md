@@ -451,7 +451,8 @@ lists what was and wasn't checked.
    Save Set and Calc Against This fill stat points in with the on-device
    predictor, since Limitless doesn't publish them.
 6. **4f, app: Teams to beat and the archetype page**, with the links to
-   Team Search.
+   Team Search. Built: `MetaArchetypeViews.swift`; a best-placed team opens
+   Events' team sheet (`StandingDetailView`), with its save buttons.
 7. **4g, app: Mon Index's card.**
 
 4a, 4b and 4c don't depend on each other, except that 4c's golden file

@@ -213,6 +213,66 @@ struct MetaModelTests {
         #expect(page.trios.allSatisfy { $0.members.contains("rillaboom") })
     }
 
+    // MARK: Archetypes
+
+    @Test func archetypesFromTheServer() async throws {
+        try serve()
+        MetaModelStubProtocol.responses["/v1/formats/M-C/archetypes"] = try fixture("archetypes-M-C-30d")
+        MetaModelStubProtocol.responses["/v1/formats/M-C/archetypes/garchomp+gholdengo+incineroar+rillaboom"]
+            = try fixture("archetype-M-C-30d")
+        let (model, _) = model(server: true)
+        await model.load(.mC, window: .days30)
+        let snapshot = try #require(model.snapshot)
+        let teams = try #require(MetaTeamsToBeatCard.teams(snapshot))
+        #expect(teams.count == 5)
+        #expect(zip(teams, teams.dropFirst()).allSatisfy { $0.topCutTeams >= $1.topCutTeams }, "most top-cut teams first")
+
+        let page = try #require(await MetaModel.archetype("garchomp+gholdengo+incineroar+rillaboom", in: snapshot))
+        #expect(page.archetype.core.count == 4)
+        #expect(!page.archetype.matchups.isEmpty)
+        #expect(page.examples.count == 5)
+        #expect(await MetaModel.archetype("a+b+c+d", in: snapshot) == nil)
+    }
+
+    @Test func archetypesFromTheDevice() async throws {
+        let (model, store) = model(server: false)
+        _ = try await store.corpus(for: .mC)
+        await model.load(.mC, window: .days30)
+        let snapshot = try #require(model.snapshot)
+        let teams = try #require(MetaTeamsToBeatCard.teams(snapshot))
+        #expect(!teams.isEmpty)
+        let page = try #require(await MetaModel.archetype("garchomp+gholdengo+rillaboom+volcarona", in: snapshot))
+        #expect(page.archetype.matchups.isEmpty, "the device has no pairings")
+        #expect(page.examples.map(\.placing) == [19, 23, 26, 33, 46])
+    }
+
+    /// An example team opens the team sheet Events shows, with its save buttons.
+    @Test func anExampleTeamAsAStanding() {
+        let team = MetaAPI.ExampleTeam(
+            eventId: "e1", eventName: "Test Event", eventDate: nil, players: 83, player: "Player 19", placing: 19,
+            wins: 3, losses: 1, ties: 0,
+            members: [MetaAPI.ExampleMember(key: "arcanine:hisui", name: "Hisuian Arcanine", item: "No Item",
+                                            ability: "Intimidate", nature: "Jolly", moves: ["Flare Blitz"])])
+        let standing = team.standing
+        #expect(standing.name == "Player 19")
+        #expect(standing.placing == 19)
+        #expect(standing.record?.wins == 3 && standing.record?.losses == 1)
+        let member = standing.decklist?.first
+        #expect(member?.limitlessID == "arcanine-hisui")
+        #expect(member?.item == nil, "No Item is no item")
+        #expect(member?.attacks == ["Flare Blitz"])
+    }
+
+    @Test func archetypeWords() {
+        let archetype = MetaAPI.Archetype(id: "a", name: "rillaboom+incineroar+gholdengo", core: [], teams: 1, usage: 0,
+                                          topCutTeams: 0, topCutUsage: nil, record: nil, matchups: [])
+        #expect(MetaText.archetypeName(archetype, name: { $0.capitalized }) == "Rillaboom + Incineroar + Gholdengo")
+        #expect(MetaText.placing(1, of: 83) == "1st of 83")
+        #expect(MetaText.placing(22, of: 1200) == "22nd of 1,200")
+        #expect(MetaText.placing(13, of: 83) == "13th of 83")
+        #expect(MetaText.placing(nil, of: 83) == "Unplaced")
+    }
+
     @Test func aSetToSaveOrCalc() {
         let set = MetaAPI.PokemonSet(item: "No Item", ability: "Intimidate", nature: "Adamant",
                                      moves: ["Flare Blitz", "Extreme Speed"], count: 3, share: 0.1)
