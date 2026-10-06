@@ -437,60 +437,71 @@ private struct MetaSetsCard: View {
     let sets: [MetaAPI.PokemonSet]
     let namer: MetaNamer
     let regulation: ChampionsRegulation
-    @Query(sort: \PKMNStats.name) private var allStats: [PKMNStats]
-    @Query(sort: \MoveData.name) private var allMoves: [MoveData]
-    @Environment(\.modelContext) private var modelContext
-    @State private var saved: MetaSetRequest?
-    @State private var unmatched: [String] = []
-    @State private var showingUnmatched = false
 
     var body: some View {
         if !sets.isEmpty {
             SectionCard(title: "Top Sets", icon: "square.stack.3d.up") {
                 HStack {
-                    Text("Limitless doesn't publish stat points: Save Set and Calc Against This fill them in with the on-device predictor.")
+                    Text(MetaText.predictedStats)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Spacer()
                     MetaInfoButton(definition: .set)
                 }
                 ForEach(Array(sets.prefix(5).enumerated()), id: \.offset) { _, set in
-                    let request = MetaSetRequest(key: key, name: namer.name(key), set: set)
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text([set.item, set.ability, set.nature].compactMap { $0 }.joined(separator: " · "))
-                                .font(.subheadline.weight(.semibold))
-                            Spacer()
-                            Text("\(MetaText.percent(set.share)) · \(set.count.formatted())")
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                        }
-                        Text(set.moves.joined(separator: ", "))
-                            .font(.subheadline)
-                        HStack {
-                            Button(saved == request ? "Saved" : "Save Set", systemImage: saved == request
-                                   ? "checkmark" : "square.and.arrow.down") { save(request) }
-                            Button("Calc Against This", systemImage: "bolt.fill") {
-                                AppNavigator.shared.request = .calcDefender(request)
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                        .font(.subheadline)
-                    }
-                    .padding(.vertical, 4)
-                    .accessibilityElement(children: .contain)
+                    MetaSetRow(request: MetaSetRequest(key: key, name: namer.name(key), set: set), set: set)
                     Divider()
                 }
             }
-            .alert("Couldn't Save", isPresented: $showingUnmatched) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(unmatched.joined(separator: "\n"))
+        }
+    }
+}
+
+/// One whole set: its item, ability, nature and moves, how common it is,
+/// and Save Set and Calc Against This.
+struct MetaSetRow: View {
+    let request: MetaSetRequest
+    let set: MetaAPI.PokemonSet
+    @Query(sort: \PKMNStats.name) private var allStats: [PKMNStats]
+    @Query(sort: \MoveData.name) private var allMoves: [MoveData]
+    @Environment(\.modelContext) private var modelContext
+    @State private var saved = false
+    @State private var unmatched: [String] = []
+    @State private var showingUnmatched = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text([set.item, set.ability, set.nature].compactMap { $0 }.joined(separator: " · "))
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text("\(MetaText.percent(set.share)) · \(set.count.formatted())")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
             }
+            Text(set.moves.joined(separator: ", "))
+                .font(.subheadline)
+            HStack {
+                Button(saved ? "Saved" : "Save Set", systemImage: saved ? "checkmark" : "square.and.arrow.down") {
+                    save()
+                }
+                Button("Calc Against This", systemImage: "bolt.fill") {
+                    AppNavigator.shared.request = .calcDefender(request)
+                }
+            }
+            .buttonStyle(.bordered)
+            .font(.subheadline)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .contain)
+        .alert("Couldn't Save", isPresented: $showingUnmatched) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(unmatched.joined(separator: "\n"))
         }
     }
 
-    private func save(_ request: MetaSetRequest) {
+    private func save() {
         let spreads = (try? modelContext.fetch(FetchDescriptor<SavedSpread>())) ?? []
         let teams = (try? modelContext.fetch(FetchDescriptor<SavedTeam>())) ?? []
         switch LimitlessTeamImporter(allPokemon: allStats, allMoves: allMoves)
@@ -498,7 +509,7 @@ private struct MetaSetsCard: View {
                         predictStats: true) {
         case .success(let spread):
             modelContext.insert(spread)
-            withAnimation { saved = request }
+            withAnimation { saved = true }
         case .failure(let failure):
             unmatched = failure.lines
             showingUnmatched = true

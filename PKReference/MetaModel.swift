@@ -109,7 +109,10 @@ final class MetaModel {
 
     /// Loads the regulation's numbers for the window: from the server's
     /// cache when it's current, and fresh when `force`d (pull to refresh).
-    func load(_ regulation: ChampionsRegulation, window: MetaAPI.Window, force: Bool = false) async {
+    /// Without `limitless`, it never asks Limitless for its newest events
+    /// when there's nothing else to show, as Mon Index's card needs.
+    func load(_ regulation: ChampionsRegulation, window: MetaAPI.Window, force: Bool = false,
+              limitless: Bool = true) async {
         generation += 1
         let mine = generation
         if snapshot?.regulation != regulation || snapshot?.window != window { status = .loading }
@@ -121,13 +124,13 @@ final class MetaModel {
                 let shown = try await fromServer(insights, regulation, window, force: force)
                 guard mine == generation else { return }
                 apply(shown.snapshot, warning: shown.warning, problem: shown.problem)
-                if snapshot == nil { await loadLimitlessEvents(regulation, mine) }
+                if snapshot == nil && limitless { await loadLimitlessEvents(regulation, mine) }
                 return
             } catch {
                 problem = error
             }
         }
-        await fromDevice(regulation, window, problem: problem, mine)
+        await fromDevice(regulation, window, limitless: limitless, problem: problem, mine)
     }
 
     /// Pull to refresh: the server's answers asked for again, or Team
@@ -238,14 +241,14 @@ final class MetaModel {
     }
 
     /// The device's numbers, from Team Search's downloaded events.
-    private func fromDevice(_ regulation: ChampionsRegulation, _ window: MetaAPI.Window,
+    private func fromDevice(_ regulation: ChampionsRegulation, _ window: MetaAPI.Window, limitless: Bool = true,
                             problem: MetaFailure?, _ mine: Int) async {
         let corpus = await corpusStore.cachedCorpus(format: regulation.limitlessFormat)
         guard mine == generation else { return }
         guard let corpus, !corpus.teams.isEmpty else {
             apply(nil, warning: nil, problem: problem)
             status = .needsDownload
-            await loadLimitlessEvents(regulation, mine)
+            if limitless { await loadLimitlessEvents(regulation, mine) }
             return
         }
         let snapshot = await Self.deviceSnapshot(corpus, regulation, window, now())
@@ -518,6 +521,22 @@ nonisolated enum MetaText {
         case 3: return "rd"
         default: return "th"
         }
+    }
+
+    static let predictedStats = "Limitless doesn't publish stat points: Save Set and Calc Against This fill "
+        + "them in with the on-device predictor."
+
+    /// The Mon Index card's sentence: "On 52% of teams in M-C over the last
+    /// 30 days, and 51% of top-cut teams."
+    static func inTheMeta(_ usage: MetaAPI.PokemonUsage, regulation: ChampionsRegulation, window: MetaAPI.Window,
+                          source: MetaModel.Source) -> String {
+        var text = "On \(percent(usage.usage)) of teams in \(regulation.limitlessFormat) over \(windowPhrase(window))"
+        if let top = usage.topCutUsage {
+            text += ", and \(percent(top)) of \(source == .server ? "top-cut" : "top-8") teams"
+        }
+        text += "."
+        if let trend = trend(usage.trend) { text += " \(trend) in two weeks." }
+        return text
     }
 
     /// "1 event", "46 events".

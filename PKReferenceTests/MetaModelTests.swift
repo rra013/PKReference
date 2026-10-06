@@ -58,6 +58,15 @@ private func fixture(_ name: String) throws -> Data {
         .appending(path: "MetaFixtures/\(name).json"))
 }
 
+/// A flag a @Sendable closure can set.
+private final class Locked: @unchecked Sendable {
+    private let lock = NSLock()
+    private var flag: Bool
+    init(_ flag: Bool) { self.flag = flag }
+    var value: Bool { lock.withLock { flag } }
+    func set(_ new: Bool) { lock.withLock { flag = new } }
+}
+
 /// 2026-10-06T12:00:00Z, the day after the fixture event.
 private let now = Date(timeIntervalSince1970: 1_791_288_000)
 
@@ -271,6 +280,48 @@ struct MetaModelTests {
         #expect(MetaText.placing(22, of: 1200) == "22nd of 1,200")
         #expect(MetaText.placing(13, of: 83) == "13th of 83")
         #expect(MetaText.placing(nil, of: 83) == "Unplaced")
+    }
+
+    // MARK: Mon Index's card
+
+    /// The page's species and form, as the server names them.
+    @Test func theCardsKeys() throws {
+        let vocabulary = try TeamSearchVocabulary.bundled(for: .mC)
+        func key(_ species: String, _ form: String? = nil) -> String {
+            MetaInTheMeta.key(species: species, alternateForm: form, vocabulary: vocabulary)
+        }
+        #expect(key("Rillaboom") == "rillaboom")
+        #expect(key("Arcanine") == "arcanine")
+        #expect(key("Arcanine", "Hisuian Form") == "arcanine:hisui")
+        #expect(key("Charizard") == "charizard", "a Mega counts under its species")
+    }
+
+    /// The card never asks Limitless, even with nothing downloaded.
+    @Test func theCardDoesntAskLimitless() async {
+        let asked = Locked(false)
+        let configuration = MetaServerClient.configuration()
+        configuration.protocolClasses = [MetaModelStubProtocol.self]
+        let model = MetaModel(serverURL: { nil }, session: URLSession(configuration: configuration),
+                              cache: MetaCache(directory: folder.appending(path: "meta")),
+                              corpusStore: TeamCorpusStore(fetcher: FixtureFetcher(date: "2026-10-05T18:00:00.000Z"),
+                                                           directory: folder.appending(path: "corpus")),
+                              recentFromLimitless: { _ in asked.set(true); return [] }, now: { now })
+        await model.load(.mC, window: .days30, limitless: false)
+        #expect(model.status == .needsDownload)
+        #expect(!asked.value)
+        await model.load(.mC, window: .days30)
+        #expect(asked.value)
+    }
+
+    @Test func theCardsSentence() {
+        let usage = MetaAPI.PokemonUsage(key: "rillaboom", teams: 1364, usage: 0.518, topCutTeams: 247,
+                                         topCutUsage: 0.5103, trend: 0.0612, record: nil)
+        #expect(MetaText.inTheMeta(usage, regulation: .mC, window: .days30, source: .server)
+                == "On 52% of teams in M-C over the last 30 days, and 51% of top-cut teams. ▲ 6.1 points in two weeks.")
+        let noTrend = MetaAPI.PokemonUsage(key: "rillaboom", teams: 44, usage: 0.5301, topCutTeams: 6,
+                                           topCutUsage: 0.75, trend: nil, record: nil)
+        #expect(MetaText.inTheMeta(noTrend, regulation: .mC, window: .regulation, source: .device)
+                == "On 53% of teams in M-C over the regulation so far, and 75% of top-8 teams.")
     }
 
     @Test func aSetToSaveOrCalc() {
