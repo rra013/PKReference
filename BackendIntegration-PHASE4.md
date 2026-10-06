@@ -3,7 +3,8 @@
 The detailed plan for Phase 4 of [`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md).
 The plan has the goals, the metrics' definitions (§4.2) and the owner's
 decisions (§9); this file says what Phase 4 builds, how, and in which PRs.
-Written 2026-10-06, against `backend-integration` at 93db120.
+Written 2026-10-06, against `backend-integration` at 93db120, and built
+the same day in #103–#109 (§9).
 
 ## 1. What ships
 
@@ -453,7 +454,10 @@ lists what was and wasn't checked.
 6. **4f, app: Teams to beat and the archetype page**, with the links to
    Team Search. Built: `MetaArchetypeViews.swift`; a best-placed team opens
    Events' team sheet (`StandingDetailView`), with its save buttons.
-7. **4g, app: Mon Index's card.**
+7. **4g, app: Mon Index's card.** Built: `MetaInTheMetaCard.swift`. The page
+   loads it from a task on its scroll view (a view with nothing in it never
+   runs its own tasks), with `MetaModel.load(limitless: false)` so it never
+   asks Limitless.
 
 4a, 4b and 4c don't depend on each other, except that 4c's golden file
 comes from 4b. 4e's Recent events and 4f's example teams need 4b with the

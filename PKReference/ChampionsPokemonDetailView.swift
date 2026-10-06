@@ -87,6 +87,8 @@ struct ChampionsPokemonDetailView: View {
     @State private var moveSearch: String = ""
     @State private var showSetSheet: Bool = false
     @State private var showCompare: Bool = false
+    /// The "In the meta" card's numbers.
+    @State private var inTheMeta = MetaInTheMeta()
 
     /// `form` is the form the page opens on, such as the Mega a search
     /// named.
@@ -155,6 +157,8 @@ struct ChampionsPokemonDetailView: View {
                     statsSection(display: display)
                         .id(SectionID.stats)
 
+                    MetaInTheMetaCard(state: inTheMeta)
+
                     abilitiesSection(display: display, basePKMNStats: basePKMNStats)
                         .id(SectionID.abilities)
 
@@ -170,6 +174,9 @@ struct ChampionsPokemonDetailView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .cardPage(types: displayedTypes)
+            .task(id: MetaInTheMeta.loadKey(species: species.name, alternateForm: alternateFormName)) {
+                await inTheMeta.load(species: species.name, alternateForm: alternateFormName)
+            }
             .safeAreaBar(edge: .top, spacing: 0) {
                 sectionNav(proxy: proxy)
             }
@@ -489,6 +496,12 @@ struct ChampionsPokemonDetailView: View {
         case .mega(let name): return name
         case .alternate(let name): return name
         }
+    }
+
+    /// The alternate form shown ("Hisuian Form"), for the meta card's key.
+    private var alternateFormName: String? {
+        if case .alternate(let name) = selectedForm { return name }
+        return nil
     }
 
     private func displayedForm(for species: ChampionsSpecies) -> DisplayedForm {

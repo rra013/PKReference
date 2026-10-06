@@ -2,7 +2,7 @@
 
 How the app gets real insight from tournament and ladder data through the
 Kafka backend (`backend/`), to help players prepare for events and climb the
-ranked ladder. Written 2026-10-06; phases 0–3 are built.
+ranked ladder. Written 2026-10-06; phases 0–4 are built.
 
 This file is the roadmap: the goals, the design, the metrics' definitions,
 the owner's decisions and the phases. How to run the backend is in
@@ -30,7 +30,7 @@ rate, win rates from match results), what's changing (trends), what goes
 together (full sets, cores, archetypes), and how each of these meets the
 player's own team. The app also has to keep working when the server doesn't.
 
-## 2. Done: phases 0–3
+## 2. Done: phases 0–4
 
 Each PR's description says what it changed and what was checked.
 
@@ -44,6 +44,7 @@ Each PR's description says what it changed and what was checked.
 | 2b, what wins | #99 | Win records from the pairings (mirrors left out, Wilson 95% ranges, none under 30 matches), `/v1/formats/{f}/cores` and `/v1/formats/{f}/archetypes`. Swagger UI describes every endpoint and field. |
 | 3a, the corpus | #100 | `/v1/formats/{f}/tournaments` and `/v1/tournaments/{id}/standings`: the stored events in Limitless's own shapes. |
 | 3b, the app's switch | #101 | Settings → PK Reference Server (Beta), off by default, with the address (`http://localhost:8080`) and Test Connection. With it on, Team Search's corpus, and so the Problem Solver's usage, comes from the server through `PreferredCorpusFetcher` (`PKReference/MetaServer.swift`), and from Limitless whenever the server can't answer. Checked end to end against the owner's server. |
+| 4, the Meta tab | #102–#109 | The Meta tab in place of Tournaments, with Events inside it: what's winning, rising and falling, teams to beat, recent events, every Pokémon's and archetype's page, and an ⓘ definition for each number; Mon Index's "In the meta" card. The backend adds recent events, archetype pages and unique archetype names (#104). The app reads `/v1` through a disk cache with an explicit freshness rule (#103), and without the server works the same numbers out on the device from Team Search's teams, checked against the server by a shared golden file (#105). [`BackendIntegration-PHASE4.md`](BackendIntegration-PHASE4.md) has the design and each PR. |
 
 **Findings worth keeping:**
 
@@ -307,12 +308,6 @@ date. Then:
 
 Each phase is one PR into `backend-integration`, or several where it's large.
 
-4. **Meta tab, first version.** The Meta tab in place of Tournaments (with
-   Events inside it), its home, the Pokémon and archetype pages, the info
-   sheets, Mon Index's "In the meta" card, the app's `/v1` client and cache,
-   and a version worked out on the device for when the server is off or
-   unreachable. Doubles only. Planned in detail in
-   [`BackendIntegration-PHASE4.md`](BackendIntegration-PHASE4.md).
 5. **Ladder and singles.**
    - Smogon's monthly download moves to the server (`ladder.stats`), with a
      rating band picker covering Bo1 and Bo3, for doubles and BSS. This is

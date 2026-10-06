@@ -39,7 +39,7 @@ not yet in `main`.
 Before that, #23–#56 were the UI pass, game data into JSON, iPad fixes, the
 Mac app, Siri Phase 1 and the rename to PK Reference.
 
-Full suite on 2026-10-06, on `backend-integration` with Phase 4f: 1,323 tests,
+Full suite on 2026-10-06, on `backend-integration` with Phase 4g: 1,326 tests,
 all passing on the iPhone 17 Pro Max simulator. The iOS and Mac builds had no warnings.
 
 ---
@@ -631,11 +631,12 @@ is in [Recent work](#recent-work) and the README.
    - Names Limitless writes that the alias table doesn't know still search,
      but saving a team reports them; a log of them would show the gaps.
 6. **The backend integration**, on `backend-integration` (PRs go there,
-   not to `main`). Phases 0–3 are done. Phase 4, the Meta tab in place of
-   Tournaments, is under way: its PRs and what's left are in
-   [`BackendIntegration-PHASE4.md`](BackendIntegration-PHASE4.md) §9. Phases
-   5–7 (ladder and singles, the planning flows, launch) are in
-   [`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md). The server
+   not to `main`). Phases 0–4 are done, the Meta tab included
+   ([`BackendIntegration-PHASE4.md`](BackendIntegration-PHASE4.md)). Next
+   is Phase 5, the ladder and singles from Smogon's stats; then 6 and 7
+   (the planning flows, launch), all in
+   [`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md). Not yet
+   checked: VoiceOver read aloud over the Meta tab, on a device. The server
    runs on the owner's machine in Docker; leave their containers, topics and
    consumer groups alone, and check changes on a separate stack.
 7. **FireRed and LeafGreen's open items.** Wild calibration (Ten Lines'
