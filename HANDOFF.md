@@ -99,7 +99,9 @@ within its keyless limit of 50 requests in 5 minutes, and fetches each event's
 details, standings and matches by the app's rules (16 players or more, final
 48 hours after the start). It streams them through Kafka, stores every team and
 match in Postgres (the team store), counts usage from final standings, and
-serves the counts at `GET /api/usage`. `standings.fetched` and
+serves insights from the store at `GET /v1/...` (usage by window, top-cut
+rate, trends, sets and teammates; cached, with ETags) besides the older counts
+at `GET /api/usage`. `standings.fetched` and
 `pairings.fetched` keep every event for good, so anything built from them can
 be rebuilt. `docker compose up -d` runs Kafka and Postgres, with their data in
 volumes; the store's tests also run on Postgres through Testcontainers. Its `NameStandardizer` reads every repo-root

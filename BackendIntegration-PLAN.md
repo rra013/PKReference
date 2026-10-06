@@ -332,10 +332,13 @@ Each phase is one PR into `backend-integration`, or two where it's large.
      Mega Stone. A golden file recorded from the app
      (`golden/species-identity.json`, 171 cases) is checked by both test
      suites.
-2. **Insight projections and API v1.**
-   - Usage windows, top-cut rate, trends, cores, full sets, win rates, and a
-     first version of archetypes.
-   - `/v1` with caching and OpenAPI.
+2. **Insight projections and API v1.** Two PRs:
+   - **2a:** usage windows, top-cut rate, trends, full sets, items, moves
+     and teammates, at `/v1/formats` and `/v1/formats/{f}/pokemon[/{key}]`,
+     cached with ETags and gzipped. Worked out from the team store when
+     asked and memoized on its version, rather than kept in more tables:
+     at a few thousand teams a format it takes milliseconds.
+   - **2b:** win rates from the pairings, cores and archetypes.
 3. **The app's client, behind the setting.**
    - Client, disk cache, the setting and freshness labels.
    - Team Search's corpus and the Problem Solver's usage from the server,
