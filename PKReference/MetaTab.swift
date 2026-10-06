@@ -65,8 +65,11 @@ struct MetaTab: View {
                         // Two columns where there's room: iPad and the Mac.
                         if horizontalSizeClass == .regular {
                             HStack(alignment: .top, spacing: 16) {
-                                CardStack { MetaWhatsWinningCard(snapshot: snapshot, namer: namer) }
-                                    .frame(maxWidth: .infinity, alignment: .top)
+                                CardStack {
+                                    MetaWhatsWinningCard(snapshot: snapshot, namer: namer)
+                                    MetaTeamsToBeatCard(snapshot: snapshot, namer: namer)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .top)
                                 CardStack {
                                     MetaRisingCard(snapshot: snapshot, namer: namer)
                                     recent
@@ -76,6 +79,7 @@ struct MetaTab: View {
                         } else {
                             MetaWhatsWinningCard(snapshot: snapshot, namer: namer)
                             MetaRisingCard(snapshot: snapshot, namer: namer)
+                            MetaTeamsToBeatCard(snapshot: snapshot, namer: namer)
                             recent
                         }
                     } else {
@@ -120,6 +124,13 @@ struct MetaTab: View {
                 for _ in 0..<20 where model.snapshot == nil { try? await Task.sleep(for: .milliseconds(250)) }
                 if let key = model.snapshot?.list.pokemon.first?.key { debugRoute = .pokemon(key) }
             }
+            .task {
+                // `-debugOpenSheet metaArchetype`: the first team to beat's page.
+                await DebugSnapshot.openSheet("metaArchetype") {}
+                guard UserDefaults.standard.string(forKey: "debugOpenSheet") == "metaArchetype" else { return }
+                for _ in 0..<20 where model.snapshot == nil { try? await Task.sleep(for: .milliseconds(250)) }
+                if let id = model.snapshot.flatMap(MetaTeamsToBeatCard.teams)?.first?.id { debugRoute = .archetype(id) }
+            }
             .sheet(isPresented: $showingInfo) { MetaInfoSheet(definition: .usage) }
             #endif
         }
@@ -133,6 +144,8 @@ struct MetaTab: View {
                 MetaPokemonPage(key: key, snapshot: snapshot, namer: MetaNamer(regulation))
             case .allPokemon:
                 MetaPokemonListView(snapshot: snapshot, namer: MetaNamer(regulation))
+            case .archetype(let id):
+                MetaArchetypePage(id: id, snapshot: snapshot, namer: MetaNamer(regulation))
             }
         }
     }
@@ -363,6 +376,7 @@ private struct MetaEventRow: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .trailing) { MetaChevron() }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
