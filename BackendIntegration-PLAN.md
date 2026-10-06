@@ -65,9 +65,10 @@ Each PR's description says what it changed and what was checked.
 - **URLSession's cache honored the server's 15-minute `Cache-Control`**, so
   Test Connection showed stale counts after new events came in. Phase 4
   fixes it (see its file).
-- **Archetype names can repeat.** The name is the core's two most-used
+- **Archetype names could repeat.** The name was the core's two most-used
   members, and two cores of four can share those (seen on the owner's server
-  on 2026-10-06: two "rillaboom+incineroar"). Phase 4 fixes it.
+  on 2026-10-06, and in the fixture event: two "rillaboom+incineroar").
+  Phase 4b adds more of the core until names differ.
 
 ## 3. Data sources
 
@@ -188,8 +189,8 @@ has examples.
 | `GET /v1/formats/{f}/cores` | Pairs and trios, with their lift | Built (2b) |
 | `GET /v1/formats/{f}/archetypes` | Archetypes, with their records against each other | Built (2b) |
 | `GET /v1/formats/{f}/tournaments`, `/v1/tournaments/{id}/standings` | Team Search's corpus, in Limitless's shapes | Built (3a) |
-| `GET /v1/formats/{f}/events` | Recent events, with their winners and top cut | Phase 4 |
-| `GET /v1/formats/{f}/archetypes/{id}` | One archetype's example teams | Phase 4 |
+| `GET /v1/formats/{f}/events` | Recent events, with their winners and top cut | Built (4b) |
+| `GET /v1/formats/{f}/archetypes/{id}` | One archetype's example teams | Built (4b) |
 | `GET /v1/formats/{f}/pokemon/{key}` matchups | The archetypes it does best and worst against | Later |
 | `GET /v1/ladder/{f}?rating=&month=` | Smogon's stats, already reduced; leads, and brings once replays are in | Phase 5 |
 | `GET /v1/events/upcoming` | The event calendar | Phase 6 |

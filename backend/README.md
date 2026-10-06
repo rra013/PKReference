@@ -49,6 +49,8 @@ curl 'localhost:8080/v1/formats/M-C/pokemon?window=30d'                # 14d, 30
 curl 'localhost:8080/v1/formats/M-C/pokemon/arcanine:hisui?window=30d'
 curl 'localhost:8080/v1/formats/M-C/cores?window=30d'
 curl 'localhost:8080/v1/formats/M-C/archetypes?window=30d'
+curl 'localhost:8080/v1/formats/M-C/archetypes/garchomp+gholdengo+incineroar+rillaboom?window=30d'
+curl 'localhost:8080/v1/formats/M-C/events?limit=10'
 ```
 **Full reference:** with the backend running, Swagger UI at
 [localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) describes every endpoint, parameter
@@ -63,8 +65,11 @@ annotations in `MetaController` and `MetaResponses`.
 - Cores: the 20 most common pairs and trios (on 4 teams or more), with `lift`, their share over what
   chance would give.
 - Archetypes: teams grouped by a core of four (defined in the plan's §4.2), each with its usage, top-cut
-  rate, record, and record against each other archetype. `name` is the core's two most-used members, so
-  two archetypes can share it; `id` is unique.
+  rate, record, and record against each other archetype. `name` is the core's two most-used members, with
+  more of the core when an archetype with more teams already has that name, so it's unique, as `id` is.
+  One archetype's page adds its five best-placed teams with their sets.
+- Events: the newest stored events, with their size, whether their standings are final, how many played
+  in their top cut, and the winner's record and team.
 
 - The corpus, for the app's Team Search: the stored events in Limitless's own shapes, answering the two
   calls the app makes to Limitless, so a device can build its corpus from the server instead:
@@ -138,7 +143,10 @@ through SQL Postgres rejects; without Docker they're skipped. The fixtures in
 `src/test/resources/limitless/` are one real event's API responses, with the players' names replaced.
 `golden/species-identity.json` holds species keys recorded from the app: the app's
 `SpeciesIdentityGoldenTests` and the backend's `SpeciesVocabularyGoldenTest` both check against it, so a
-change to either side's naming fails a test until the other matches.
+change to either side's naming fails a test until the other matches. `golden/meta-fixture.json` holds the
+insights `MetaService` works out from the fixture event (usage, trends, sets, cores, archetypes), checked
+by `MetaGoldenFileTest`, for the app's version worked out on the device to match. After a deliberate
+change to the insights, record it again with `mvn test -Dtest=MetaGoldenFileTest -Dgolden.record=true`.
 GitHub Actions runs it for changes to the backend (`.github/workflows/backend.yml`).
 
 ## Name standardization

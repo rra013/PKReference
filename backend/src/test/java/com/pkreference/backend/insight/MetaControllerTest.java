@@ -62,5 +62,25 @@ class MetaControllerTest {
         mvc.perform(get("/v1/formats/M-C/pokemon/pikachu"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("No team in the window has pikachu"));
+        mvc.perform(get("/v1/formats/M-C/events?limit=0")).andExpect(status().isBadRequest());
+        mvc.perform(get("/v1/formats/M-C/events?limit=51")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void eventsAndAnArchetype() throws Exception {
+        when(meta.events("M-C", 10)).thenReturn(new MetaResponses.Events("M-C", NOW, List.of(
+                new MetaResponses.EventSummary("e1", "Test Event", NOW, 83, true, 16,
+                        new MetaResponses.EventWinner("Player 01", 8, 2, 0, List.of("grimmsnarl"))))));
+        mvc.perform(get("/v1/formats/M-C/events"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "max-age=900, public"))
+                .andExpect(jsonPath("$.events[0].topCutPlayers").value(16))
+                .andExpect(jsonPath("$.events[0].winner.team[0]").value("grimmsnarl"));
+
+        // The id's + and : come through the path as they are.
+        when(meta.archetype(eq("M-C"), eq("arcanine:hisui+gholdengo+raichu+staraptor"), eq(MetaWindow.DAYS_30)))
+                .thenThrow(new NoSuchElementException("No archetype arcanine:hisui+gholdengo+raichu+staraptor in the window"));
+        mvc.perform(get("/v1/formats/M-C/archetypes/arcanine:hisui+gholdengo+raichu+staraptor"))
+                .andExpect(status().isNotFound());
     }
 }

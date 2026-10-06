@@ -84,7 +84,9 @@ public final class MetaResponses {
             it contains, and teams with none are "other".""")
     public record Archetype(
             @Schema(description = "The core's species keys, sorted, joined with +.") String id,
-            @Schema(description = "Its two most-used members, joined with +.") String name,
+            @Schema(description = """
+                    Its two most-used members, joined with +, and more of the core, most used first, when an \
+                    archetype with more teams already has that name. Unique.""") String name,
             @Schema(description = "The core, most used first.") List<String> core,
             int teams, double usage, int topCutTeams, Double topCutUsage, WinRecord record,
             @Schema(description = "Against each other archetype it has played.") List<Matchup> matchups) {}
@@ -92,4 +94,39 @@ public final class MetaResponses {
     public record Archetypes(String format, String window, Instant from, Instant to, Instant generatedAt,
                              Sample sample, @Schema(description = "Teams in no archetype.") int other,
                              List<Archetype> archetypes) {}
+
+    @Schema(description = "A Pokémon on an example team, its names standardized.")
+    public record ExampleMember(
+            @Schema(description = "The app's species key; null when the member has none yet.") String key,
+            @Schema(description = "The name Limitless gave.") String name,
+            String item, String ability, String nature, List<String> moves) {}
+
+    @Schema(description = "One team in an archetype, with where it placed.")
+    public record ExampleTeam(String eventId, String eventName, Instant eventDate,
+                              @Schema(description = "The event's size.") int players,
+                              @Schema(description = "The player's name, as Limitless shows it.") String player,
+                              Integer placing, int wins, int losses, int ties, List<ExampleMember> members) {}
+
+    public record ArchetypeDetail(String format, String window, Instant from, Instant to, Instant generatedAt,
+                                  Sample sample, Archetype archetype,
+                                  @Schema(description = """
+                                          Its best-placed teams: by placing, then the bigger event, then the \
+                                          newer one. Teams with no placing are left out.""")
+                                  List<ExampleTeam> examples) {}
+
+    @Schema(description = "An event's winner: first place.")
+    public record EventWinner(@Schema(description = "As Limitless shows it.") String player,
+                              int wins, int losses, int ties,
+                              @Schema(description = "The team's species keys, in its order; empty when it has no "
+                                      + "published team.") List<String> team) {}
+
+    public record EventSummary(String id, String name, Instant date, int players,
+                               @Schema(description = "False while it may still change: until 48 hours after the start.")
+                               boolean standingsFinal,
+                               @Schema(description = "Players in its top cut (a bracket phase); null when it had none.")
+                               Integer topCutPlayers,
+                               @Schema(description = "Null until someone has placed first.") EventWinner winner) {}
+
+    public record Events(String format, Instant generatedAt,
+                         @Schema(description = "Newest first.") List<EventSummary> events) {}
 }
