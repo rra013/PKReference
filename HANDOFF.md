@@ -39,7 +39,7 @@ not yet in `main`.
 Before that, #23–#56 were the UI pass, game data into JSON, iPad fixes, the
 Mac app, Siri Phase 1 and the rename to PK Reference.
 
-Full suite on 2026-10-06, on `backend-integration` with Phase 4g: 1,326 tests,
+Full suite on 2026-10-06, on `backend-integration` with the API key: 1,331 tests,
 all passing on the iPhone 17 Pro Max simulator. The iOS and Mac builds had no warnings.
 
 ---
@@ -111,7 +111,9 @@ PK Reference Server (Beta) stores `metaServerEnabled` and `metaServerAddress`;
 `PreferredCorpusFetcher`, `TeamCorpusStore`'s default source, reads them at
 each call and asks the server, then Limitless whenever the server can't
 answer. `MetaServerClient`'s session has no URL cache, so nothing it asks is
-answered from an old copy. `MetaAPI.swift` decodes the `/v1` insights, and
+answered from an old copy. It sends Settings' API key (`MetaServerKeychain`)
+as `Authorization: Bearer`, only over HTTPS or to the same device; the
+backend checks it in `ApiKeyFilter` when `PKREF_API_KEY_HASHES` is set. `MetaAPI.swift` decodes the `/v1` insights, and
 `MetaCache.swift` keeps them on disk with the rule for when to ask again
 (`MetaInsights.load`); tests read real answers saved in
 `PKReferenceTests/MetaFixtures/`. Without the server, `MetaDeviceInsights.swift`

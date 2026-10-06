@@ -20,8 +20,8 @@ Limitless --poll--> EventDiscovery    --> tournaments.discovered
 ## Run
 ```sh
 cd backend
-docker compose up -d                 # Kafka on :9092, Kafka UI on :8081, Postgres on :5432
-mvn spring-boot:run                  # API on :8080, Swagger UI at /swagger-ui.html
+docker compose up -d                 # Kafka on :9092, Kafka UI on :8081, Postgres on :5432, all on 127.0.0.1
+mvn spring-boot:run                  # API on 127.0.0.1:8080, Swagger UI at /swagger-ui.html
 curl 'localhost:8080/v1/formats'
 ```
 Set `LIMITLESS_GAME` and `LIMITLESS_FORMATS` (comma-separated, such as `M-C,M-B`; empty for every format)
@@ -89,10 +89,43 @@ counts. Nothing calls them; the plan drops them by Phase 7.
 ### Using it from the app
 Settings → PK Reference Server (Beta) in the app, off by default, takes the server's address,
 `http://localhost:8080` by default: that reaches this machine from the simulator and the Mac app. A phone
-needs this Mac's network address, and asks for local network access. Test Connection lists the formats
+uses the Tailscale address (below). Test Connection lists the formats
 `/v1/formats` reports. With the switch on, Team Search and the Problem Solver read their corpus from
 `/v1/.../tournaments` and `/standings`, and from Limitless whenever the server can't answer
 (`PKReference/MetaServer.swift`).
+
+### Reaching it from your phone
+Everything listens on this machine only (`127.0.0.1`): Kafka UI has no login, Kafka and Postgres take
+anyone who reaches them, and the API answers anyone. A phone reaches the API, and nothing else, through
+[Tailscale](https://tailscale.com): a private network of your own devices, with HTTPS, nothing opened on
+the router, and nothing on the public internet. An API key is the second lock.
+
+1. **The key.** Run `scripts/new-api-key.sh`. It prints a key, for the app, and its hash, for the
+   server. Put the hash in `backend/.env` (git ignores it), then start the server with it:
+   ```sh
+   echo 'PKREF_API_KEY_HASHES=<hash>' >> .env
+   set -a; . ./.env; set +a; mvn spring-boot:run
+   ```
+   With a hash set, every request needs `Authorization: Bearer <key>`, or gets a 401; answers say
+   `Cache-Control: private`. Several keys are comma-separated hashes; remove a hash to retire its key.
+   Swagger UI still opens, and its Authorize button takes the key. Keep the key out of the repository,
+   chats and screenshots: the server only ever has its hash.
+2. **Tailscale.** Install it on this Mac and the phone, signed in to the same account, then give the
+   API an HTTPS address on your tailnet:
+   ```sh
+   tailscale serve --bg 8080
+   ```
+   It prints the address, such as `https://your-mac.your-tailnet.ts.net`. Only your devices can reach
+   it. Don't use `tailscale funnel`, which puts it on the public internet.
+3. **The app.** Settings → PK Reference Server (Beta): that address, and the key under API Key, which
+   the app keeps in the Keychain and sends only over HTTPS (or to this machine). Test Connection says if
+   the key is wrong.
+
+Without Tailscale, `SERVER_ADDRESS=0.0.0.0` opens the API to every network this machine is on, over
+plain HTTP, where the key can be read: keep it to a network you trust. The ports `docker compose`
+publishes change to `127.0.0.1` when it next recreates the containers (`docker compose up -d`); their
+data stays in the volumes. Postgres keeps the password it was created with (`pkref`), which only
+matters to something that can reach it.
 
 ### Finding events, and backfilling
 Every 30 minutes `EventDiscovery` walks each format's tournament list back through the lookback

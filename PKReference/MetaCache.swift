@@ -111,12 +111,15 @@ nonisolated enum MetaFailure: Error, Equatable, Sendable {
     case http(status: Int)
     /// The answer came, in a shape this version can't read.
     case unreadable
+    /// The app wouldn't send the API key to this address: it isn't HTTPS.
+    case insecureKey
 
     init(_ error: any Error) {
         switch error {
         case let failure as MetaFailure: self = failure
         case MetaServerError.http(let status): self = .http(status: status)
         case MetaServerError.unreadable, is DecodingError: self = .unreadable
+        case MetaServerError.insecureKey: self = .insecureKey
         default: self = .unreachable(error.localizedDescription)
         }
     }
@@ -126,6 +129,7 @@ nonisolated enum MetaFailure: Error, Equatable, Sendable {
         case .unreachable(let reason): return "Couldn't reach the server: \(reason)"
         case .http(let status): return MetaServerError.http(status: status).localizedDescription
         case .unreadable: return MetaServerError.unreadable.localizedDescription
+        case .insecureKey: return MetaServerError.insecureKey.localizedDescription
         }
     }
 }

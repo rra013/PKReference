@@ -205,9 +205,15 @@ it (Phase 7 at the latest).
 - **Setting:** Settings → PK Reference Server (Beta), **off by default**,
   with the server's address. While the app isn't deployed the server is the
   owner's local Docker setup, so the address defaults to
-  `http://localhost:8080`: the simulator's and the Mac's own machine. A phone
-  needs the Mac's network address. `NSAllowsLocalNetworking` allows plain
-  HTTP to it.
+  `http://localhost:8080`: the simulator's and the Mac's own machine.
+- **Remote access** (the owner's phone): the server and its containers
+  listen on `127.0.0.1` only; the phone reaches the API, and nothing else,
+  through Tailscale's HTTPS address on the owner's tailnet, with an API key
+  (`Authorization: Bearer`, kept in the Keychain, sent only over HTTPS or to
+  the same machine; the server holds only its SHA-256 hash). The setup is
+  in [`backend/README.md`](backend/README.md#reaching-it-from-your-phone).
+  A key inside a shipped app isn't secret, so a public release needs more
+  (Phase 7).
 - **Client:** `MetaServerClient` (`PKReference/MetaServer.swift`), a small
   struct that GETs and decodes JSON with short timeouts. Tests stub its
   `URLSession`.
@@ -326,6 +332,9 @@ Each phase is one PR into `backend-integration`, or several where it's large.
    - Backups and the cost.
    - Ask Limitless for an access key and the webhook, and about running a
      public service on their API.
+   - Public access, if any: a public HTTPS address in place of Tailscale,
+     per-device keys or App Attest (a key in the app can be pulled out),
+     and rate limits per key.
    - Drop `/api/usage`.
    - Merge into `main`, with the setting still off by default.
 
@@ -388,3 +397,5 @@ Each phase is one PR into `backend-integration`, or several where it's large.
    device, from Team Search's teams.
 8. **The Meta tab's defaults:** named "Meta", icon `chart.bar.xaxis`, window
    30 days.
+9. **Remote access:** only the owner, from their phone, through Tailscale
+   with an API key; nothing on the public internet.
