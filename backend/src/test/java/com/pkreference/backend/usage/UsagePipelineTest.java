@@ -1,16 +1,21 @@
 package com.pkreference.backend.usage;
 
 import com.pkreference.backend.config.Topics;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.common.config.ConfigResource;
+import org.apache.kafka.common.config.TopicConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.kafka.core.KafkaAdmin;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.context.TestPropertySource;
 
 import java.time.Duration;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -26,6 +31,7 @@ class UsagePipelineTest {
     @Autowired KafkaTemplate<String, Object> kafka;
     @Autowired UsageCounterRepository counters;
     @Autowired TestRestTemplate rest;
+    @Autowired KafkaAdmin kafkaAdmin;
 
     @Test
     void standingsEventEndsUpInTheUsageApi() {
@@ -41,5 +47,20 @@ class UsagePipelineTest {
 
         var body = rest.getForObject("/api/usage?format=reg-m-a", String.class);
         assertThat(body).contains("incineroar").contains("100.0");
+    }
+
+    /**
+     * The embedded broker made standings.fetched with the defaults, as the local broker has it
+     * from before; starting the app gives it Topics.java's settings.
+     */
+    @Test
+    void standingsAreKeptForGood() throws Exception {
+        var topic = new ConfigResource(ConfigResource.Type.TOPIC, Topics.STANDINGS_FETCHED);
+        try (var admin = AdminClient.create(kafkaAdmin.getConfigurationProperties())) {
+            var config = admin.describeConfigs(List.of(topic)).all().get().get(topic);
+            assertThat(config.get(TopicConfig.CLEANUP_POLICY_CONFIG).value()).isEqualTo("compact");
+            assertThat(config.get(TopicConfig.RETENTION_MS_CONFIG).value()).isEqualTo("-1");
+            assertThat(config.get(TopicConfig.MAX_MESSAGE_BYTES_CONFIG).value()).isEqualTo("5242880");
+        }
     }
 }

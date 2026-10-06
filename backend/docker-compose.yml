@@ -1,4 +1,4 @@
-# Local single-node Kafka (KRaft, no Zookeeper) + Kafka UI.
+# Local single-node Kafka (KRaft, no Zookeeper), Kafka UI, and Postgres for the counters.
 services:
   kafka:
     image: apache/kafka:3.9.0
@@ -18,6 +18,13 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Keep the topics (standings.fetched holds every event fetched) across restarts and
+      # `docker compose down`: without these the broker wrote to /tmp inside the container.
+      # The cluster ID has to stay the same for the stored data to load.
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: ARrv7jH-RueeM_hdf9TgjA
+    volumes:
+      - pkref-kafka:/var/lib/kafka/data
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -28,3 +35,20 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:19092
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: pkref-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      # Local development only.
+      POSTGRES_DB: pkref
+      POSTGRES_USER: pkref
+      POSTGRES_PASSWORD: pkref
+    volumes:
+      - pkref-postgres:/var/lib/postgresql/data
+
+volumes:
+  pkref-kafka:
+  pkref-postgres:
