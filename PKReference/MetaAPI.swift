@@ -136,6 +136,25 @@ nonisolated enum MetaAPI {
                  megaStones, teammates, sets, weekly
         }
 
+        init(format: String, key: String, window: String, generatedAt: Date?, sample: Sample,
+             usage: PokemonUsage?, items: [Share], abilities: [Share], natures: [Share], moves: [Share],
+             megaStones: [Share], teammates: [Share], sets: [PokemonSet], weekly: [WeekUsage]) {
+            self.format = format
+            self.key = key
+            self.window = window
+            self.generatedAt = generatedAt
+            self.sample = sample
+            self.usage = usage
+            self.items = items
+            self.abilities = abilities
+            self.natures = natures
+            self.moves = moves
+            self.megaStones = megaStones
+            self.teammates = teammates
+            self.sets = sets
+            self.weekly = weekly
+        }
+
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             format = try c.decode(String.self, forKey: .format)
@@ -188,7 +207,8 @@ nonisolated enum MetaAPI {
     struct Archetype: Decodable, Sendable, Equatable {
         /// The core's species keys, sorted, joined with "+". Unique.
         let id: String
-        /// Its two most-used members, joined with "+". Not always unique.
+        /// Its two most-used members, joined with "+", and more of its core
+        /// when an archetype with more teams has that name. Unique.
         let name: String
         /// The core, most used first.
         let core: [String]
@@ -201,6 +221,19 @@ nonisolated enum MetaAPI {
 
         private enum CodingKeys: String, CodingKey {
             case id, name, core, teams, usage, topCutTeams, topCutUsage, record, matchups
+        }
+
+        init(id: String, name: String, core: [String], teams: Int, usage: Double, topCutTeams: Int,
+             topCutUsage: Double?, record: WinRecord?, matchups: [Matchup]) {
+            self.id = id
+            self.name = name
+            self.core = core
+            self.teams = teams
+            self.usage = usage
+            self.topCutTeams = topCutTeams
+            self.topCutUsage = topCutUsage
+            self.record = record
+            self.matchups = matchups
         }
 
         init(from decoder: Decoder) throws {
@@ -225,6 +258,78 @@ nonisolated enum MetaAPI {
         /// Teams in no archetype.
         let other: Int
         let archetypes: [Archetype]
+    }
+
+    // MARK: /v1/formats/{f}/archetypes/{id}
+
+    /// A Pokémon on an example team, its names standardized.
+    struct ExampleMember: Decodable, Sendable, Equatable {
+        /// nil when the server has no key for it yet.
+        let key: String?
+        /// The name Limitless gave.
+        let name: String
+        let item: String?
+        let ability: String?
+        let nature: String?
+        let moves: [String]
+    }
+
+    /// One team in an archetype, with where it placed.
+    struct ExampleTeam: Decodable, Sendable, Equatable {
+        let eventId: String
+        let eventName: String?
+        let eventDate: Date?
+        /// The event's size.
+        let players: Int
+        /// The player's name, as Limitless shows it.
+        let player: String?
+        let placing: Int?
+        let wins: Int
+        let losses: Int
+        let ties: Int
+        let members: [ExampleMember]
+    }
+
+    struct ArchetypeDetail: Decodable, Sendable {
+        let format: String
+        let window: String
+        let generatedAt: Date?
+        let sample: Sample
+        let archetype: Archetype
+        /// The best-placed teams: by placing, then the bigger event, then the
+        /// newer one.
+        let examples: [ExampleTeam]
+    }
+
+    // MARK: /v1/formats/{f}/events
+
+    struct EventWinner: Decodable, Sendable, Equatable {
+        let player: String?
+        let wins: Int
+        let losses: Int
+        let ties: Int
+        /// Species keys, in the team's order; empty with no published team.
+        let team: [String]
+    }
+
+    struct EventSummary: Decodable, Sendable, Equatable {
+        let id: String
+        let name: String?
+        let date: Date?
+        let players: Int
+        /// False while the standings may still change.
+        let standingsFinal: Bool
+        /// Players in its top cut; nil when it had none, or it isn't known.
+        let topCutPlayers: Int?
+        /// nil until someone has placed first.
+        let winner: EventWinner?
+    }
+
+    struct Events: Decodable, Sendable {
+        let format: String
+        let generatedAt: Date?
+        /// Newest first.
+        let events: [EventSummary]
     }
 
     // MARK: Requests
@@ -260,6 +365,15 @@ nonisolated enum MetaAPI {
     static func archetypes(format: String, window: Window) -> Endpoint<Archetypes> {
         Endpoint(path: "v1/formats/\(format)/archetypes",
                  query: [URLQueryItem(name: "window", value: window.rawValue)])
+    }
+
+    static func archetype(format: String, id: String, window: Window) -> Endpoint<ArchetypeDetail> {
+        Endpoint(path: "v1/formats/\(format)/archetypes/\(id)",
+                 query: [URLQueryItem(name: "window", value: window.rawValue)])
+    }
+
+    static func events(format: String, limit: Int = 10) -> Endpoint<Events> {
+        Endpoint(path: "v1/formats/\(format)/events", query: [URLQueryItem(name: "limit", value: String(limit))])
     }
 
     // MARK: Decoding
