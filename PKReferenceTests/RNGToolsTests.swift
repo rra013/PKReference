@@ -2795,10 +2795,133 @@ struct Gen4ToolsTests {
         #expect(Int(target.delay) == exact.delay)
     }
 
-    /// TID/SID offers Gen 3 and 4: its Gen 5 and 8 tabs ran Gen 4's
-    /// generator.
+    /// TID/SID offers Gen 3, 4 and 5: its Gen 8 tab ran Gen 4's generator,
+    /// as Gen 5's did before PR 12 gave it PokéFinder's IDSearcher5.
     @MainActor
     @Test func idToolGenerations() {
-        #expect(IDRNGView.generations == [.gen3, .gen4])
+        #expect(IDRNGView.generations == [.gen3, .gen4, .gen5])
+    }
+}
+
+// MARK: - Gen 5 Profile Tests
+
+/// RNG fixes PR 12: Gen 5 profiles, the calibrator, Gen 5 IDs and Gen 5's
+/// Send to Timer.
+struct Gen5ProfileTests {
+    /// A DS with known parameters (a made-up one: the calibrator's ranges
+    /// hold it).
+    private let ds = Gen5DSParameters(mac: 0x0009_BF12_3456, timer0Min: 0xC79, timer0Max: 0xC79, vcount: 0x60,
+                                      gxstat: 6, vframe: 5, dsType: 0, language: 0)
+
+    /// The calibrator finds the parameters a seed was made with.
+    @Test func calibratorFindsTheParameters() async throws {
+        let seed = PFBridge.gen5InitialSeed(game: .black, profile: ds, timer0: 0xC79,
+                                            year: 2011, month: 3, day: 6, hour: 10, minute: 20, second: 33)
+        let ranges = Gen5DSParameters.calibratorRanges(game: .black, dsType: 0)
+        let handle = try #require(PFBridge.profileSearch5Start(
+            bySeed: true, game: .black, language: 0, dsType: 0, mac: ds.mac, buttons: 0,
+            year: 2011, month: 3, day: 6, hour: 10, minute: 20, seconds: 0...59,
+            vcount: UInt8(ranges.vcount.lowerBound)...UInt8(ranges.vcount.upperBound),
+            timer0: UInt16(ranges.timer0.lowerBound)...UInt16(ranges.timer0.upperBound),
+            gxstat: 6...6, vframe: 0...10, seed: seed))
+        while !PFBridge.profileSearch5Done(handle) { try? await Task.sleep(for: .milliseconds(20)) }
+        let results = PFBridge.profileSearch5Results(handle)
+        #expect(PFBridge.profileSearch5Progress(handle) == 100)
+        PFBridge.profileSearch5Free(handle)
+        let found = try #require(results.first)
+        #expect(results.count == 1)
+        #expect(found.timer0 == 0xC79 && found.vcount == 0x60 && found.vframe == 5 && found.gxstat == 6 && found.second == 33)
+    }
+
+    /// The IV calibrator reads every combination in range: with every IV
+    /// allowed, each set of parameters fits.
+    @Test func calibratorIVsWired() async throws {
+        let handle = try #require(PFBridge.profileSearch5Start(
+            bySeed: false, game: .white2, language: 0, dsType: 2, mac: ds.mac, buttons: 0,
+            year: 2012, month: 7, day: 1, hour: 9, minute: 0, seconds: 10...11,
+            vcount: 0xA0...0xA1, timer0: 0x1400...0x1402, gxstat: 6...6, vframe: 0...1))
+        while !PFBridge.profileSearch5Done(handle) { try? await Task.sleep(for: .milliseconds(20)) }
+        let results = PFBridge.profileSearch5Results(handle)
+        PFBridge.profileSearch5Free(handle)
+        // 2 seconds, 2 VCounts, 3 Timer0s, 1 GxStat and 2 VFrames.
+        let combinations = 24
+        #expect(results.count == combinations)
+
+    }
+
+    /// PokéFinder's calibrator's starting ranges, by game and DS.
+    @Test func calibratorRanges() {
+        #expect(Gen5DSParameters.calibratorRanges(game: .black, dsType: 0) == (0x50...0x70, 0xC60...0xCA0))
+        #expect(Gen5DSParameters.calibratorRanges(game: .white2, dsType: 0) == (0x70...0x90, 0x10E0...0x1130))
+        #expect(Gen5DSParameters.calibratorRanges(game: .white, dsType: 1) == (0x80...0x92, 0x1140...0x12D0))
+        #expect(Gen5DSParameters.calibratorRanges(game: .black2, dsType: 2) == (0xA0...0xC0, 0x1400...0x1900))
+        #expect(Gen5DSParameters().isUnset && !ds.isUnset)
+    }
+
+    /// Find My Seed finds the seed from the TID it gave, and each result's
+    /// IDs regenerate in IDGenerator5; the date search finds the same.
+    @Test func gen5IDs() async throws {
+        let seed = PFBridge.gen5InitialSeed(game: .black, profile: ds, timer0: 0xC79,
+                                            year: 2011, month: 3, day: 6, hour: 10, minute: 20, second: 33)
+        let ids = PFBridge.idGenerate5(seed: seed, game: .black, profile: ds, maxAdvances: 0)
+        let first = try #require(ids.first)
+        let found = PFBridge.idFind5(game: .black, profile: ds, tid: first.tid, year: 2011, month: 3, day: 6,
+                                     hour: 10, minute: 20, seconds: 0...59, maxAdvances: 0)
+        let hit = try #require(found.first { $0.seed == seed })
+        #expect(hit.second == 33 && hit.timer0 == 0xC79 && hit.tid == first.tid && hit.sid == first.sid)
+        for r in found {
+            let again = PFBridge.idGenerate5(seed: r.seed, game: .black, profile: ds, maxAdvances: 0)
+            #expect(again.contains { $0.advances == r.advances && $0.tid == r.tid && $0.sid == r.sid })
+        }
+        let handle = try #require(PFBridge.idSearch5Start(game: .black, profile: ds,
+                                                          start: (2011, 3, 6), end: (2011, 3, 6), maxAdvances: 0,
+                                                          tid: first.tid, filterTID: true, sid: first.sid, filterSID: true))
+        while !PFBridge.idSearch5Done(handle) { try? await Task.sleep(for: .milliseconds(20)) }
+        let searched = PFBridge.idSearch5Results(handle)
+        PFBridge.idSearch5Free(handle)
+        #expect(searched.contains { $0.seed == seed && $0.hour == 10 && $0.minute == 20 && $0.second == 33 })
+    }
+
+    /// A Gen 5 ID result sends the Gen 5 Timer its second.
+    @MainActor
+    @Test func sendToTimer() {
+        let r = PFBridge.IDSearchResult5(year: 2011, month: 3, day: 6, hour: 10, minute: 20, second: 33,
+                                         seed: 0x1234, timer0: 0xC79, buttons: 1 << 4, advances: 0,
+                                         tid: 1, sid: 2, tsv: 0)
+        let bridge = FinderTimerBridge.shared
+        bridge.clear()
+        Gen5IDView.sendToTimer(r)
+        #expect(bridge.pendingGen == .gen5 && bridge.pendingTargetSecond == 33 && bridge.shouldSwitchToTimer)
+        #expect(bridge.selectedTime == "2011/03/06 10:20:33, holding A")
+        bridge.clear()
+    }
+
+    /// PokéFinder's Gen 5 generators don't read the method: Method 5, its
+    /// IVs and its C-Gear gave the same results, so the Finder offers one.
+    @Test func gen5Methods() {
+        #expect(FinderMethod.methods(for: .gen5) == [.method5])
+        func generate(_ method: PFMethod) -> [UInt32] {
+            PFBridge.staticGenerate5(seed: 0x1234_5678_9ABC_DEF0, initialAdvances: 0, maxAdvances: 20,
+                                     ivInitialAdvances: 0, ivMaxAdvances: 0, method: method, tid: 0, sid: 0,
+                                     game: .black, staticType: 0, staticIndex: 0, mac: ds.mac, keypresses: ds.keypresses,
+                                     vcount: ds.vcount, gxstat: ds.gxstat, vframe: ds.vframe, skipLR: false,
+                                     timer0Min: ds.timer0Min, timer0Max: ds.timer0Max, memoryLink: false,
+                                     shinyCharm: false, dsType: 0, language: 0).map(\.pid)
+        }
+        #expect(!generate(.method5).isEmpty)
+        #expect(generate(.method5) == generate(.method5CGear) && generate(.method5) == generate(.method5IVs))
+    }
+
+    /// A profile keeps the DS's parameters, and they store and read back.
+    @Test func profilesKeepTheParameters() throws {
+        var profile = FinderProfile(name: "Black", tid: 1, sid: 2, gameVersion: "Black")
+        profile.gen5Parameters = ds
+        #expect(profile.gen5Parameters == ds && profile.isGen5)
+        let defaults = try #require(UserDefaults(suiteName: "Gen5ProfileTests"))
+        defaults.removePersistentDomain(forName: "Gen5ProfileTests")
+        Gen5DSParametersCard.store(ds, defaults)
+        #expect(Gen5DSParametersCard.stored(defaults) == ds)
+        #expect(Gen5DSParameterKeys.keypresses(from: "010000000") == [false, true] + Array(repeating: false, count: 7))
+        #expect(Gen5Buttons.describe(0) == "None" && Gen5Buttons.describe((1 << 4) | (1 << 7)) == "A + Start")
     }
 }

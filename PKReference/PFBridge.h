@@ -994,6 +994,100 @@ PFWildSearchResult5 *pf_search5_wild_getResults(PFSearch5Handle handle, int *out
 void pf_search5_cancel(PFSearch5Handle handle);
 void pf_search5_free(PFSearch5Handle handle);
 
+// MARK: - Gen 5 Profiles
+
+/// A DS's Gen 5 parameters, as PokéFinder's Profile5 holds them.
+typedef struct {
+    uint64_t mac;
+    /// Which counts of held buttons to try: 0 to 8.
+    bool keypresses[9];
+    uint8_t vcount;
+    uint8_t gxstat;
+    uint8_t vframe;
+    bool skipLR;
+    uint16_t timer0Min;
+    uint16_t timer0Max;
+    bool memoryLink;
+    bool shinyCharm;
+    /// PokéFinder's DSType: 0 DS, 1 DSi, 2 3DS.
+    uint8_t dsType;
+    /// PokéFinder's Language: English, French, German, Italian, Japanese,
+    /// Korean, Spanish.
+    uint8_t language;
+} PFProfile5;
+
+/// One set of parameters that makes the seed searched for.
+typedef struct {
+    uint64_t seed;
+    uint16_t timer0;
+    uint8_t vcount;
+    uint8_t vframe;
+    uint8_t gxstat;
+    uint8_t second;
+} PFProfileResult5;
+
+typedef void *PFProfileSearch5Handle;
+
+/// PokéFinder's profile calibrator (ProfileSearcher5) on its own thread:
+/// with `bySeed`, the parameters that make `seed`; otherwise the IV
+/// searcher's, whose first IVs fall in the ranges. The game was started at
+/// the date and time, with `buttons` held (PokéFinder's Buttons bits).
+PFProfileSearch5Handle pf_profileSearch5_start(bool bySeed, uint32_t game, uint8_t language, uint8_t dsType,
+                                               uint64_t mac, uint16_t buttons,
+                                               uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute,
+                                               uint8_t minSecond, uint8_t maxSecond,
+                                               uint8_t minVCount, uint8_t maxVCount,
+                                               uint16_t minTimer0, uint16_t maxTimer0,
+                                               uint8_t minGxStat, uint8_t maxGxStat,
+                                               uint8_t minVFrame, uint8_t maxVFrame,
+                                               const uint8_t ivMin[6], const uint8_t ivMax[6], uint64_t seed);
+int pf_profileSearch5_progress(PFProfileSearch5Handle handle);
+bool pf_profileSearch5_done(PFProfileSearch5Handle handle);
+PFProfileResult5 *pf_profileSearch5_getResults(PFProfileSearch5Handle handle, int *outCount);
+void pf_profileSearch5_cancel(PFProfileSearch5Handle handle);
+void pf_profileSearch5_free(PFProfileSearch5Handle handle);
+
+/// The seed a DS with `profile`'s parameters makes when the game is
+/// started at the date and time with `buttons` held, at `timer0` (PokéFinder's
+/// SHA1).
+uint64_t pf_gen5InitialSeed(uint32_t game, const PFProfile5 *profile, uint16_t timer0, uint16_t buttons,
+                            uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second);
+
+// MARK: - Gen 5 IDs
+
+typedef struct {
+    PFDateTime dateTime;
+    uint64_t seed;
+    uint16_t timer0;
+    uint16_t buttons;
+    uint32_t advances;
+    uint16_t tid;
+    uint16_t sid;
+    uint16_t tsv;
+} PFIDSearchResult5;
+
+typedef void *PFIDSearch5Handle;
+
+/// PokéFinder's IDSearcher5 over every second of the dates, on its own
+/// thread, with the profile's Timer0 range and keypresses.
+PFIDSearch5Handle pf_idSearch5_start(uint32_t game, const PFProfile5 *profile,
+                                     uint16_t startYear, uint8_t startMonth, uint8_t startDay,
+                                     uint16_t endYear, uint8_t endMonth, uint8_t endDay,
+                                     uint32_t maxAdvances,
+                                     uint32_t pid, bool checkPID, bool checkXOR,
+                                     uint16_t tid, bool filterTID, uint16_t sid, bool filterSID);
+int pf_idSearch5_progress(PFIDSearch5Handle handle);
+bool pf_idSearch5_done(PFIDSearch5Handle handle);
+PFIDSearchResult5 *pf_idSearch5_getResults(PFIDSearch5Handle handle, int *outCount);
+void pf_idSearch5_cancel(PFIDSearch5Handle handle);
+void pf_idSearch5_free(PFIDSearch5Handle handle);
+
+/// The seeds that gave the TID you got, from the minute and the seconds
+/// the game was started in (PokéFinder's IDs5 Find).
+PFIDSearchResult5 *pf_idFind5(uint32_t game, const PFProfile5 *profile, uint16_t tid,
+                              uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute,
+                              uint8_t minSecond, uint8_t maxSecond, uint32_t maxAdvances, int *outCount);
+
 // MARK: - Gen 8 Generator State
 
 typedef struct {
