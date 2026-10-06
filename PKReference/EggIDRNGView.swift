@@ -459,10 +459,10 @@ struct EggRNGView: View {
 // MARK: - ID RNG View
 
 struct IDRNGView: View {
-    /// Gen 3 and 4. Gen 8's IDs are the Finder's TID/SID mode (the same
-    /// BDSP generator), and Gen 5's need the profile work (RNG fixes PR 12):
-    /// both tabs ran Gen 4's generator.
-    static let generations: [FinderGeneration] = [.gen3, .gen4]
+    /// Gen 3, 4 and 5. Gen 8's IDs are the Finder's TID/SID mode (the same
+    /// BDSP generator); its tab ran Gen 4's generator, as Gen 5's did before
+    /// it had PokéFinder's IDSearcher5.
+    static let generations: [FinderGeneration] = [.gen3, .gen4, .gen5]
 
     @State private var generation: FinderGeneration = .gen3
     @State private var selectedGame: FinderGameVersion = .emerald
@@ -526,20 +526,20 @@ struct IDRNGView: View {
                     }
                 }
 
-                if generation == .gen3 {
+                if generation == .gen5 {
+                    Gen5IDView(game: selectedGame)
+                } else if generation == .gen3 {
                     gen3Inputs
                 } else {
-                    if generation == .gen4 {
-                        gen4ModeSelector
-                    }
-                    if generation == .gen4 && gen4Mode == 1 {
+                    gen4ModeSelector
+                    if gen4Mode == 1 {
                         gen4SearcherInputs
                     } else {
                         gen4GeneratorInputs
                     }
                 }
 
-                if generation == .gen3 || !(generation == .gen4 && gen4Mode == 1) {
+                if generation == .gen3 || (generation == .gen4 && gen4Mode == 0) {
                     Button {
                         generateIDs()
                     } label: {
@@ -552,7 +552,7 @@ struct IDRNGView: View {
                     gen4SearchButton
                 }
 
-                if finished && (generation == .gen3 ? results3.isEmpty : results4.isEmpty) {
+                if finished && generation != .gen5 && (generation == .gen3 ? results3.isEmpty : results4.isEmpty) {
                     Text(noResultsText(filters: setFilterNames, widen: generation == .gen3 ? "the advances" : "the delays"))
                         .font(.caption).foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
@@ -561,7 +561,7 @@ struct IDRNGView: View {
                 if generation == .gen3 && !results3.isEmpty {
                     idResults3Section
                 }
-                if generation != .gen3 && !results4.isEmpty {
+                if generation == .gen4 && !results4.isEmpty {
                     idResults4Section
                 }
 
@@ -1097,5 +1097,292 @@ struct IDRNGView: View {
         }
         gen4SearchHandle = nil
         gen4Searching = false
+    }
+}
+
+// MARK: - Gen 5 IDs
+
+/// Black, White, Black 2 and White 2's IDs, with the DS's parameters:
+/// PokéFinder's IDSearcher5 over dates, or its seed finder from the TID you
+/// got (its IDs5 screen).
+struct Gen5IDView: View {
+    let game: FinderGameVersion
+
+    enum Mode: String, CaseIterable, Identifiable {
+        case search = "Search"
+        case find = "Find My Seed"
+        var id: String { rawValue }
+    }
+
+    @State private var mode: Mode = .search
+    @State private var startDate = Gen5IDView.date(2000, 1, 1)
+    @State private var endDate = Gen5IDView.date(2000, 1, 1)
+    @State private var maxAdvances = 100
+    @State private var filterTID = false
+    @State private var targetTID: UInt16 = 0
+    @State private var filterSID = false
+    @State private var targetSID: UInt16 = 0
+    @State private var shinyPID = false
+    @State private var pidText = ""
+    @State private var wildPID = false
+
+    @State private var findTID: UInt16 = 0
+    @State private var findDate = Date()
+    @State private var findHour = 0
+    @State private var findMinute = 0
+    @State private var findMinSecond = 0
+    @State private var findMaxSecond = 59
+    @State private var findMaxAdvances = 100
+
+    @State private var results: [PFBridge.IDSearchResult5] = []
+    @State private var handle: OpaquePointer?
+    @State private var searchTask: Task<Void, Never>?
+    @State private var progress = 0
+    @State private var finished = false
+
+    private static var utc: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
+
+    static func date(_ year: Int, _ month: Int, _ day: Int) -> Date {
+        utc.date(from: DateComponents(year: year, month: month, day: day)) ?? Date()
+    }
+
+    static func parts(_ date: Date) -> (year: UInt16, month: UInt8, day: UInt8) {
+        let c = utc.dateComponents([.year, .month, .day], from: date)
+        return (UInt16(clamping: c.year ?? 2000), UInt8(clamping: c.month ?? 1), UInt8(clamping: c.day ?? 1))
+    }
+
+    private var parameters: Gen5DSParameters { Gen5DSParametersCard.stored() }
+
+    var body: some View {
+        Gen5DSParametersCard(game: game, showsProfiles: true)
+
+        Picker("Mode", selection: $mode) {
+            ForEach(Mode.allCases) { Text($0.rawValue).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .onChange(of: mode) { clear() }
+        .onChange(of: game) { clear() }
+
+        if mode == .search {
+            SectionCard(title: "Gen 5 ID Search", icon: "magnifyingglass") {
+                Text("Every second of the dates, with your DS's parameters and keypresses. Set a filter: without one, every ID matches.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                DatePicker("Start Date", selection: $startDate, displayedComponents: .date)
+                DatePicker("End Date", selection: $endDate, displayedComponents: .date)
+                RNGIntField(label: "Max Advances", value: $maxAdvances, range: RNGFieldRange.advances)
+                Toggle("Filter TID", isOn: $filterTID)
+                if filterTID { FinderUInt16Field(label: "Target TID", value: $targetTID) }
+                Toggle("Filter SID", isOn: $filterSID)
+                if filterSID { FinderUInt16Field(label: "Target SID", value: $targetSID) }
+                Toggle("Shiny for a PID", isOn: $shinyPID)
+                if shinyPID {
+                    HStack {
+                        Text("PID (hex)")
+                        Spacer()
+                        TextField("00000000", text: $pidText)
+                            .textFieldStyle(.roundedBorder).scaledWidth(120).multilineTextAlignment(.trailing)
+                            .autocorrectionDisabled()
+                            #if os(iOS)
+                            .textInputAutocapitalization(.characters)
+                            #endif
+                            .hexDigitsOnly($pidText, count: 8)
+                    }
+                    Toggle("A Wild or Stationary Pokémon", isOn: $wildPID)
+                    Text("Their PIDs' top bit follows the IDs, so fewer IDs make one shiny.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .environment(\.timeZone, TimeZone(secondsFromGMT: 0)!)
+            searchButton
+        } else {
+            SectionCard(title: "Find My Seed", icon: "scope") {
+                Text("The TID you got, and the minute you started the game in.")
+                    .font(.caption).foregroundStyle(.secondary)
+                FinderUInt16Field(label: "TID", value: $findTID)
+                DatePicker("Date", selection: $findDate, displayedComponents: .date)
+                HStack {
+                    Text("Time")
+                    Spacer()
+                    LiveIntField("H", value: $findHour, range: 0...23, grouping: false)
+                        .clamping($findHour, to: 0...23)
+                        .textFieldStyle(.roundedBorder).scaledWidth(44)
+                    Text(":")
+                    LiveIntField("M", value: $findMinute, range: 0...59, grouping: false)
+                        .clamping($findMinute, to: 0...59)
+                        .textFieldStyle(.roundedBorder).scaledWidth(44)
+                }
+                RNGIntField(label: "Seconds From", value: $findMinSecond, range: 0...59)
+                RNGIntField(label: "Seconds To", value: $findMaxSecond, range: 0...59)
+                RNGIntField(label: "Max Advances", value: $findMaxAdvances, range: RNGFieldRange.advances)
+            }
+            .environment(\.timeZone, TimeZone(secondsFromGMT: 0)!)
+            Button {
+                find()
+            } label: {
+                Label("Find", systemImage: "magnifyingglass")
+            }
+            .buttonStyle(.primaryAction)
+            .disabled(blockedReason != nil || searchTask != nil)
+        }
+
+        if let blockedReason {
+            Text(blockedReason)
+                .font(.caption).foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+
+        if finished && results.isEmpty {
+            Text(mode == .search ? "Nothing found. Widen the dates or the advances, or loosen a filter."
+                                 : "Nothing found. Check the TID, date and minute, and your DS's parameters, or widen the seconds or the advances.")
+                .font(.caption).foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+
+        if !results.isEmpty {
+            SectionCard(title: "Results (\(results.count))", icon: "list.bullet") {
+                Text("Tap one to send it to the Timer: set your DS's clock to its minute, then press Continue on its second.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                ForEach(results.prefix(500)) { r in
+                    Button {
+                        Self.sendToTimer(r)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text(r.dateTimeText).font(.system(.caption, design: .monospaced))
+                                Spacer()
+                                Text("Adv: \(r.advances)").font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                            }
+                            HStack {
+                                Text("TID: \(r.tid)").font(.system(.caption, design: .monospaced))
+                                Text("SID: \(r.sid)").font(.system(.caption, design: .monospaced))
+                                Spacer()
+                                Text("TSV: \(r.tsv)").font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                            }
+                            Text(String(format: "Seed %016llX  Timer0 %X  ", r.seed, r.timer0) + Gen5Buttons.describe(r.buttons))
+                                .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    Divider()
+                }
+            }
+        }
+    }
+
+    /// Why Search or Find is off.
+    private var blockedReason: String? {
+        if parameters.isUnset { return "Set your DS's parameters first: Find My Parameters above." }
+        if mode == .search && startDate > endDate { return "The start date is after the end date." }
+        if mode == .search && shinyPID && UInt32(pidText, radix: 16) == nil { return "Enter the PID, in hex." }
+        if mode == .find && findMinSecond > findMaxSecond { return "The seconds are the wrong way round." }
+        return nil
+    }
+
+    private var searchButton: some View {
+        VStack(spacing: 8) {
+            if searchTask != nil {
+                ProgressView(value: Double(progress), total: 100)
+                    .progressViewStyle(.linear)
+                Text("\(progress)% — \(results.count) found")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button { stop() } label: { Label("Stop", systemImage: "stop.fill") }
+                    .buttonStyle(.primaryAction)
+                    .tint(.red)
+            } else {
+                Button { search() } label: { Label("Search", systemImage: "magnifyingglass") }
+                    .buttonStyle(.primaryAction)
+                    .disabled(blockedReason != nil)
+                if results.count >= searchResultLimit {
+                    Text(searchResultLimitNote)
+                        .font(.caption).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    private func clear() {
+        stop()
+        results = []
+        finished = false
+    }
+
+    private func search() {
+        stop()
+        results = []
+        finished = false
+        progress = 0
+        guard let h = PFBridge.idSearch5Start(
+            game: game.pfGame, profile: parameters, start: Self.parts(startDate), end: Self.parts(endDate),
+            maxAdvances: UInt32(clamping: maxAdvances),
+            pid: UInt32(pidText, radix: 16) ?? 0, checkPID: shinyPID, checkXOR: shinyPID && wildPID,
+            tid: targetTID, filterTID: filterTID, sid: targetSID, filterSID: filterSID) else { return }
+        handle = h
+        searchTask = Task {
+            while !PFBridge.idSearch5Done(h) {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard handle == h else { break }
+                progress = PFBridge.idSearch5Progress(h)
+                // At most searchResultLimit, as every RNG search keeps.
+                results.append(contentsOf: PFBridge.idSearch5Results(h).prefix(max(0, searchResultLimit - results.count)))
+                if results.count >= searchResultLimit { PFBridge.idSearch5Cancel(h) }
+            }
+            if handle == h {
+                results.append(contentsOf: PFBridge.idSearch5Results(h).prefix(max(0, searchResultLimit - results.count)))
+                progress = PFBridge.idSearch5Progress(h)
+                finished = true
+                handle = nil
+                searchTask = nil
+            }
+            await Task.detached { PFBridge.idSearch5Free(h) }.value
+        }
+    }
+
+    private func find() {
+        stop()
+        results = []
+        finished = false
+        let date = Self.parts(findDate)
+        let params = parameters
+        let gameVal = game.pfGame
+        let tid = findTID, hour = UInt8(clamping: findHour), minute = UInt8(clamping: findMinute)
+        let seconds = UInt8(clamping: findMinSecond)...UInt8(clamping: findMaxSecond)
+        let maxAdv = UInt32(clamping: findMaxAdvances)
+        searchTask = Task {
+            let found = await Task.detached {
+                PFBridge.idFind5(game: gameVal, profile: params, tid: tid, year: date.year, month: date.month,
+                                 day: date.day, hour: hour, minute: minute, seconds: seconds, maxAdvances: maxAdv)
+            }.value
+            results = found
+            finished = true
+            searchTask = nil
+        }
+    }
+
+    private func stop() {
+        if let handle { PFBridge.idSearch5Cancel(handle) }
+        handle = nil
+        searchTask = nil
+    }
+
+    /// The Gen 5 Timer's Standard mode: the result's second, after setting
+    /// the DS's clock to its minute.
+    static func sendToTimer(_ r: PFBridge.IDSearchResult5) {
+        let bridge = FinderTimerBridge.shared
+        bridge.pendingGen = .gen5
+        bridge.pendingTargetSecond = r.second
+        bridge.selectedTime = r.dateTimeText + (r.buttons == 0 ? "" : ", holding \(Gen5Buttons.describe(r.buttons))")
+        bridge.selectedSeed = String(format: "%016llX", r.seed)
+        bridge.shouldSwitchToTimer = true
     }
 }

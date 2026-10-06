@@ -1,8 +1,8 @@
 # RNG tools fixes: plan
 
-Status: **PRs 1–8, 11 and 11b merged** (2026-10-04 and 05, #74–#83);
-**PRs 9 and 10 built** (§5, §6); **PR 12 planned** (§7). From the RNG
-audit's 45 findings, and twelve found since (46–57). The owner took every recommendation in §9, and in
+Status: **PRs 1–11 and 11b merged** (2026-10-04 and 05, #74–#83, #87,
+#88); **PR 12 built** (§7), the last. From the RNG audit's 45 findings, and
+thirteen found since (46–58). The owner took every recommendation in §9, and in
 §10 for PRs 5–12. When PR 12 merges, what's still true here moves into
 `HANDOFF.md` and this file goes.
 
@@ -37,9 +37,9 @@ history has that version.
 | 11b | 21, 42, 43, 50–52 | IV Calc with each game's base stats, IV fields, number fields | [#81](https://github.com/rra013/PKReference/pull/81), merged 2026-10-05 |
 | 7 | 12, 13, 31, 39, 53, 54 | Gen 3 targets: Ruby/Sapphire days, Emerald, Dead Battery | [#82](https://github.com/rra013/PKReference/pull/82), merged 2026-10-05 |
 | 8 | 36, 37, 48, 55 | Finder results: generators in chunks, empty and stale results | [#83](https://github.com/rra013/PKReference/pull/83), merged 2026-10-05 |
-| 9 | 19, 20, 24, 25, 44, 49, 56, 57 | Wild areas from PokéFinder's tables | Built (§5) |
-| 10 | 17 (Gen 8), 35, 40 | Gen 4 tools: years, delays, TSV | Built (§6) |
-| 12 | 17 (Gen 5), 26, 34 | Gen 5 profiles, calibrator, IDs and Timer | Planned (§7) |
+| 9 | 19, 20, 24, 25, 44, 49, 56, 57 | Wild areas from PokéFinder's tables | [#87](https://github.com/rra013/PKReference/pull/87), merged 2026-10-05 |
+| 10 | 17 (Gen 8), 35, 40 | Gen 4 tools: years, delays, TSV | [#88](https://github.com/rra013/PKReference/pull/88), merged 2026-10-05 |
+| 12 | 17 (Gen 5), 26, 34, 58 | Gen 5 profiles, calibrator, IDs and Timer | Built (§7) |
 
 PRs 1–4 were the worst ten findings. PR 11 was moved up after PR 6
 (2026-10-04): a simulated run from search to calibration showed that
@@ -105,7 +105,7 @@ PR left in the code, and where it went beyond the plan.
 | 17 | 10 (Gen 8), 12 (Gen 5) |
 | 19, 20, 24, 25, 44, 49, 56, 57 | 9 |
 | 21, 42, 43, 50–52 | 11b |
-| 26, 34 | 12 |
+| 26, 34, 58 | 12 |
 | 27–30, 32, 33 | 6 |
 | 35, 40 | 10 |
 | 36, 37, 48, 55 | 8 |
@@ -240,7 +240,7 @@ is gone.
 
 ---
 
-## 7. PR 12: Gen 5 profiles (17 Gen 5, 26, 34)
+## 7. PR 12: Gen 5 profiles (17 Gen 5, 26, 34; 58)
 
 - **Profiles (26):** a Gen 5 profile (MAC, DS type, language, game, Timer0
   range, VCount, GxStat, VFrame, keypress options), saved like the Trainer
@@ -258,6 +258,38 @@ is gone.
 - **Tests:** the calibrator finds the parameters a seed was made with; the
   ID searcher's results regenerate in `IDGenerator5`; the handoff fills
   the Gen 5 Timer.
+
+**Built (2026-10-05).** `Gen5Profile.swift`.
+
+- **Profiles (26):** one DS Parameters card (`Gen5DSParametersCard`) for the
+  Finder and TID/SID's Gen 5 tab, kept in the Finder's `finder_gen5*`
+  settings (the keypresses too, which were per visit). Timer0, VCount,
+  GxStat and VFrame are entered in hex, as PokéFinder and the guides give
+  them. A Trainer profile saved in Gen 5 keeps the DS's parameters, and
+  choosing it loads them; TID/SID's card can load any Gen 5 profile.
+- **Calibrator (26):** Find My Parameters runs PokéFinder's
+  ProfileSearcher5 on its own thread (`pf_profileSearch5_start`, the
+  streaming pattern), from a Pokémon's IVs or a seed you know, over
+  PokéFinder's calibrator ranges for the game and DS type
+  (`calibratorRanges`, §10.5: ranges to search, not console values). A
+  result fills the card. Until then, the card says the parameters aren't
+  set, and TID/SID's Gen 5 search is off.
+- **Gen 5 IDs (17):** TID/SID's Gen 5 tab is back, with PokéFinder's IDs5:
+  Search over dates (IDSearcher5, TID, SID and a PID's shininess, with the
+  wild or stationary XOR) and Find My Seed from the TID you got.
+- **Send to Timer (34):** a Gen 5 target's page and each Gen 5 ID result
+  send the Gen 5 Timer's Standard mode the second to press Continue, with
+  the date, minute and buttons as the reminder.
+- **Changed from the plan:**
+  - C-Gear and Entralink's timings aren't set from the result: PokéFinder's
+    Gen 5 results carry no delay, and its generators don't read the method
+    (58). Those Timer modes stay as you set them.
+  - The calibrator has IVs and seed, as planned; PokéFinder's needle
+    calibration (from the Unova Link's needle) is left out.
+  - The Finder offers one Gen 5 method (58).
+  - The calibrator needs the IVs narrowed (every IV at 0–31 fits every set
+    of parameters), stops at `searchResultLimit`, and starts from your
+    local time, as the DS's clock is.
 
 ---
 
@@ -286,6 +318,9 @@ is gone.
   SoulSilver). Wild offers its game's own (PR 9).
 - 57: Gen 5 and BDSP wild searches ignored the Pokémon picker: the slots it
   allows were never passed (PR 9).
+- 58: the Finder's three Gen 5 methods (Method 5, its IVs and its C-Gear)
+  gave the same results: PokéFinder's Gen 5 generators and searchers take a
+  method but don't read it. The Finder offers one (PR 12).
 
 ---
 

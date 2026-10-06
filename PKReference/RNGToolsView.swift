@@ -655,7 +655,9 @@ enum FinderMethod: String, CaseIterable, Identifiable, Sendable {
         case .gen4:
             guard !staticEncounter, let game else { return [.method1, .methodJ, .methodK] }
             return game.isHGSS ? [.methodK] : [.methodJ]
-        case .gen5: return [.method5, .method5IVs, .method5CGear]
+        // PokéFinder's Gen 5 generators and searchers take a method but
+        // don't read it: all three gave the same results.
+        case .gen5: return [.method5]
         case .gen8: return [.method1]
         }
     }
@@ -924,6 +926,11 @@ struct StaticSearchResult: Identifiable, Sendable {
     var pidHex: String { String(format: "%08X", pid) }
     var seedHex: String { String(format: "%08X", seed) }
     var seedHex64: String? { initialSeed64.map { String(format: "%016llX", $0) } }
+    /// Gen 5: the second of the date and time ("2000-01-01 12:34:56").
+    var dateTimeSecond: Int? {
+        dateTimeString.flatMap { Int($0.suffix(2)) }
+    }
+
     var buttonPressName: String? {
         guard let b = buttons else { return nil }
         if b == 0 { return "None" }
@@ -3179,6 +3186,12 @@ struct RNGTimerView: View {
                     gen4SeedTimeData = bridge.pendingSeedTime?.encoded ?? Data()
                     if let hgss = bridge.pendingHGSS { gen4HGSS = hgss }
                 }
+                // Gen 5: the second to press Continue, after setting the
+                // DS's clock to the target's minute (Standard mode).
+                if gen == .gen5, let second = bridge.pendingTargetSecond {
+                    gen5Mode = .standard
+                    gen5TargetSecond = second
+                }
                 if let time = bridge.selectedTime {
                     let seed = bridge.selectedSeed ?? "?"
                     reminderText = "Seed \(seed) — \(time)"
@@ -3737,7 +3750,8 @@ struct FinderRootView: View {
     @AppStorage("finder_gen5memoryLink") private var gen5MemoryLink: Bool = false
     @AppStorage("finder_gen5shinyCharm") private var gen5ShinyCharm: Bool = false
     @AppStorage("finder_gen5season") private var gen5Season: UInt8 = 0
-    @State private var gen5Keypresses: [Bool] = [true, false, false, false, false, false, false, false, false]
+    @AppStorage(Gen5DSParameterKeys.keypresses) private var gen5KeypressText = "100000000"
+    private var gen5Keypresses: [Bool] { Gen5DSParameterKeys.keypresses(from: gen5KeypressText) }
 
     // Gen 5 searcher date range
     @State private var gen5StartDate: Date = {
@@ -3986,6 +4000,7 @@ struct FinderRootView: View {
                                 tid = profile.tid
                                 sid = profile.sid
                                 deadBattery = profile.deadBattery
+                                if profile.isGen5 { Gen5DSParametersCard.store(profile.gen5Parameters) }
                                 if let gv = profile.gameVersion,
                                    let game = FinderGameVersion(rawValue: gv) {
                                     selectedGame = game
@@ -4024,62 +4039,9 @@ struct FinderRootView: View {
                     }
                 }
 
-                // Gen 5 DS Parameters
+                // Gen 5 DS Parameters, shared with the TID/SID tool
                 if generation == .gen5 {
-                    SectionCard(title: "DS Parameters", icon: "wifi") {
-                        HStack {
-                            Text("MAC Address")
-                            Spacer()
-                            TextField("e.g. 0009BF123456", text: $gen5MacText)
-                                .textFieldStyle(.roundedBorder)
-                                .scaledWidth(160)
-                                .multilineTextAlignment(.trailing)
-                                .autocorrectionDisabled()
-                                #if os(iOS)
-                                .textInputAutocapitalization(.characters)
-                                #endif
-                        }
-                        RNGIntField(label: "Timer0 Min", value: $gen5Timer0Min, range: RNGFieldRange.word)
-                        RNGIntField(label: "Timer0 Max", value: $gen5Timer0Max, range: RNGFieldRange.word)
-                        RNGIntField(label: "VCount", value: $gen5VCount, range: RNGFieldRange.byte)
-                        RNGIntField(label: "GxStat", value: $gen5GxStat, range: RNGFieldRange.byte)
-                        RNGIntField(label: "VFrame", value: $gen5VFrame, range: RNGFieldRange.byte)
-
-                        Picker("DS Type", selection: $gen5DSType) {
-                            Text("DS Lite").tag(UInt8(0))
-                            Text("DSi").tag(UInt8(1))
-                            Text("3DS").tag(UInt8(2))
-                        }
-
-                        Picker("Language", selection: $gen5Language) {
-                            Text("English").tag(UInt8(0))
-                            Text("French").tag(UInt8(1))
-                            Text("German").tag(UInt8(2))
-                            Text("Italian").tag(UInt8(3))
-                            Text("Japanese").tag(UInt8(4))
-                            Text("Korean").tag(UInt8(5))
-                            Text("Spanish").tag(UInt8(6))
-                        }
-
-                        Toggle("Skip L/R", isOn: $gen5SkipLR)
-                        Toggle("Memory Link", isOn: $gen5MemoryLink)
-                        if selectedGame == .black2 || selectedGame == .white2 {
-                            Toggle("Shiny Charm", isOn: $gen5ShinyCharm)
-                        }
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Keypresses").font(.subheadline).foregroundStyle(.secondary)
-                            let labels = ["None", "1 Button", "2 Buttons", "3 Buttons",
-                                          "4 Buttons", "5 Buttons", "6 Buttons", "7 Buttons", "8 Buttons"]
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))], spacing: 4) {
-                                ForEach(0..<9, id: \.self) { i in
-                                    Toggle(labels[i], isOn: $gen5Keypresses[i])
-                                        .toggleStyle(.button)
-                                        .font(.caption)
-                                }
-                            }
-                        }
-                    }
+                    Gen5DSParametersCard(game: selectedGame)
                 }
 
                 // Gen 8 Parameters
@@ -4270,10 +4232,12 @@ struct FinderRootView: View {
             Button("Save") {
                 let name = newProfileName.trimmingCharacters(in: .whitespaces)
                 guard !name.isEmpty else { return }
-                let profile = FinderProfile(name: name, tid: tid, sid: sid,
+                var profile = FinderProfile(name: name, tid: tid, sid: sid,
                                             gameVersion: selectedGame.rawValue,
                                             deadBattery: deadBattery,
                                             nationalDex: false)
+                // A Gen 5 profile keeps the DS's parameters too.
+                if generation == .gen5 { profile.gen5Parameters = Gen5DSParametersCard.stored() }
                 savedProfiles.append(profile)
                 selectedProfileID = profile.id
                 FinderProfileStore.save(savedProfiles)
@@ -5891,8 +5855,7 @@ struct SeedToTimeView: View {
         }
 
         if generation == .gen5 {
-            Text("Seed-to-time is not applicable for Gen 5.")
-                .foregroundStyle(.secondary)
+            gen5TimerSection
         } else if !isComputing && generation == .gen4 && timeResults4.isEmpty
                     && gen4Year > seedToTimeGen4LatestYear(seed: result.seed) {
             Text("This seed's delay is \(seedToTimeGen4LatestYear(seed: result.seed) - 2000) on a DS set to 2000, so a year after \(seedToTimeGen4LatestYear(seed: result.seed)) would need a negative delay. Choose an earlier year.")
@@ -5905,6 +5868,39 @@ struct SeedToTimeView: View {
             Text("No date/time combos found for this seed.")
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// Gen 5: the seed is the date and time you press Continue, so the DS's
+    /// clock is set to the target's minute and the Timer counts to its
+    /// second (the Gen 5 Timer's Standard mode).
+    @ViewBuilder
+    private var gen5TimerSection: some View {
+        if let dateTime = result.dateTimeString, let second = result.dateTimeSecond {
+            SectionCard(title: "Hit It", icon: "timer") {
+                Text("Set your DS's clock to \(String(dateTime.dropLast(3))), a little before the minute. Start the game, then press Continue as the Timer ends, on second \(second)\(result.buttons.map { $0 == 0 ? "" : ", holding \(Gen5Buttons.describe($0))" } ?? "").")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    sendToTimerGen5(second: second, time: dateTime)
+                } label: {
+                    Label("Send to Timer", systemImage: "timer")
+                }
+                .buttonStyle(.primaryAction)
+            }
+        } else {
+            Text("A Gen 5 Generator result has no date and time: search for one in Searcher mode.")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func sendToTimerGen5(second: Int, time: String) {
+        let bridge = FinderTimerBridge.shared
+        bridge.pendingGen = .gen5
+        bridge.pendingTargetSecond = second
+        bridge.selectedTime = time + (result.buttonPressName.map { $0 == "None" ? "" : ", holding \($0)" } ?? "")
+        bridge.selectedSeed = result.seedHex64 ?? result.seedHex
+        bridge.shouldSwitchToTimer = true
+        close()
     }
 
     /// The DS's year, which sets the delay.

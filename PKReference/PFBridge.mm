@@ -81,6 +81,11 @@
 #include <Core/Gen5/Generators/EggGenerator5.hpp>
 #include <Core/Gen5/Generators/IDGenerator5.hpp>
 #include <Core/Gen5/Searchers/IVSearcher5.hpp>
+#include <Core/Gen5/Searchers/IDSearcher5.hpp>
+#include <Core/Gen5/Searchers/ProfileSearcher5.hpp>
+#include <Core/RNG/SHA1.hpp>
+#include <Core/Gen5/States/ProfileSearcherState5.hpp>
+#include <Core/Enum/Buttons.hpp>
 #include <Core/Gen5/States/SearcherState5.hpp>
 #include <Core/Enum/Buttons.hpp>
 #include <Core/Enum/DSType.hpp>
@@ -2771,6 +2776,231 @@ extern "C" void pf_search5_cancel(PFSearch5Handle handle)
 extern "C" void pf_search5_free(PFSearch5Handle handle)
 {
     delete static_cast<PFAsyncSearch5 *>(handle);
+}
+
+// MARK: - Gen 5 Profiles
+
+static Profile5 makeProfile5(Game game, u16 tid, u16 sid, const PFProfile5 *p)
+{
+    return makeProfile5(game, tid, sid, p->mac, p->keypresses, p->vcount, p->gxstat, p->vframe,
+                        p->skipLR, p->timer0Min, p->timer0Max, p->memoryLink, p->shinyCharm,
+                        p->dsType, p->language);
+}
+
+struct PFProfileSearch5 {
+    ProfileSearcher5 *searcher;
+    std::thread thread;
+    std::atomic<bool> done { false };
+
+    ~PFProfileSearch5() {
+        if (thread.joinable()) thread.join();
+        delete searcher;
+    }
+};
+
+extern "C" PFProfileSearch5Handle pf_profileSearch5_start(bool bySeed, uint32_t game, uint8_t language, uint8_t dsType,
+                                                          uint64_t mac, uint16_t buttons,
+                                                          uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute,
+                                                          uint8_t minSecond, uint8_t maxSecond,
+                                                          uint8_t minVCount, uint8_t maxVCount,
+                                                          uint16_t minTimer0, uint16_t maxTimer0,
+                                                          uint8_t minGxStat, uint8_t maxGxStat,
+                                                          uint8_t minVFrame, uint8_t maxVFrame,
+                                                          const uint8_t ivMin[6], const uint8_t ivMax[6], uint64_t seed)
+{
+    if (minSecond > maxSecond || minVCount > maxVCount || minTimer0 > maxTimer0
+        || minGxStat > maxGxStat || minVFrame > maxVFrame) {
+        return nullptr;
+    }
+    Date date(year, month, day);
+    Time time(hour, minute, 0);
+    auto version = static_cast<Game>(game);
+    auto lang = static_cast<Language>(language);
+    auto ds = static_cast<DSType>(dsType);
+    auto held = static_cast<Buttons>(buttons);
+
+    ProfileSearcher5 *searcher;
+    if (bySeed) {
+        searcher = new ProfileSeedSearcher5(date, time, minSecond, maxSecond, minVCount, maxVCount, minTimer0, maxTimer0,
+                                            minGxStat, maxGxStat, version, lang, ds, mac, held, seed);
+    } else {
+        std::array<u8, 6> min, max;
+        std::copy(ivMin, ivMin + 6, min.begin());
+        std::copy(ivMax, ivMax + 6, max.begin());
+        searcher = new ProfileIVSearcher5(date, time, minSecond, maxSecond, minVCount, maxVCount, minTimer0, maxTimer0,
+                                          minGxStat, maxGxStat, version, lang, ds, mac, held, min, max);
+    }
+    // As PokéFinder's calibrator: a step per Timer0, GxStat and VFrame.
+    searcher->setMaxProgress(static_cast<u64>(maxTimer0 - minTimer0 + 1) * (maxGxStat - minGxStat + 1)
+                             * (maxVFrame - minVFrame + 1));
+
+    auto *handle = new PFProfileSearch5();
+    handle->searcher = searcher;
+    handle->thread = std::thread([handle, searcher, minVFrame, maxVFrame]() {
+        int threads = static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
+        searcher->startSearch(threads, minVFrame, maxVFrame);
+        handle->done = true;
+    });
+    return handle;
+}
+
+extern "C" int pf_profileSearch5_progress(PFProfileSearch5Handle h)
+{
+    return static_cast<PFProfileSearch5 *>(h)->searcher->getProgress();
+}
+
+extern "C" bool pf_profileSearch5_done(PFProfileSearch5Handle h)
+{
+    return static_cast<PFProfileSearch5 *>(h)->done;
+}
+
+extern "C" PFProfileResult5 *pf_profileSearch5_getResults(PFProfileSearch5Handle h, int *outCount)
+{
+    auto results = static_cast<PFProfileSearch5 *>(h)->searcher->getResults();
+    *outCount = static_cast<int>(results.size());
+    if (results.empty()) return nullptr;
+    auto *out = static_cast<PFProfileResult5 *>(malloc(sizeof(PFProfileResult5) * results.size()));
+    for (size_t i = 0; i < results.size(); i++) {
+        out[i].seed = results[i].getSeed();
+        out[i].timer0 = results[i].getTimer0();
+        out[i].vcount = results[i].getVCount();
+        out[i].vframe = results[i].getVFrame();
+        out[i].gxstat = results[i].getGxStat();
+        out[i].second = results[i].getSecond();
+    }
+    return out;
+}
+
+extern "C" void pf_profileSearch5_cancel(PFProfileSearch5Handle h)
+{
+    static_cast<PFProfileSearch5 *>(h)->searcher->cancelSearch();
+}
+
+extern "C" void pf_profileSearch5_free(PFProfileSearch5Handle h)
+{
+    delete static_cast<PFProfileSearch5 *>(h);
+}
+
+extern "C" uint64_t pf_gen5InitialSeed(uint32_t game, const PFProfile5 *p, uint16_t timer0, uint16_t buttons,
+                                       uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second)
+{
+    Profile5 profile = makeProfile5(static_cast<Game>(game), 0, 0, p);
+    SHA1 sha(profile);
+    sha.setTimer0(timer0, p->vcount);
+    sha.setDate(Date(year, month, day));
+    sha.setButton(Keypresses::getValue(static_cast<Buttons>(buttons)));
+    auto alpha = sha.precompute();
+    sha.setTime(hour, minute, second, static_cast<DSType>(p->dsType));
+    return sha.hashSeed(alpha);
+}
+
+// MARK: - Gen 5 IDs
+
+static PFIDSearchResult5 convertIDSearchResult5(const SearcherState5<IDState> &s)
+{
+    PFIDSearchResult5 r;
+    r.dateTime = convertDateTime(s.getDateTime());
+    r.seed = s.getInitialSeed();
+    r.timer0 = s.getTimer0();
+    r.buttons = static_cast<uint16_t>(s.getButtons());
+    const auto &state = s.getState();
+    r.advances = state.getAdvances();
+    r.tid = state.getTID();
+    r.sid = state.getSID();
+    r.tsv = state.getTSV();
+    return r;
+}
+
+static IDFilter makeIDFilter5(uint16_t tid, bool filterTID, uint16_t sid, bool filterSID)
+{
+    std::vector<u16> tids, sids;
+    if (filterTID) tids.push_back(tid);
+    if (filterSID) sids.push_back(sid);
+    return IDFilter(tids, sids, {}, {}, {}, {});
+}
+
+struct PFIDSearch5 {
+    IDSearcher5 *searcher;
+    std::thread thread;
+    std::atomic<bool> done { false };
+
+    ~PFIDSearch5() {
+        if (thread.joinable()) thread.join();
+        delete searcher;
+    }
+};
+
+extern "C" PFIDSearch5Handle pf_idSearch5_start(uint32_t game, const PFProfile5 *p,
+                                                uint16_t startYear, uint8_t startMonth, uint8_t startDay,
+                                                uint16_t endYear, uint8_t endMonth, uint8_t endDay,
+                                                uint32_t maxAdvances,
+                                                uint32_t pid, bool checkPID, bool checkXOR,
+                                                uint16_t tid, bool filterTID, uint16_t sid, bool filterSID)
+{
+    Date start(startYear, startMonth, startDay);
+    Date end(endYear, endMonth, endDay);
+    if (start > end || p->timer0Min > p->timer0Max) return nullptr;
+
+    Profile5 profile = makeProfile5(static_cast<Game>(game), 0, 0, p);
+    IDGenerator5 generator(0, maxAdvances, pid, checkPID, checkXOR, profile, makeIDFilter5(tid, filterTID, sid, filterSID));
+    auto *searcher = new IDSearcher5(generator, profile);
+    searcher->setMaxProgress(std::max<u64>(1, searcher->getMaxProgress(start, end)));
+
+    auto *handle = new PFIDSearch5();
+    handle->searcher = searcher;
+    handle->thread = std::thread([handle, searcher, start, end]() {
+        int threads = static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
+        searcher->startSearch(threads, start, end);
+        handle->done = true;
+    });
+    return handle;
+}
+
+extern "C" int pf_idSearch5_progress(PFIDSearch5Handle h)
+{
+    return static_cast<PFIDSearch5 *>(h)->searcher->getProgress();
+}
+
+extern "C" bool pf_idSearch5_done(PFIDSearch5Handle h)
+{
+    return static_cast<PFIDSearch5 *>(h)->done;
+}
+
+extern "C" PFIDSearchResult5 *pf_idSearch5_getResults(PFIDSearch5Handle h, int *outCount)
+{
+    auto results = static_cast<PFIDSearch5 *>(h)->searcher->getResults();
+    *outCount = static_cast<int>(results.size());
+    if (results.empty()) return nullptr;
+    auto *out = static_cast<PFIDSearchResult5 *>(malloc(sizeof(PFIDSearchResult5) * results.size()));
+    for (size_t i = 0; i < results.size(); i++) out[i] = convertIDSearchResult5(results[i]);
+    return out;
+}
+
+extern "C" void pf_idSearch5_cancel(PFIDSearch5Handle h)
+{
+    static_cast<PFIDSearch5 *>(h)->searcher->cancelSearch();
+}
+
+extern "C" void pf_idSearch5_free(PFIDSearch5Handle h)
+{
+    delete static_cast<PFIDSearch5 *>(h);
+}
+
+extern "C" PFIDSearchResult5 *pf_idFind5(uint32_t game, const PFProfile5 *p, uint16_t tid,
+                                         uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute,
+                                         uint8_t minSecond, uint8_t maxSecond, uint32_t maxAdvances, int *outCount)
+{
+    *outCount = 0;
+    if (minSecond > maxSecond || p->timer0Min > p->timer0Max) return nullptr;
+    Profile5 profile = makeProfile5(static_cast<Game>(game), 0, 0, p);
+    IDGenerator5 generator(0, maxAdvances, 0, false, false, profile, makeIDFilter5(tid, true, 0, false));
+    IDSearcher5 searcher(generator, profile);
+    auto results = searcher.search(generator, Date(year, month, day), hour, minute, minSecond, maxSecond);
+    *outCount = static_cast<int>(results.size());
+    if (results.empty()) return nullptr;
+    auto *out = static_cast<PFIDSearchResult5 *>(malloc(sizeof(PFIDSearchResult5) * results.size()));
+    for (size_t i = 0; i < results.size(); i++) out[i] = convertIDSearchResult5(results[i]);
+    return out;
 }
 
 // MARK: - Gen 8 Helpers
