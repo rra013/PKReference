@@ -214,8 +214,8 @@ Settings' regulation:
 The server names Pokémon by the app's species keys ("arcanine:hisui"). The
 app makes a key with `TeamSearchVocabulary.identity(name:slug:).key`, as
 `TournamentUsage` does. Phase 4 adds the reverse,
-`TeamSearchVocabulary.species(forKey:)`, giving the name, form and Pokédex
-entry to show and open. A test runs every key in the golden file
+`TeamSearchVocabulary.species(forKey:)` (built in 4a), giving the species
+term, and so the name and form, to show and open. A test runs every key in the golden file
 (`backend/src/test/resources/golden/species-identity.json`) through it. A key
 it can't name shows as the server sent it.
 
@@ -229,14 +229,16 @@ it can't name shows as the server sent it.
   do without are optional, so a newer server's additions don't break an
   older app. Dates decode as ISO 8601 with or without fractional seconds:
   the server sends both (`generatedAt` has them, `lastEvent` doesn't).
-- **Requests:** on `MetaServerClient`, which gains `If-None-Match` and
-  answers `.notModified` for a 304. `MetaInsights` wraps the endpoints:
-  `formats()`, `pokemon(format:window:)`, `pokemon(format:key:window:)`,
-  `cores`, `archetypes`, `archetype(id:)` and `events`.
-- **Errors:** "can't reach the server" (no connection, a timeout, a refused
-  connection), "the server answered HTTP n", and "the answer didn't read"
-  (a schema the app doesn't know) are told apart, because §6 shows each
-  differently.
+- **Requests:** `MetaServerClient.fetch(_:etag:)` sends `If-None-Match`
+  and answers `.notModified` for a 304. Each answer is a `MetaAPI.Endpoint`
+  (`formats`, `pokemon(format:window:)`, `pokemon(format:key:window:)`,
+  `cores` and `archetypes`; `archetype(id:)` and `events` come once 4b's
+  endpoints exist), read through `MetaInsights`' `cached(_:)` and
+  `load(_:force:)` (§4.3).
+- **Errors:** `MetaFailure` tells apart "can't reach the server" (no
+  connection, a timeout, a refused connection), "the server answered HTTP
+  n", and "the answer didn't read" (a schema the app doesn't know), because
+  §6 shows each differently.
 
 ### 4.2 The stale connection test
 

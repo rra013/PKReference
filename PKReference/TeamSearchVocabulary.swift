@@ -244,6 +244,17 @@ nonisolated struct TeamSearchVocabulary: Sendable {
                            formWords: words.filter(identity.formWords.contains), mega: mega)
     }
 
+    /// A species key, as the PK Reference server sends it ("arcanine:hisui",
+    /// `Identity.key`), as a species term: Arcanine (Hisui). nil for a
+    /// species outside the regulation, or a form word it doesn't list.
+    func species(forKey key: String) -> SpeciesTerm? {
+        let parts = key.split(separator: ":", maxSplits: 1).map(String.init)
+        guard let first = parts.first, let species = speciesByID[first] else { return nil }
+        let formWords = parts.count > 1 ? parts[1].split(separator: "-").map(String.init) : []
+        guard formWords.allSatisfy(species.formWords.contains) else { return nil }
+        return SpeciesTerm(speciesID: species.id, name: species.name, formWords: formWords)
+    }
+
     /// The Mega a member can become: the held item must be one of its own
     /// species' stones.
     func mega(heldItem: String?, speciesID: String) -> Mega? {

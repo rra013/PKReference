@@ -39,7 +39,7 @@ not yet in `main`.
 Before that, #23–#56 were the UI pass, game data into JSON, iPad fixes, the
 Mac app, Siri Phase 1 and the rename to PK Reference.
 
-Full suite on 2026-10-06, on `backend-integration` after #101: 1,285 tests,
+Full suite on 2026-10-06, on `backend-integration` with Phase 4a: 1,295 tests,
 all passing on the iPhone 17 Pro Max simulator. The iOS and Mac builds had no warnings.
 
 ---
@@ -110,7 +110,11 @@ nothing there; a change to how the app names species must keep
 PK Reference Server (Beta) stores `metaServerEnabled` and `metaServerAddress`;
 `PreferredCorpusFetcher`, `TeamCorpusStore`'s default source, reads them at
 each call and asks the server, then Limitless whenever the server can't
-answer.
+answer. `MetaServerClient`'s session has no URL cache, so nothing it asks is
+answered from an old copy. `MetaAPI.swift` decodes the `/v1` insights, and
+`MetaCache.swift` keeps them on disk with the rule for when to ask again
+(`MetaInsights.load`); tests read real answers saved in
+`PKReferenceTests/MetaFixtures/`.
 
 **RNG tools** (`RNGToolsView.swift` and the files beside it): PokéFinder's
 C++ core is called through `PFBridge.h`/`.mm`, with `PFBridgeSwift.swift` as
