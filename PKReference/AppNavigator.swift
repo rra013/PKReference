@@ -47,6 +47,9 @@ final class AppNavigator {
         /// An index, with its search field filled in: the Mon, Move or
         /// Ability Index.
         case indexSearch(AppTab, String)
+        /// Settings, as the Meta tab's Change in Settings opens it on iPhone
+        /// and iPad. The Mac opens its Settings window instead.
+        case settings
 
         var tab: AppTab {
             switch self {
@@ -58,6 +61,7 @@ final class AppNavigator {
             case .savedTeam: .teams
             case .indexSearch(let tab, _): tab
             case .problemSolver: .problemSolver
+            case .settings: .settings
             }
         }
     }

@@ -13,7 +13,7 @@ one app:
 - a problem solver: pick a set that's giving you trouble and see every Pokémon, move and investment that knocks it out in one hit
 - a singles and doubles battle simulator with an on-device AI opponent
 - a full suite of Gen 3–5 RNG tools, ported from PokéFinder and EonTimer
-- tournament results and team sheets from Limitless
+- the tournament meta (what's used, with its sets, cores and archetypes) and team sheets from Limitless
 
 The app is **PK Reference** (`PK Reference.app`, bundle ID
 `yukisoft.PKReference`). The Xcode project, its targets and the Swift module
@@ -56,7 +56,7 @@ commits use.
 | **Problem Solver** | Pick the set you need to beat and see every Champions Pokémon, move and investment that knocks it out in one hit (or two), guaranteed, in doubles, grouped by whether it moves first. |
 | **Battle Sim** | Singles and doubles battle engine using your saved teams, with Mega Evolution and an on-device AI that can play either side. |
 | **RNG Tools** | Timer, seed finder, wild and static encounters, eggs, TID/SID, GameCube (Colosseum/XD), IV calculator, IV→PID and Hidden Power, for Gen 3–5, plus Sword/Shield raid dens. |
-| **Tournaments** | Tournaments, standings and team sheets from Limitless, with one-tap import of any team. |
+| **Meta** | What's used in the current regulation's tournaments, and Events: tournaments, standings and team sheets from Limitless, with one-tap import of any team. |
 | **Team Search** | Describe a team idea in plain words and see the popular tournament teams that match it, grouped into compositions. |
 | **Settings** | Appearance, accent color, type badge style, density, type-colored backgrounds, tab order and visibility, default tab and generation, active Champions regulation, data management, and acknowledgements and licenses. |
 
@@ -243,11 +243,26 @@ XD, Diamond, Pearl, Platinum, HeartGold, SoulSilver, Black, White, Black 2
 and White 2, plus Sword and Shield Max Raid dens. Profiles store console
 details such as MAC address and DS type.
 
-### Tournaments
+### Meta
 
-Browse recent Limitless tournaments by game and format, including Champions
-regulations M-A, M-B and M-C, and filter by minimum player count. Open an
-event to see:
+The tournament meta for the Champions regulation chosen in Settings, over
+the last 14 days, 30 days or the whole regulation: how many events and teams
+the numbers rest on, where they come from and how old they are, and the
+newest events with their winners' teams. It replaced the Tournaments tab.
+
+- **Where the numbers come from:** with Settings → PK Reference Server (Beta)
+  on, from the server. Otherwise, or when the server can't be reached, the
+  app works them out itself from the events Team Search downloaded
+  (**Download Events** fetches them the first time), and says so. Worked out
+  on the device, the top-cut rate is the top-8 rate and records are the
+  teams' own, since Limitless's standings don't say who made the top cut or
+  who played whom.
+- **When there's nothing to show** for the regulation or the window, it
+  says why, and how to change it.
+
+**Events** (All Events, from the Meta tab) browses Limitless's tournaments
+live by game and format, including Champions regulations M-A, M-B and M-C,
+and filters by minimum player count. Open an event to see:
 
 - **Standings,** filterable to the top 4, 8, 16 or 32. Players who dropped
   are listed after the ranked players.
@@ -300,7 +315,7 @@ back to Limitless whenever the server can't be reached.
   events were. Each shows its style tags, team and event counts, and best
   finish. With an empty search, the tab shows the most popular compositions.
 - **Details:** a composition lists why it matched, its variants and its
-  teams. Each team opens the same team sheet as the Tournaments tab, with
+  teams. Each team opens the same team sheet as Events, with
   the same save buttons.
 - **Partial matches:** when fewer than 10 teams match everything, teams
   missing one of the requested Pokémon are shown too, marked "Partial match".
@@ -354,7 +369,7 @@ Each Champions ranked regulation is described by two bundled JSON files:
 `ChampionsRegulation` is the single source of truth. By default it uses the
 newest regulation, and the one in use can be changed in Settings. The Mon
 Index, set and team builders, validator, battle simulator, set predictor and
-Tournaments tab all read from it. Adding a new regulation takes two JSON
+Meta tab all read from it. Adding a new regulation takes two JSON
 files and one enum case; [`tools/README.md`](tools/README.md) walks through
 it step by step.
 
@@ -415,7 +430,7 @@ All inference runs on the device.
 | Model | Files | Used by | Runtime |
 |---|---|---|---|
 | **Set predictor**: species + style → complete set | `name_qual_weights.npz`, `name_qual_vocab.json` | Sets → Predict Set | `PokiiLite` (Accelerate) |
-| **Stat & nature predictor**: species, item, ability and moves → stat points + nature | `stat_nature_model.npz`, `stat_nature_vocab.json` | Tournaments → Predict Stats & Nature | `PokiiLite` |
+| **Stat & nature predictor**: species, item, ability and moves → stat points + nature | `stat_nature_model.npz`, `stat_nature_vocab.json` | Meta → Events → Predict Stats & Nature | `PokiiLite` |
 | **Pokii doubles policy**: battle state → action, and whether to Mega Evolve | `pokii_battler.safetensors`, `feature_config.json` | Battle Sim AI | `PokiiBattler` (Accelerate) |
 
 All three are small multilayer perceptrons (MLPs), bundled with the app and
@@ -479,10 +494,10 @@ project has no Swift package dependencies.
 1. Open `PKReference.xcodeproj` and select the **PKReference** scheme.
 2. Run on a simulator, a device or **My Mac**. The first launch downloads
    Pokémon and move data from PokeAPI, so it needs a network connection;
-   later launches work offline, except for Tournaments and Team Search's new
+   later launches work offline, except for Events and Team Search's new
    events. The Mac app is sandboxed, with outgoing network access.
 
-**Tests:** 1,303 tests written with Swift Testing. They cover the damage engines
+**Tests:** 1,314 tests written with Swift Testing. They cover the damage engines
 and the port, the battle engine by mechanic tier, the EV and two-hit solvers,
 speed tiers, paste parsing and import, Champions filters and legality, RNG
 tools, ML parity, the tournament import and data store, Team Search's parser,
@@ -542,7 +557,7 @@ PK Reference is built on the work of many people and projects. Thank you all.
 |---|---|---|
 | [**PokeAPI**](https://pokeapi.co): REST (`pokeapi.co/api/v2`) and GraphQL (`graphql.pokeapi.co/v1beta2`) | National and regional Pokédex, species and forms, base stats, types, abilities, learnsets, and every move's data | Mon Index, Move Index, Ability Index, Damage Calc, Sets, Teams, Battle Sim, Speed Tiers |
 | [**Serebii.net**](https://www.serebii.net) | Pokédex, Attackdex and Abilitydex pages, plus the Champions Pokédex and regulation pages | In-app detail pages and links; the developer scripts that build each regulation's JSON files |
-| [**Limitless**](https://play.limitlesstcg.com) (`play.limitlesstcg.com/api`) | Tournament listings, standings and published team sheets | Tournaments tab and Team Search, directly or through the optional PK Reference server |
+| [**Limitless**](https://play.limitlesstcg.com) (`play.limitlesstcg.com/api`) | Tournament listings, standings and published team sheets | The Meta tab, its Events, and Team Search, directly or through the optional PK Reference server |
 | [**Smogon**](https://www.smogon.com) | `@smogon/calc` and its data (below), and monthly ladder usage statistics ([smogon.com/stats](https://www.smogon.com/stats/)) | Damage Calc, EV solver, Speed Tiers, Battle Sim damage; Team Search's "often paired with" suggestions and ladder usage |
 
 ### Ported and vendored code

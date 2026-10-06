@@ -440,7 +440,10 @@ lists what was and wasn't checked.
    and requests for 4b's events and archetype pages. No new screens.
 4. **4d, app: the Meta tab.** The rename and its migration, Events inside
    Meta, the regulation header and its warnings, the window choice, the
-   source rule and the states (§6), with Recent events.
+   source rule and the states (§6), with Recent events. Built: `MetaTab`,
+   `MetaModel` (the source rule, and `MetaText`'s sentences) and
+   `EventsView`; `TabLayout` also reads the old tab name wherever one is
+   stored, so a very old saved tab list keeps it.
 5. **4e, app: Meta home's cards and the Pokémon page**, with the full list
    and the info sheets.
 6. **4f, app: Teams to beat and the archetype page**, with the links to

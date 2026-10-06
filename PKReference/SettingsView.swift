@@ -323,6 +323,9 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .onChange(of: AppNavigator.shared.request, initial: true) {
+                if AppNavigator.shared.request == .settings { AppNavigator.shared.request = nil }
+            }
             .task { teamSearchCacheBytes = await teamSearchCacheSize() }
             .confirmationDialog(
                 "Redownload Data",

@@ -66,7 +66,7 @@ struct ListDetailSplit<ListColumn: View, Detail: View>: View {
 // MARK: - App Tab Definition
 
 enum AppTab: String, CaseIterable, Identifiable {
-    case monIndex, moveIndex, abilityIndex, damageCalc, sets, teams, speedTiers, problemSolver, battleSim, rngTools, tournaments, teamSearch, settings
+    case monIndex, moveIndex, abilityIndex, damageCalc, sets, teams, speedTiers, problemSolver, battleSim, rngTools, meta, teamSearch, settings
 
     var id: String { rawValue }
 
@@ -82,7 +82,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .problemSolver: return "Problem Solver"
         case .battleSim:    return "Battle Sim"
         case .rngTools:     return "RNG Tools"
-        case .tournaments:  return "Tournaments"
+        case .meta:         return "Meta"
         case .teamSearch:   return "Team Search"
         case .settings:     return "Settings"
         }
@@ -100,13 +100,13 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .problemSolver: return "scope"
         case .battleSim:    return "gamecontroller.fill"
         case .rngTools:     return "dice"
-        case .tournaments:  return "trophy"
+        case .meta:         return "chart.bar.xaxis"
         case .teamSearch:   return "sparkle.magnifyingglass"
         case .settings:     return "gear"
         }
     }
 
-    static let allUserTabs: [AppTab] = [.monIndex, .moveIndex, .abilityIndex, .damageCalc, .sets, .teams, .speedTiers, .problemSolver, .battleSim, .rngTools, .tournaments, .teamSearch]
+    static let allUserTabs: [AppTab] = [.monIndex, .moveIndex, .abilityIndex, .damageCalc, .sets, .teams, .speedTiers, .problemSolver, .battleSim, .rngTools, .meta, .teamSearch]
 }
 
 // MARK: - Accent Color
@@ -373,7 +373,7 @@ struct ContentView: View {
         case .problemSolver: ProblemSolverView()
         case .battleSim:    BattleSimulatorView()
         case .rngTools:     RNGToolsView()
-        case .tournaments:  TournamentsTab()
+        case .meta:         MetaTab()
         case .teamSearch:   TeamSearchView()
         case .settings:     SettingsView()
         }
