@@ -1,16 +1,20 @@
 # PK Reference backend (Kafka + Spring Boot)
 
 Companion service for the PK Reference app. It pulls Limitless tournament data, streams it
-through Kafka, keeps every event's teams and matches, and serves team usage stats over REST.
-[`BackendIntegration-PLAN.md`](../BackendIntegration-PLAN.md) is where it's going.
+through Kafka, keeps every event's teams and matches in Postgres, and serves insights and Team
+Search's corpus at `/v1`. The app reads the corpus from it when Settings → PK Reference Server
+(Beta) is on ([below](#using-it-from-the-app)).
+[`BackendIntegration-PLAN.md`](../BackendIntegration-PLAN.md) is where it's going, and has the
+metrics' definitions (§4.2).
 
 ```
 Limitless --poll--> EventDiscovery    --> tournaments.discovered
                     EventFetcher      --> standings.fetched + pairings.fetched (details, standings, matches)
                     TeamStoreConsumer --> Postgres: event, event_phase, team, team_member(_move), pairing
                     UsageConsumer     --> Postgres counters + pokemon.usage (compacted)
-                    MetaController    --> GET /v1/... (insights from the team store)
-                    UsageController   --> GET /api/usage?format=... (the older all-time counts)
+                    MetaController    --> GET /v1/formats/... (insights from the team store)
+                    CorpusController  --> GET /v1/.../tournaments, standings (Team Search's corpus)
+                    UsageController   --> GET /api/usage?format=... (the first version's all-time counts)
 ```
 
 ## Run
@@ -18,8 +22,7 @@ Limitless --poll--> EventDiscovery    --> tournaments.discovered
 cd backend
 docker compose up -d                 # Kafka on :9092, Kafka UI on :8081, Postgres on :5432
 mvn spring-boot:run                  # API on :8080, Swagger UI at /swagger-ui.html
-curl 'localhost:8080/api/usage?format=<format>&limit=20'
-curl 'localhost:8080/api/usage/incineroar?format=<format>'
+curl 'localhost:8080/v1/formats'
 ```
 Set `LIMITLESS_GAME` and `LIMITLESS_FORMATS` (comma-separated, such as `M-C,M-B`; empty for every format)
 to pick the circuit (see `GET /games` on the Limitless API). `LIMITLESS_FORMAT`, the old single format,
@@ -59,10 +62,9 @@ annotations in `MetaController` and `MetaResponses`.
   whole sets, and its usage week by week.
 - Cores: the 20 most common pairs and trios (on 4 teams or more), with `lift`, their share over what
   chance would give.
-- Archetypes: teams grouped by a core of four. Cores are the most common sets of four that share at most
-  two Pokémon with any more common core (on at least 4 teams and 2% of them); each team belongs to the
-  first core it contains. Each archetype has its usage, top-cut rate, record, and record against each
-  other archetype.
+- Archetypes: teams grouped by a core of four (defined in the plan's §4.2), each with its usage, top-cut
+  rate, record, and record against each other archetype. `name` is the core's two most-used members, so
+  two archetypes can share it; `id` is unique.
 
 - The corpus, for the app's Team Search: the stored events in Limitless's own shapes, answering the two
   calls the app makes to Limitless, so a device can build its corpus from the server instead:
@@ -75,6 +77,17 @@ annotations in `MetaController` and `MetaResponses`.
 `MetaService` works these out from the team store when asked, and keeps each result until the store
 changes (`store_version`, which every write bumps in its transaction) or the hour does. Shares are 0 to 1.
 Definitions are in [the plan](../BackendIntegration-PLAN.md) (§4.2).
+
+The older `GET /api/usage?format=…` and `/api/usage/{species}` still serve the first version's all-time
+counts. Nothing calls them; the plan drops them by Phase 7.
+
+### Using it from the app
+Settings → PK Reference Server (Beta) in the app, off by default, takes the server's address,
+`http://localhost:8080` by default: that reaches this machine from the simulator and the Mac app. A phone
+needs this Mac's network address, and asks for local network access. Test Connection lists the formats
+`/v1/formats` reports. With the switch on, Team Search and the Problem Solver read their corpus from
+`/v1/.../tournaments` and `/standings`, and from Limitless whenever the server can't answer
+(`PKReference/MetaServer.swift`).
 
 ### Finding events, and backfilling
 Every 30 minutes `EventDiscovery` walks each format's tournament list back through the lookback

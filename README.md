@@ -325,6 +325,11 @@ back to Limitless whenever the server can't be reached.
   newest regulation.
 - **Data management:** re-download the Pokémon and move data, clear Team
   Search's cached tournament data, or reset all data.
+- **PK Reference Server (Beta):** off by default. With it on, Team Search
+  and the Problem Solver read tournament teams from a PK Reference server
+  (`backend/`) at the address given, `http://localhost:8080` by default, and
+  from Limitless whenever it can't be reached. Test Connection says how many
+  events and teams the server has.
 - **Acknowledgements & Licenses:** the data sources and open-source
   components the app uses, with each license's full text.
 
@@ -451,9 +456,10 @@ the git history.
 - **C++ core:** PokéFinder's generators and searchers live in `PKReference/Core`,
   and `PFBridge.h/.mm` wraps them. `PFBridgeSwift.swift` gives the RNG
   views a Swift interface to them.
-- **Networking:** `LimitlessAPIService` (an actor with a short in-memory cache)
-  and `TeamCorpusStore` (a disk cache of tournament standings for Team Search,
-  which retries after rate limits and server errors).
+- **Networking:** `LimitlessAPIService` (an actor with a short in-memory cache),
+  `TeamCorpusStore` (a disk cache of tournament standings for Team Search,
+  which retries after rate limits and server errors), and `MetaServerClient`
+  (`MetaServer.swift`), which reads that corpus from the optional server.
 
 More internal documentation:
 [`HANDOFF.md`](HANDOFF.md) (where the code lives, conventions, design
@@ -472,20 +478,19 @@ project has no Swift package dependencies.
 1. Open `PKReference.xcodeproj` and select the **PKReference** scheme.
 2. Run on a simulator, a device or **My Mac**. The first launch downloads
    Pokémon and move data from PokeAPI, so it needs a network connection;
-   later launches work offline, except for Tournaments. The Mac app is
-   sandboxed, with outgoing network access.
+   later launches work offline, except for Tournaments and Team Search's new
+   events. The Mac app is sandboxed, with outgoing network access.
 
 **Tests:** 1,285 tests written with Swift Testing. They cover the damage engines
 and the port, the battle engine by mechanic tier, the EV and two-hit solvers,
 speed tiers, paste parsing and import, Champions filters and legality, RNG
 tools, ML parity, the tournament import and data store, Team Search's parser,
 engine, Smogon suggestions and Apple Intelligence reading (with canned
-answers), and the bundled license files. None of them need the network or a
-SwiftData store.
+answers), the PK Reference server option (over a stubbed network), and the
+bundled license files. None of them need the network or a SwiftData store.
 
-```bash
-xcodebuild test -project PKReference.xcodeproj -scheme PKReference -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
-```
+The command, and what to watch for running it and building the Mac app,
+are in [`HANDOFF.md`](HANDOFF.md#building-and-testing).
 
 **Developer tools** (not shipped in the app):
 
@@ -520,7 +525,8 @@ xcodebuild test -project PKReference.xcodeproj -scheme PKReference -destination 
 | `LICENSE` | The GNU General Public License, version 3 |
 | `THIRD_PARTY_NOTICES.md` | Every third-party component, its copyright and its license |
 | `HANDOFF.md` | Notes for contributors: where the code lives, conventions, known limitations and what's next |
-| `backend/` | Optional Kafka + Spring Boot service that ingests Limitless tournaments and serves team usage stats (see `backend/README.md`) |
+| `backend/` | Optional Kafka + Spring Boot service that keeps Limitless's tournaments and serves insights and Team Search's corpus (see [`backend/README.md`](backend/README.md)) |
+| `BackendIntegration-PLAN.md`, `BackendIntegration-PHASE4.md` | The plan for bringing the backend into the app |
 | `tools/` | Regulation scrapers, the Showdown data generator, and vendored upstream sources |
 
 ---
@@ -535,7 +541,7 @@ PK Reference is built on the work of many people and projects. Thank you all.
 |---|---|---|
 | [**PokeAPI**](https://pokeapi.co): REST (`pokeapi.co/api/v2`) and GraphQL (`graphql.pokeapi.co/v1beta2`) | National and regional Pokédex, species and forms, base stats, types, abilities, learnsets, and every move's data | Mon Index, Move Index, Ability Index, Damage Calc, Sets, Teams, Battle Sim, Speed Tiers |
 | [**Serebii.net**](https://www.serebii.net) | Pokédex, Attackdex and Abilitydex pages, plus the Champions Pokédex and regulation pages | In-app detail pages and links; the developer scripts that build each regulation's JSON files |
-| [**Limitless**](https://play.limitlesstcg.com) (`play.limitlesstcg.com/api`) | Tournament listings, standings and published team sheets | Tournaments tab and Team Search |
+| [**Limitless**](https://play.limitlesstcg.com) (`play.limitlesstcg.com/api`) | Tournament listings, standings and published team sheets | Tournaments tab and Team Search, directly or through the optional PK Reference server |
 | [**Smogon**](https://www.smogon.com) | `@smogon/calc` and its data (below), and monthly ladder usage statistics ([smogon.com/stats](https://www.smogon.com/stats/)) | Damage Calc, EV solver, Speed Tiers, Battle Sim damage; Team Search's "often paired with" suggestions and ladder usage |
 
 ### Ported and vendored code
