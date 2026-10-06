@@ -111,6 +111,8 @@
         <targetPath>regulations</targetPath>
         <includes>
           <include>showdown-champions-data.json</include>
+          <!-- Species keys: its form noise words (SpeciesVocabulary). -->
+          <include>team_search_vocab.json</include>
         </includes>
       </resource>
     </resources>

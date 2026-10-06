@@ -53,7 +53,11 @@ restart.
 ### The team store
 `TeamStoreConsumer` writes every fetched event into Postgres: `event` and its `event_phase`s (Swiss, top
 cut), each player's `team` (placement, record) with its `team_member`s and their moves, and every match in
-`pairing` with its `result` (`P1`, `P2`, `TIE`, `DOUBLE_LOSS`, `BYE`, `NO_SHOW`). A newer fetch of an event
+`pairing` with its `result` (`P1`, `P2`, `TIE`, `DOUBLE_LOSS`, `BYE`, `NO_SHOW`). Each member also gets
+its `species_key` the app's way ("arcanine:hisui": the species and the form words its regulation lists)
+and its `mega_stone` when it holds one of its own Mega Stones (`SpeciesVocabularies`, a port of the app's
+`TeamSearchVocabulary`, built from the same bundled files). Rows stored before that came in get keys
+when the store is rebuilt (below). A newer fetch of an event
 replaces its rows, and an older one is ignored. The top cut is who played in a bracket phase (`phase > 1`).
 Events are stored before their standings are final (`standings_final`), so they can be seen early; the
 usage counters wait until they are.
@@ -78,6 +82,9 @@ done
 the same migrations. The store's tests also run on Postgres 17 in Docker (Testcontainers), because H2 lets
 through SQL Postgres rejects; without Docker they're skipped. The fixtures in
 `src/test/resources/limitless/` are one real event's API responses, with the players' names replaced.
+`golden/species-identity.json` holds species keys recorded from the app: the app's
+`SpeciesIdentityGoldenTests` and the backend's `SpeciesVocabularyGoldenTest` both check against it, so a
+change to either side's naming fails a test until the other matches.
 GitHub Actions runs it for changes to the backend (`.github/workflows/backend.yml`).
 
 ## Name standardization

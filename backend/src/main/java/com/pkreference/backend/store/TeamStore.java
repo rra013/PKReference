@@ -6,6 +6,7 @@ import com.pkreference.backend.model.Events.Standing;
 import com.pkreference.backend.model.Events.StandingsFetched;
 import com.pkreference.backend.model.Events.TeamMember;
 import com.pkreference.backend.model.Events.TournamentDetails;
+import com.pkreference.backend.standardize.SpeciesVocabularies;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,16 +21,19 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Every event's teams and matches, as fetched: the tables Phase 2's insights read. Each fetch of
+ * Every event's teams and matches, as fetched: the tables Phase 2's insights read. Each member
+ * gets its species key the app's way (SpeciesVocabularies). Each fetch of
  * an event replaces its rows, so reading the topics again from the start rebuilds them, and a
  * fetch older than the one stored is ignored.
  */
 @Repository
 public class TeamStore {
     private final JdbcTemplate jdbc;
+    private final SpeciesVocabularies species;
 
-    public TeamStore(JdbcTemplate jdbc) {
+    public TeamStore(JdbcTemplate jdbc, SpeciesVocabularies species) {
         this.jdbc = jdbc;
+        this.species = species;
     }
 
     @Transactional
@@ -69,9 +73,10 @@ public class TeamStore {
             List<TeamMember> list = s.decklist() == null ? List.of() : s.decklist();
             for (int slot = 0; slot < list.size(); slot++) {
                 TeamMember m = list.get(slot);
+                var key = species.identify(t.format(), m.name(), m.limitlessId(), m.item());
                 members.add(new Object[] {t.id(), cut(s.player(), 255), slot, cut(m.name(), 255),
                         cut(m.limitlessId(), 255), cut(m.item(), 255), cut(m.ability(), 255), cut(m.nature(), 64),
-                        cut(m.tera(), 64)});
+                        cut(m.tera(), 64), cut(key.key(), 255), cut(key.megaStone(), 64)});
                 List<String> attacks = m.attacks() == null ? List.of() : m.attacks();
                 for (int i = 0; i < attacks.size(); i++) {
                     if (attacks.get(i) == null || attacks.get(i).isBlank()) continue;
@@ -83,8 +88,9 @@ public class TeamStore {
                 insert into team (event_id, player, name, country, placement, wins, losses, ties, dropped)
                 values (?, ?, ?, ?, ?, ?, ?, ?, ?)""", teams);
         jdbc.batchUpdate("""
-                insert into team_member (event_id, player, slot, name, limitless_id, item, ability, nature, tera)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?)""", members);
+                insert into team_member (event_id, player, slot, name, limitless_id, item, ability, nature, tera,
+                                         species_key, mega_stone)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", members);
         jdbc.batchUpdate("insert into team_member_move (event_id, player, slot, move_slot, move) values (?, ?, ?, ?, ?)",
                 moves);
     }

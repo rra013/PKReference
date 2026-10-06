@@ -1,0 +1,1373 @@
+{
+ "about": "Species keys the app gives Limitless team members (TeamSearchVocabulary.identity(name:slug:).key, and the stone ID of mega(heldItem:speciesID:)), recorded from the app on 2026-10-06. The app's SpeciesIdentityGoldenTests and the backend's SpeciesVocabularyGoldenTest both check against it, so the two stay the same. Inputs: every member of the fixture event (limitless/event-83) and edge cases. Outside a Champions regulation the key is toID(slug, or name when there is no slug).",
+ "cases": [
+  {
+   "format": "M-C",
+   "name": "Grimmsnarl",
+   "slug": "grimmsnarl",
+   "item": "Light Clay",
+   "key": "grimmsnarl",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Golisopod",
+   "slug": "golisopod",
+   "item": "Golisopite",
+   "key": "golisopod",
+   "mega": "golisopite"
+  },
+  {
+   "format": "M-C",
+   "name": "Pelipper",
+   "slug": "pelipper",
+   "item": "Bright Powder",
+   "key": "pelipper",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Charizard",
+   "slug": "charizard",
+   "item": "Charizardite Y",
+   "key": "charizard",
+   "mega": "charizarditey"
+  },
+  {
+   "format": "M-C",
+   "name": "Basculegion",
+   "slug": "basculegion",
+   "item": "Choice Scarf",
+   "key": "basculegion",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Archaludon",
+   "slug": "archaludon",
+   "item": "Leftovers",
+   "key": "archaludon",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Garchomp",
+   "slug": "garchomp",
+   "item": "Garchompite Z",
+   "key": "garchomp",
+   "mega": "garchompitez"
+  },
+  {
+   "format": "M-C",
+   "name": "Rillaboom",
+   "slug": "rillaboom",
+   "item": "Miracle Seed",
+   "key": "rillaboom",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Volcarona",
+   "slug": "volcarona",
+   "item": "Grassy Seed",
+   "key": "volcarona",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Raichu",
+   "slug": "raichu",
+   "item": "Raichunite Y",
+   "key": "raichu",
+   "mega": "raichunitey"
+  },
+  {
+   "format": "M-C",
+   "name": "Incineroar",
+   "slug": "incineroar",
+   "item": "Sitrus Berry",
+   "key": "incineroar",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Staraptor",
+   "slug": "staraptor",
+   "item": "Staraptite",
+   "key": "staraptor",
+   "mega": "staraptite"
+  },
+  {
+   "format": "M-C",
+   "name": "Annihilape",
+   "slug": "annihilape",
+   "item": "Choice Scarf",
+   "key": "annihilape",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Gholdengo",
+   "slug": "gholdengo",
+   "item": "Life Orb",
+   "key": "gholdengo",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Hisuian Arcanine",
+   "slug": "arcanine-hisui",
+   "item": "Focus Sash",
+   "key": "arcanine:hisui",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Whimsicott",
+   "slug": "whimsicott",
+   "item": "Focus Sash",
+   "key": "whimsicott",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Sinistcha",
+   "slug": "sinistcha",
+   "item": "Colbur Berry",
+   "key": "sinistcha",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Metagross",
+   "slug": "metagross",
+   "item": "Metagrossite",
+   "key": "metagross",
+   "mega": "metagrossite"
+  },
+  {
+   "format": "M-C",
+   "name": "Dragapult",
+   "slug": "dragapult",
+   "item": "Life Orb",
+   "key": "dragapult",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Pelipper",
+   "slug": "pelipper",
+   "item": "Life Orb",
+   "key": "pelipper",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Farigiraf",
+   "slug": "farigiraf",
+   "item": "Sitrus Berry",
+   "key": "farigiraf",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Swampert",
+   "slug": "swampert",
+   "item": "Swampertite",
+   "key": "swampert",
+   "mega": "swampertite"
+  },
+  {
+   "format": "M-C",
+   "name": "Annihilape",
+   "slug": "annihilape",
+   "item": "Focus Sash",
+   "key": "annihilape",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Delphox",
+   "slug": "delphox",
+   "item": "Delphoxite",
+   "key": "delphox",
+   "mega": "delphoxite"
+  },
+  {
+   "format": "M-C",
+   "name": "Sneasler",
+   "slug": "sneasler",
+   "item": "Grassy Seed",
+   "key": "sneasler",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Garchomp",
+   "slug": "garchomp",
+   "item": "Focus Sash",
+   "key": "garchomp",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Espathra",
+   "slug": "espathra",
+   "item": "Electric Seed",
+   "key": "espathra",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Politoed",
+   "slug": "politoed",
+   "item": "Sitrus Berry",
+   "key": "politoed",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Raichu",
+   "slug": "raichu",
+   "item": "Raichunite X",
+   "key": "raichu",
+   "mega": "raichunitex"
+  },
+  {
+   "format": "M-C",
+   "name": "Kleavor",
+   "slug": "kleavor",
+   "item": "Focus Sash",
+   "key": "kleavor",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Hisuian Decidueye",
+   "slug": "decidueye-hisui",
+   "item": "Scope Lens",
+   "key": "decidueye:hisui",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Ceruledge",
+   "slug": "ceruledge",
+   "item": "Colbur Berry",
+   "key": "ceruledge",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Milotic",
+   "slug": "milotic",
+   "item": "Leftovers",
+   "key": "milotic",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Lucario",
+   "slug": "lucario",
+   "item": "Lucarionite Z",
+   "key": "lucario",
+   "mega": "lucarionitez"
+  },
+  {
+   "format": "M-C",
+   "name": "Gengar",
+   "slug": "gengar",
+   "item": "Gengarite",
+   "key": "gengar",
+   "mega": "gengarite"
+  },
+  {
+   "format": "M-C",
+   "name": "Incineroar",
+   "slug": "incineroar",
+   "item": "Chople Berry",
+   "key": "incineroar",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Kommo-o",
+   "slug": "kommo-o",
+   "item": "Leftovers",
+   "key": "kommoo",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Dragonite",
+   "slug": "dragonite",
+   "item": "Dragoninite",
+   "key": "dragonite",
+   "mega": "dragoninite"
+  },
+  {
+   "format": "M-C",
+   "name": "Primarina",
+   "slug": "primarina",
+   "item": "Leftovers",
+   "key": "primarina",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Salamence",
+   "slug": "salamence",
+   "item": "Salamencite",
+   "key": "salamence",
+   "mega": "salamencite"
+  },
+  {
+   "format": "M-C",
+   "name": "Sneasler",
+   "slug": "sneasler",
+   "item": "White Herb",
+   "key": "sneasler",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Indeedee",
+   "slug": "indeedee",
+   "item": "Choice Scarf",
+   "key": "indeedee",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Tyranitar",
+   "slug": "tyranitar",
+   "item": "Tyranitarite",
+   "key": "tyranitar",
+   "mega": "tyranitarite"
+  },
+  {
+   "format": "M-C",
+   "name": "Excadrill",
+   "slug": "excadrill",
+   "item": "Focus Sash",
+   "key": "excadrill",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Corviknight",
+   "slug": "corviknight",
+   "item": "Psychic Seed",
+   "key": "corviknight",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Incineroar",
+   "slug": "incineroar",
+   "item": "Passho Berry",
+   "key": "incineroar",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Rillaboom",
+   "slug": "rillaboom",
+   "item": "Eject Button",
+   "key": "rillaboom",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Froslass",
+   "slug": "froslass",
+   "item": "Froslassite",
+   "key": "froslass",
+   "mega": "froslassite"
+  },
+  {
+   "format": "M-C",
+   "name": "Eternal Flower Floette",
+   "slug": "floette-eternal",
+   "item": "Floettite",
+   "key": "floette",
+   "mega": "floettite"
+  },
+  {
+   "format": "M-C",
+   "name": "Venusaur",
+   "slug": "venusaur",
+   "item": "Life Orb",
+   "key": "venusaur",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Sylveon",
+   "slug": "sylveon",
+   "item": "Fairy Feather",
+   "key": "sylveon",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Farigiraf",
+   "slug": "farigiraf",
+   "item": "Colbur Berry",
+   "key": "farigiraf",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Garchomp",
+   "slug": "garchomp",
+   "item": "Choice Scarf",
+   "key": "garchomp",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Pelipper",
+   "slug": "pelipper",
+   "item": "Damp Rock",
+   "key": "pelipper",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Basculegion",
+   "slug": "basculegion",
+   "item": "Life Orb",
+   "key": "basculegion",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Sneasler",
+   "slug": "sneasler",
+   "item": "Focus Slash",
+   "key": "sneasler",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Sneasler",
+   "slug": "sneasler",
+   "item": "Psychic Seed",
+   "key": "sneasler",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Volcarona",
+   "slug": "volcarona",
+   "item": "Rocky Helmet",
+   "key": "volcarona",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Sceptile",
+   "slug": "sceptile",
+   "item": "Sceptilite",
+   "key": "sceptile",
+   "mega": "sceptilite"
+  },
+  {
+   "format": "M-C",
+   "name": "Kleavor",
+   "slug": "kleavor",
+   "item": "Choice Scarf",
+   "key": "kleavor",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Indeedee ♀",
+   "slug": "indeedee-f",
+   "item": "Rocky Helmet",
+   "key": "indeedee:female",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Aegislash",
+   "slug": "aegislash",
+   "item": "Life Orb",
+   "key": "aegislash",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Gardevoir",
+   "slug": "gardevoir",
+   "item": "Gardevoirite",
+   "key": "gardevoir",
+   "mega": "gardevoirite"
+  },
+  {
+   "format": "M-C",
+   "name": "Pelipper",
+   "slug": "pelipper",
+   "item": "Focus Sash",
+   "key": "pelipper",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Sinistcha",
+   "slug": "sinistcha",
+   "item": "Sitrus Berry",
+   "key": "sinistcha",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Azumarill",
+   "slug": "azumarill",
+   "item": "Mystic Water",
+   "key": "azumarill",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Camerupt",
+   "slug": "camerupt",
+   "item": "Cameruptite",
+   "key": "camerupt",
+   "mega": "cameruptite"
+  },
+  {
+   "format": "M-C",
+   "name": "Venusaur",
+   "slug": "venusaur",
+   "item": "Focus Sash",
+   "key": "venusaur",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Kingambit",
+   "slug": "kingambit",
+   "item": "Chople Berry",
+   "key": "kingambit",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Glalie",
+   "slug": "glalie",
+   "item": "Glalitite",
+   "key": "glalie",
+   "mega": "glalitite"
+  },
+  {
+   "format": "M-C",
+   "name": "Medicham",
+   "slug": "medicham",
+   "item": "Sitrus Berry",
+   "key": "medicham",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Noivern",
+   "slug": "noivern",
+   "item": "Normal Gem",
+   "key": "noivern",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Pawmot",
+   "slug": "pawmot",
+   "item": "Leppa Berry",
+   "key": "pawmot",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Indeedee ♀",
+   "slug": "indeedee-f",
+   "item": "Sitrus Berry",
+   "key": "indeedee:female",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Milotic",
+   "slug": "milotic",
+   "item": "Psychic Seed",
+   "key": "milotic",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Baxcalibur",
+   "slug": "baxcalibur",
+   "item": "Baxcalibrite",
+   "key": "baxcalibur",
+   "mega": "baxcalibrite"
+  },
+  {
+   "format": "M-C",
+   "name": "Alolan Ninetales",
+   "slug": "ninetales-alola",
+   "item": "Focus Sash",
+   "key": "ninetales:alola",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Kingambit",
+   "slug": "kingambit",
+   "item": "Focus Sash",
+   "key": "kingambit",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Mimikyu",
+   "slug": "mimikyu",
+   "item": "Life Orb",
+   "key": "mimikyu",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Pelipper",
+   "slug": "pelipper",
+   "item": "Sitrus Berry",
+   "key": "pelipper",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Sneasler",
+   "slug": "sneasler",
+   "item": "Focus Sash",
+   "key": "sneasler",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Basculegion ♀",
+   "slug": "basculegion-f",
+   "item": "Life Orb",
+   "key": "basculegion",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Mamoswine",
+   "slug": "mamoswine",
+   "item": "Focus Sash",
+   "key": "mamoswine",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Venusaur",
+   "slug": "venusaur",
+   "item": "Venusaurite",
+   "key": "venusaur",
+   "mega": "venusaurite"
+  },
+  {
+   "format": "M-C",
+   "name": "Sylveon",
+   "slug": "sylveon",
+   "item": "Life Orb",
+   "key": "sylveon",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Mr. Rime",
+   "slug": "mr-rime",
+   "item": "Focus Sash",
+   "key": "mrrime",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Toxapex",
+   "slug": "toxapex",
+   "item": "Leftovers",
+   "key": "toxapex",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Blastoise",
+   "slug": "blastoise",
+   "item": "Blastoisinite",
+   "key": "blastoise",
+   "mega": "blastoisinite"
+  },
+  {
+   "format": "M-C",
+   "name": "Indeedee ♀",
+   "slug": "indeedee-f",
+   "item": "Colbur Berry",
+   "key": "indeedee:female",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Volcarona",
+   "slug": "volcarona",
+   "item": "Psychic Seed",
+   "key": "volcarona",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Chesnaught",
+   "slug": "chesnaught",
+   "item": "Chesnaughtite",
+   "key": "chesnaught",
+   "mega": "chesnaughtite"
+  },
+  {
+   "format": "M-C",
+   "name": "Espathra",
+   "slug": "espathra",
+   "item": "Grassy Seed",
+   "key": "espathra",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Meowstic ♀",
+   "slug": "meowstic-f",
+   "item": "Meowsticite",
+   "key": "meowstic",
+   "mega": "meowsticite"
+  },
+  {
+   "format": "M-C",
+   "name": "Indeedee",
+   "slug": "indeedee",
+   "item": "Focus Sash",
+   "key": "indeedee",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Armarouge",
+   "slug": "armarouge",
+   "item": "Focus Sash",
+   "key": "armarouge",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Garchomp",
+   "slug": "garchomp",
+   "item": "Life Orb",
+   "key": "garchomp",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Aerodactyl",
+   "slug": "aerodactyl",
+   "item": "Aerodactylite",
+   "key": "aerodactyl",
+   "mega": "aerodactylite"
+  },
+  {
+   "format": "M-C",
+   "name": "Hawlucha",
+   "slug": "hawlucha",
+   "item": "Hawluchanite",
+   "key": "hawlucha",
+   "mega": "hawluchanite"
+  },
+  {
+   "format": "M-C",
+   "name": "Snorlax",
+   "slug": "snorlax",
+   "item": "Leftovers",
+   "key": "snorlax",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Slowbro",
+   "slug": "slowbro",
+   "item": "Slowbronite",
+   "key": "slowbro",
+   "mega": "slowbronite"
+  },
+  {
+   "format": "M-C",
+   "name": "Glimmora",
+   "slug": "glimmora",
+   "item": "Glimmoranite",
+   "key": "glimmora",
+   "mega": "glimmoranite"
+  },
+  {
+   "format": "M-C",
+   "name": "Kingambit",
+   "slug": "kingambit",
+   "item": "Life Orb",
+   "key": "kingambit",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Archaludon",
+   "slug": "archaludon",
+   "item": "Sitrus Berry",
+   "key": "archaludon",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Pyroar",
+   "slug": "pyroar",
+   "item": "Pyroarite",
+   "key": "pyroar",
+   "mega": "pyroarite"
+  },
+  {
+   "format": "M-C",
+   "name": "Kommo-o",
+   "slug": "kommo-o",
+   "item": "Life Orb",
+   "key": "kommoo",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Basculegion",
+   "slug": "basculegion",
+   "item": "Mystic Water",
+   "key": "basculegion",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Primarina",
+   "slug": "primarina",
+   "item": "Grassy Seed",
+   "key": "primarina",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Torkoal",
+   "slug": "torkoal",
+   "item": "Charcoal",
+   "key": "torkoal",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Maushold",
+   "slug": "maushold",
+   "item": "Wide Lens",
+   "key": "maushold",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Sableye",
+   "slug": "sableye",
+   "item": "Eject Button",
+   "key": "sableye",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Chandelure",
+   "slug": "chandelure",
+   "item": "Chandelurite",
+   "key": "chandelure",
+   "mega": "chandelurite"
+  },
+  {
+   "format": "M-C",
+   "name": "Skarmory",
+   "slug": "skarmory",
+   "item": "Skarmorite",
+   "key": "skarmory",
+   "mega": "skarmorite"
+  },
+  {
+   "format": "M-C",
+   "name": "Charizard",
+   "slug": "charizard",
+   "item": "Charizardite X",
+   "key": "charizard",
+   "mega": "charizarditex"
+  },
+  {
+   "format": "M-C",
+   "name": "Gholdengo",
+   "slug": "gholdengo",
+   "item": "Choice Scarf",
+   "key": "gholdengo",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Sableye",
+   "slug": "sableye",
+   "item": "Light Clay",
+   "key": "sableye",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Sinistcha",
+   "slug": "sinistcha",
+   "item": "Kasib Berry",
+   "key": "sinistcha",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Clefable",
+   "slug": "clefable",
+   "item": "Rocky Helmet",
+   "key": "clefable",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Vivillon",
+   "slug": "vivillon",
+   "item": "Focus Sash",
+   "key": "vivillon",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Rillaboom",
+   "slug": "rillaboom",
+   "item": "Occa Berry",
+   "key": "rillaboom",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Absol",
+   "slug": "absol",
+   "item": "Absolite Z",
+   "key": "absol",
+   "mega": "absolitez"
+  },
+  {
+   "format": "M-C",
+   "name": "Rillaboom",
+   "slug": "rillaboom",
+   "item": "Sitrus Berry",
+   "key": "rillaboom",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Corviknight",
+   "slug": "corviknight",
+   "item": "Leftovers",
+   "key": "corviknight",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Lopunny",
+   "slug": "lopunny",
+   "item": "Lopunnite",
+   "key": "lopunny",
+   "mega": "lopunnite"
+  },
+  {
+   "format": "M-C",
+   "name": "Hatterene",
+   "slug": "hatterene",
+   "item": "Babiri Berry",
+   "key": "hatterene",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Primarina",
+   "slug": "primarina",
+   "item": "Life Orb",
+   "key": "primarina",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Gholdengo",
+   "slug": "gholdengo",
+   "item": "Occa Berry",
+   "key": "gholdengo",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Maushold",
+   "slug": "maushold",
+   "item": "Chople Berry",
+   "key": "maushold",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Kingambit",
+   "slug": "kingambit",
+   "item": "Black Glasses",
+   "key": "kingambit",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Infernape",
+   "slug": "infernape",
+   "item": "Focus Sash",
+   "key": "infernape",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Weavile",
+   "slug": "weavile",
+   "item": "Focus Sash",
+   "key": "weavile",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Aerodactyl",
+   "slug": "aerodactyl",
+   "item": "Focus Sash",
+   "key": "aerodactyl",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Heat Rotom",
+   "slug": "rotom-heat",
+   "item": "Passho Berry",
+   "key": "rotom",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Volcarona",
+   "slug": "volcarona",
+   "item": "Charti Berry",
+   "key": "volcarona",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Pikachu",
+   "slug": "pikachu",
+   "item": "Light Ball",
+   "key": "pikachu",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Pawmot",
+   "slug": "pawmot",
+   "item": "Focus Sash",
+   "key": "pawmot",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Whimsicott",
+   "slug": "whimsicott",
+   "item": "Life Orb",
+   "key": "whimsicott",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Incineroar",
+   "slug": "incineroar",
+   "item": "Charcoal",
+   "key": "incineroar",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Alolan Ninetales",
+   "slug": "ninetales-alola",
+   "item": "Light Clay",
+   "key": "ninetales:alola",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Sinistcha",
+   "slug": "sinistcha",
+   "item": "Occa Berry",
+   "key": "sinistcha",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Wash Rotom",
+   "slug": "rotom-wash",
+   "item": "Sitrus Berry",
+   "key": "rotom",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Mamoswine",
+   "slug": "mamoswine",
+   "item": "Choice Scarf",
+   "key": "mamoswine",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Serperior",
+   "slug": "serperior",
+   "item": "Sitrus Berry",
+   "key": "serperior",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Conkeldurr",
+   "slug": "conkeldurr",
+   "item": "Leftovers",
+   "key": "conkeldurr",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Annihilape",
+   "slug": "annihilape",
+   "item": "Leftovers",
+   "key": "annihilape",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Hisuian Arcanine",
+   "slug": "arcanine-hisui",
+   "item": null,
+   "key": "arcanine:hisui",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Arcanine",
+   "slug": "arcanine",
+   "item": null,
+   "key": "arcanine",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Hisuian Arcanine",
+   "slug": null,
+   "item": null,
+   "key": "arcanine:hisui",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Arcanine-H",
+   "slug": null,
+   "item": null,
+   "key": "arcanine",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Ninetales",
+   "slug": "ninetales",
+   "item": null,
+   "key": "ninetales",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Paldean Tauros",
+   "slug": "tauros-paldea-aqua",
+   "item": null,
+   "key": "tauros:aqua-paldea",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Tauros (Blaze Breed)",
+   "slug": "tauros-paldea-blaze",
+   "item": null,
+   "key": "tauros:blaze-paldea",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Lycanroc",
+   "slug": "lycanroc-dusk",
+   "item": null,
+   "key": "lycanroc:dusk",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Lycanroc (Midnight Form)",
+   "slug": null,
+   "item": null,
+   "key": "lycanroc:midnight",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Indeedee",
+   "slug": "indeedee-f",
+   "item": null,
+   "key": "indeedee:female",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Indeedee♀",
+   "slug": null,
+   "item": null,
+   "key": "indeedee:female",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Floette",
+   "slug": "floette-eternal",
+   "item": "Floettite",
+   "key": "floette",
+   "mega": "floettite"
+  },
+  {
+   "format": "M-C",
+   "name": "Charizard",
+   "slug": "charizard",
+   "item": "charizardite y",
+   "key": "charizard",
+   "mega": "charizarditey"
+  },
+  {
+   "format": "M-C",
+   "name": "Charizard",
+   "slug": "charizard",
+   "item": "Golisopite",
+   "key": "charizard",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Kommo-o",
+   "slug": "kommo-o",
+   "item": null,
+   "key": "kommoo",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Mr. Rime",
+   "slug": "mr-rime",
+   "item": null,
+   "key": "mrrime",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Flabébé",
+   "slug": "flabebe",
+   "item": null,
+   "key": "flabebe",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Totally Fake Mon",
+   "slug": "totally-fake-mon",
+   "item": null,
+   "key": "totallyfakemon",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Made Up",
+   "slug": null,
+   "item": null,
+   "key": "madeup",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Incineroar",
+   "slug": "",
+   "item": null,
+   "key": "incineroar",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Rotom",
+   "slug": "rotom-wash",
+   "item": null,
+   "key": "rotom",
+   "mega": null
+  },
+  {
+   "format": "M-C",
+   "name": "Wash Rotom",
+   "slug": null,
+   "item": null,
+   "key": "rotom",
+   "mega": null
+  },
+  {
+   "format": "M-B",
+   "name": "Incineroar",
+   "slug": "incineroar",
+   "item": "Sitrus Berry",
+   "key": "incineroar",
+   "mega": null
+  },
+  {
+   "format": "M-B",
+   "name": "Hisuian Typhlosion",
+   "slug": "typhlosion-hisui",
+   "item": null,
+   "key": "typhlosion:hisui",
+   "mega": null
+  },
+  {
+   "format": "M-A",
+   "name": "Garchomp",
+   "slug": "garchomp",
+   "item": "Garchompite",
+   "key": "garchomp",
+   "mega": "garchompite"
+  },
+  {
+   "format": "SVI",
+   "name": "Incineroar",
+   "slug": "incineroar",
+   "item": null,
+   "key": "incineroar",
+   "mega": null
+  },
+  {
+   "format": "SVI",
+   "name": "Hisuian Arcanine",
+   "slug": "arcanine-hisui",
+   "item": null,
+   "key": "arcaninehisui",
+   "mega": null
+  }
+ ]
+}
