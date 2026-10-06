@@ -35,7 +35,8 @@ class MetaControllerTest {
     void listsWithCachingAndAnEtag() throws Exception {
         when(meta.pokemon(eq("M-C"), eq(MetaWindow.DAYS_14))).thenReturn(new PokemonList("M-C", "14d",
                 NOW.minusSeconds(14 * 86400), NOW, NOW, new Sample(1, 83, 16),
-                List.of(new PokemonUsage("rillaboom", 44, 0.5301, 9, 0.5625, null))));
+                List.of(new PokemonUsage("rillaboom", 44, 0.5301, 9, 0.5625, null,
+                        new MetaResponses.WinRecord(46, 51, 0, 97, 0.4742, 0.3777, 0.5727)))));
 
         var first = mvc.perform(get("/v1/formats/M-C/pokemon?window=14d"))
                 .andExpect(status().isOk())
@@ -44,6 +45,7 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$.sample.teams").value(83))
                 .andExpect(jsonPath("$.pokemon[0].key").value("rillaboom"))
                 .andExpect(jsonPath("$.pokemon[0].topCutUsage").value(0.5625))
+                .andExpect(jsonPath("$.pokemon[0].record.winRateLow").value(0.3777))
                 .andReturn();
         String etag = first.getResponse().getHeader("ETag");
 
