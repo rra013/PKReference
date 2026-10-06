@@ -16,8 +16,13 @@ struct MetaTab: View {
     @AppStorage(AppSettings.metaServerEnabled) private var serverEnabled: Bool
     @AppStorage(AppSettings.metaServerAddress) private var serverAddress: String
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var model = MetaModel()
     @State private var showingEvents = false
+    /// `-debugOpenSheet metaInfo`: the usage info sheet, for snapshots.
+    @State private var showingInfo = false
+    /// `-debugOpenSheet metaPokemon`: a page opened in code, for snapshots.
+    @State private var debugRoute: MetaRoute?
 
     private var regulation: ChampionsRegulation {
         ChampionsRegulation(rawValue: regulationRaw) ?? .current
@@ -53,10 +58,31 @@ struct MetaTab: View {
                             OpenSettingsButton(title: "Open Settings")
                         }
                     }
-                    MetaRecentEventsCard(regulation: regulation, snapshot: model.snapshot,
-                                         limitlessEvents: model.limitlessEvents) { showingEvents = true }
+                    let namer = MetaNamer(regulation)
+                    let recent = MetaRecentEventsCard(regulation: regulation, snapshot: model.snapshot,
+                                                      limitlessEvents: model.limitlessEvents) { showingEvents = true }
+                    if let snapshot = model.snapshot, !snapshot.list.pokemon.isEmpty {
+                        // Two columns where there's room: iPad and the Mac.
+                        if horizontalSizeClass == .regular {
+                            HStack(alignment: .top, spacing: 16) {
+                                CardStack { MetaWhatsWinningCard(snapshot: snapshot, namer: namer) }
+                                    .frame(maxWidth: .infinity, alignment: .top)
+                                CardStack {
+                                    MetaRisingCard(snapshot: snapshot, namer: namer)
+                                    recent
+                                }
+                                .frame(maxWidth: .infinity, alignment: .top)
+                            }
+                        } else {
+                            MetaWhatsWinningCard(snapshot: snapshot, namer: namer)
+                            MetaRisingCard(snapshot: snapshot, namer: namer)
+                            recent
+                        }
+                    } else {
+                        recent
+                    }
                 }
-                .frame(maxWidth: 760)
+                .frame(maxWidth: horizontalSizeClass == .regular ? 1100 : 760)
                 .frame(maxWidth: .infinity)
                 .padding()
             }
@@ -76,13 +102,38 @@ struct MetaTab: View {
             .navigationDestination(isPresented: $showingEvents) {
                 EventsView(format: regulation.limitlessFormat)
             }
+            .navigationDestination(for: MetaRoute.self) { destination($0) }
+            #if DEBUG && os(macOS)
+            .navigationDestination(item: $debugRoute) { destination($0) }
+            #endif
             .task(id: loadKey) { await model.load(regulation, window: window) }
             .onChange(of: scenePhase) {
                 if scenePhase == .active { Task { await model.load(regulation, window: window) } }
             }
             #if DEBUG && os(macOS)
             .task { await DebugSnapshot.openSheet("metaEvents") { showingEvents = true } }
+            .task { await DebugSnapshot.openSheet("metaInfo") { showingInfo = true } }
+            .task {
+                // `-debugOpenSheet metaPokemon`: the most-used Pokémon's page.
+                await DebugSnapshot.openSheet("metaPokemon") {}
+                guard UserDefaults.standard.string(forKey: "debugOpenSheet") == "metaPokemon" else { return }
+                for _ in 0..<20 where model.snapshot == nil { try? await Task.sleep(for: .milliseconds(250)) }
+                if let key = model.snapshot?.list.pokemon.first?.key { debugRoute = .pokemon(key) }
+            }
+            .sheet(isPresented: $showingInfo) { MetaInfoSheet(definition: .usage) }
             #endif
+        }
+    }
+
+    @ViewBuilder
+    private func destination(_ route: MetaRoute) -> some View {
+        if let snapshot = model.snapshot {
+            switch route {
+            case .pokemon(let key):
+                MetaPokemonPage(key: key, snapshot: snapshot, namer: MetaNamer(regulation))
+            case .allPokemon:
+                MetaPokemonListView(snapshot: snapshot, namer: MetaNamer(regulation))
+            }
         }
     }
 

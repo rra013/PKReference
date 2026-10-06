@@ -184,7 +184,107 @@ struct MetaModelTests {
         #expect(model.warning == nil)
     }
 
+    // MARK: Pages
+
+    @Test func aPageFromTheServer() async throws {
+        try serve()
+        MetaModelStubProtocol.responses["/v1/formats/M-C/pokemon/rillaboom"] = try fixture("pokemon-M-C-rillaboom-30d")
+        MetaModelStubProtocol.responses["/v1/formats/M-C/cores"] = try fixture("cores-M-C-30d")
+        let (model, _) = model(server: true)
+        await model.load(.mC, window: .days30)
+        let snapshot = try #require(model.snapshot)
+        let page = try #require(await MetaModel.page("rillaboom", in: snapshot))
+        #expect(page.source == .server)
+        #expect(page.detail.key == "rillaboom")
+        #expect(!page.detail.sets.isEmpty)
+        #expect(!page.pairs.isEmpty && page.pairs.allSatisfy { $0.members.contains("rillaboom") })
+        #expect(await MetaModel.page("missingno", in: snapshot) == nil)
+    }
+
+    @Test func aPageFromTheDevice() async throws {
+        let (model, store) = model(server: false)
+        _ = try await store.corpus(for: .mC)
+        await model.load(.mC, window: .days30)
+        let snapshot = try #require(model.snapshot)
+        let page = try #require(await MetaModel.page("rillaboom", in: snapshot))
+        #expect(page.source == .device)
+        #expect(page.detail.usage?.teams == 44)
+        #expect(page.detail.sets.first?.moves == ["Fake Out", "Grassy Glide", "High Horsepower", "Wood Hammer"])
+        #expect(page.trios.allSatisfy { $0.members.contains("rillaboom") })
+    }
+
+    @Test func aSetToSaveOrCalc() {
+        let set = MetaAPI.PokemonSet(item: "No Item", ability: "Intimidate", nature: "Adamant",
+                                     moves: ["Flare Blitz", "Extreme Speed"], count: 3, share: 0.1)
+        let member = MetaSetRequest(key: "arcanine:hisui", name: "Arcanine (Hisui)", set: set).member
+        #expect(member.name == "Arcanine (Hisui)")
+        #expect(member.limitlessID == "arcanine-hisui")
+        #expect(member.item == nil, "No Item is no item")
+        #expect(member.attacks == ["Flare Blitz", "Extreme Speed"])
+        #expect(LimitlessSpeciesResolver([.init(name: "arcanine", isDefaultForm: true),
+                                          .init(name: "arcanine-hisui", isDefaultForm: false)])
+            .resolve(name: member.name, slug: member.limitlessID) == "arcanine-hisui")
+    }
+
     // MARK: Words
+
+    @Test func cardWords() {
+        #expect(MetaText.percent(0.5452) == "55%")
+        #expect(MetaText.percent(0.004) == "<1%")
+        #expect(MetaText.percent(0) == "0%")
+        #expect(MetaText.trend(0.0612) == "▲ 6.1 points")
+        #expect(MetaText.trend(-0.0024) == "▼ 0.2 points")
+        #expect(MetaText.trend(0.12) == "▲ 12 points")
+        #expect(MetaText.trend(0.0001) == "no change")
+        #expect(MetaText.trend(nil) == nil)
+        let record = MetaAPI.WinRecord(wins: 1435, losses: 1528, ties: 2, matches: 2965, winRate: 0.4843,
+                                       winRateLow: 0.4664, winRateHigh: 0.5023)
+        #expect(MetaText.record(record, source: .server) == "Wins 48% (47–50%) of 2,965 matches")
+        #expect(MetaText.record(record, source: .device) == "Team record 48% (47–50%) of 2,965 matches")
+        #expect(MetaText.record(MetaAPI.WinRecord(wins: 10, losses: 19, ties: 0, matches: 29, winRate: nil,
+                                                  winRateLow: nil, winRateHigh: nil), source: .server)
+                == "29 matches: too few for a rate")
+
+        func usage(_ key: String, _ usage: Double, _ top: Double?, trend: Double? = nil) -> MetaAPI.PokemonUsage {
+            MetaAPI.PokemonUsage(key: key, teams: 10, usage: usage, topCutTeams: 1, topCutUsage: top, trend: trend,
+                                 record: nil)
+        }
+        let list = [usage("rillaboom", 0.5452, 0.5352), usage("incineroar", 0.40, 0.38), usage("gholdengo", 0.34, 0.41)]
+        #expect(MetaText.whatsWinning(list, source: .server, name: { $0.capitalized })
+                == "Rillaboom is on 55% of teams and 54% of top-cut teams. Gholdengo does better than its usage "
+                + "says: 34% of teams, 41% of top-cut teams.")
+        #expect(MetaText.whatsWinning(Array(list.prefix(2)), source: .device, name: { $0.capitalized })
+                == "Rillaboom is on 55% of teams and 54% of top-8 teams.")
+        #expect(MetaText.spoken(usage("rillaboom", 0.5452, 0.5352, trend: -0.02), name: "Rillaboom", source: .server)
+                == "Rillaboom. On 55% of teams, 54% of top-cut teams. Trend down 2.0 points.")
+    }
+
+    /// The info sheets say what the plan's §4.2 says, word for word.
+    @Test func definitionsMatchThePlan() throws {
+        let plan = try String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "BackendIntegration-PLAN.md"), encoding: .utf8)
+        let section = try #require(plan.components(separatedBy: "### 4.2 Metrics").last?
+            .components(separatedBy: "### 4.3").first)
+        var planned: [String: String] = [:]
+        // "- **Usage:** the share…", "- **Top-8 rate** (worked out on the device…): its share…"
+        for item in section.components(separatedBy: "\n- **").dropFirst() {
+            guard let bold = item.range(of: "**") else { continue }
+            let heading = item[..<bold.lowerBound]
+            // The colon ends the bold title, or follows its parenthesis.
+            let start = heading.hasSuffix(":") ? bold.upperBound
+                : item[bold.upperBound...].firstIndex(of: ":").map(item.index(after:))
+            guard let start else { continue }
+            let title = heading.trimmingCharacters(in: CharacterSet(charactersIn: ": "))
+            var text = item[start...].replacingOccurrences(of: "**", with: "")
+                .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            text = text.prefix(1).uppercased() + text.dropFirst()
+            planned[title.lowercased()] = text
+        }
+        #expect(planned.count == MetaDefinition.allCases.count)
+        for definition in MetaDefinition.allCases {
+            #expect(planned[definition.title.lowercased()] == definition.text, "\(definition.title)")
+        }
+    }
 
     @Test func words() {
         let sample = MetaAPI.Sample(events: 46, teams: 2633, topCutTeams: 484)
