@@ -9,7 +9,8 @@ nonisolated struct EggParent: Hashable, Sendable {
     var ability: UInt8 = 0
     /// 0 male, 1 female, 2 genderless, 3 Ditto.
     var gender: UInt8
-    /// 0 none, 1 Everstone, 2 to 7 the power items (HP to Speed).
+    /// 0 none, 1 Everstone, 2 to 7 the power items (HP to Speed), 8
+    /// Destiny Knot.
     var item: UInt8 = 0
     /// Passed down with an Everstone.
     var nature: UInt8 = 0
@@ -17,7 +18,7 @@ nonisolated struct EggParent: Hashable, Sendable {
     static let genderNames = ["Male", "Female", "Genderless", "Ditto"]
     static let abilityNames = ["Ability 0", "Ability 1", "Hidden Ability"]
     static let itemNames = ["None", "Everstone", "Power Weight (HP)", "Power Bracer (Atk)", "Power Belt (Def)",
-                            "Power Lens (SpA)", "Power Band (SpD)", "Power Anklet (Spe)"]
+                            "Power Lens (SpA)", "Power Band (SpD)", "Power Anklet (Spe)", "Destiny Knot"]
 
     /// PokéFinder's check (`EggSettings::isValid`): a male and a female, or
     /// Ditto with a male, a female or a genderless Pokémon.
@@ -44,6 +45,35 @@ nonisolated struct EggParent: Hashable, Sendable {
     }
 }
 
+/// Two parents in the daycare, as you entered them.
+nonisolated protocol EggDaycare {
+    var parentA: EggParent { get }
+    var parentB: EggParent { get }
+}
+
+nonisolated extension EggDaycare {
+    /// The game holds the female, or else Ditto, second; PokéFinder swaps
+    /// the parents to match (`EggSettings::reorderParents`).
+    var isReversed: Bool {
+        switch (parentA.gender, parentB.gender) {
+        case (1, 0), (1, 3), (3, 0), (3, 2): return true
+        default: return false
+        }
+    }
+
+    /// The parents in the game's order.
+    var gameOrder: (first: EggParent, second: EggParent) {
+        isReversed ? (parentB, parentA) : (parentA, parentB)
+    }
+
+    /// Which of your parents gave each IV (1 Parent A, 2 Parent B), from
+    /// the game's order.
+    func yourParents(_ inheritance: [UInt8]) -> [UInt8] {
+        guard isReversed else { return inheritance }
+        return inheritance.map { $0 == 1 ? 2 : $0 == 2 ? 1 : $0 }
+    }
+}
+
 /// What a game's egg generator reads from the parents besides their IVs and
 /// gender, so their cards show only that (as PokéFinder's EggSettings
 /// does). A parent's nature counts only with an Everstone.
@@ -58,6 +88,11 @@ struct EggParentFields: Equatable {
             items = Array(0...7)
         case .gen3 where game == .emerald:
             items = [0, 1]
+        case .gen8:
+            // Brilliant Diamond and Shining Pearl: PokéFinder's
+            // EggGenerator8 reads the Destiny Knot but not the power items.
+            abilities = [0, 1, 2]
+            items = [0, 1, 8]
         default:
             break
         }

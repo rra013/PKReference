@@ -14,36 +14,20 @@ import SwiftUI
 // MARK: - Daycare
 
 /// The daycare as PokéFinder's Gen 5 egg tools take it.
-nonisolated struct Gen5Daycare: Hashable, Sendable {
+nonisolated struct Gen5Daycare: EggDaycare, Hashable, Sendable {
     var parentA: EggParent
     var parentB: EggParent
     var specie: UInt16
     var masuda: Bool
 
-    /// The game holds the female, or else Ditto, second; PokéFinder swaps
-    /// the parents to match (`EggSettings::reorderParents`).
-    var isReversed: Bool {
-        switch (parentA.gender, parentB.gender) {
-        case (1, 0), (1, 3), (3, 0), (3, 2): return true
-        default: return false
-        }
-    }
-
     /// The parents in the game's order.
     var pf: PFDaycare {
-        let (first, second) = isReversed ? (parentB, parentA) : (parentA, parentB)
+        let (first, second) = gameOrder
         func six(_ v: [UInt8]) -> (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) { (v[0], v[1], v[2], v[3], v[4], v[5]) }
         return PFDaycare(parentAIVs: six(first.ivs), parentBIVs: six(second.ivs),
                          abilities: (first.ability, second.ability), genders: (first.gender, second.gender),
                          items: (first.item, second.item), natures: (first.nature, second.nature),
                          specie: specie, masuda: masuda)
-    }
-
-    /// Which of your parents gave each IV (1 Parent A, 2 Parent B), from
-    /// the game's order.
-    func yourParents(_ inheritance: [UInt8]) -> [UInt8] {
-        guard isReversed else { return inheritance }
-        return inheritance.map { $0 == 1 ? 2 : $0 == 2 ? 1 : $0 }
     }
 
     /// Why these parents can't make what's asked (PokéFinder's

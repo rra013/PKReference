@@ -30,12 +30,13 @@ says what changed and what was checked.
 | [#68](https://github.com/rra013/PKReference/pull/68), [#85](https://github.com/rra013/PKReference/pull/85) | Champions data: Dragoninite in every regulation; the 15 items M-B added, which M-B and M-C lacked; and the game's names for Golisopite and Baxcalibrite. Sets saved with the old names still load (`HeldItem.renamed`). |
 | [#70](https://github.com/rra013/PKReference/pull/70)–[#83](https://github.com/rra013/PKReference/pull/83), [#87](https://github.com/rra013/PKReference/pull/87)–[#89](https://github.com/rra013/PKReference/pull/89) | RNG tools: FireRed/LeafGreen initial seeds and calibration from Ten Lines (#70–#72), a Mac crash opening Calibrate (#73), then the fixes from the 2026-10-03 audit (#74–#83, #87–#89), last of all wild areas from PokéFinder's tables, the Gen 4 tools' year, and Gen 5 profiles. See [Feature notes](#rng-tools). |
 | [#91](https://github.com/rra013/PKReference/pull/91) | RNG tools: the Eggs tool's Gen 5 tab, with PokéFinder's egg generator and its searcher over dates with the DS's parameters. Every egg tab now shows only the parent fields its game reads, and picks the species by name. |
+| [#92](https://github.com/rra013/PKReference/pull/92) | RNG tools: the Finder's BDSP Egg mode takes the egg's species, Ditto and genderless parents, the Destiny Knot and a hidden-ability filter, checks and orders the parents as PokéFinder's Eggs8 does, and applies the Oval Charm. |
 | [#84](https://github.com/rra013/PKReference/pull/84), [#85](https://github.com/rra013/PKReference/pull/85) | An optional backend in `backend/`: Limitless tournaments through Kafka into usage counts served over REST, with hand-typed names standardized. The app doesn't use it yet. |
 
 Before that, #23–#56 were the UI pass, game data into JSON, iPad fixes, the
 Mac app, Siri Phase 1 and the rename to PK Reference.
 
-Full suite on 2026-10-06, with Gen 5 eggs: 1,275 tests, all passing
+Full suite on 2026-10-06, with BDSP eggs: 1,280 tests, all passing
 on the iPhone 17 Pro Max simulator. The iOS and Mac builds had no warnings.
 
 ---
@@ -385,9 +386,10 @@ what was checked.
   - Breeding parents are `EggParent`s on `EggParentCard`s, which show only
     what the game's egg generator reads (`EggParentFields`), and the species
     is an `EggSpeciesPicker`, kept to the species PokéFinder's tables hold.
-    Gen 5 parents go to PokéFinder in the game's order, the female or else
-    Ditto second, as its `reorderParents` swaps them (`Gen5Daycare`);
-    results still name the parents as entered.
+    Gen 5 and BDSP parents go to PokéFinder in the game's order, the female
+    or else Ditto second, as its `reorderParents` swaps them (`EggDaycare`,
+    which `Gen5Daycare` and `BDSPDaycare` share); results still name the
+    parents as entered.
   - Handoffs to the Timer go through `FinderTimerBridge` to
     `RNGTimerEngine.shared`: Gen 3 targets with `Gen3TargetStart`, Gen 4
     with the whole clock time and year that Check Your Seed reads, Gen 5
@@ -537,10 +539,6 @@ Roughly in order of value for effort. Only open work is listed; what's done
 is in [Recent work](#recent-work) and the README.
 
 1. **RNG tools: what the fixes left out.** See [Feature notes](#rng-tools).
-   - The Finder's BDSP Egg mode has no species picker, so it always breeds
-     species 1's gender ratio, and it neither checks the parents nor puts
-     them in the game's order, as PokéFinder's Eggs8 does. The Eggs tool's
-     `EggParentCard`, `EggSpeciesPicker` and parent order could serve it.
    - Gen 5 needle calibration. PokéFinder's calibrator also works from the
      Unova Link's needle (`ProfileNeedleSearcher5`); the app's has IVs and
      a seed.
