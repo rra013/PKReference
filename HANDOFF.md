@@ -436,6 +436,11 @@ xcodebuild test -project PKReference.xcodeproj -scheme PKReference \
   line for checks: `xcrun simctl ui <udid> content_size accessibility-large`
   and `xcrun simctl ui <udid> appearance dark`.
 
+The backend's tests (`mvn verify` in `backend/`) run on GitHub Actions for
+changes to the backend and the data files it reads
+(`.github/workflows/backend.yml`). The app's tests need the simulator, so
+they have no CI.
+
 The Mac app builds from the same target.
 This signs it to run on this Mac only:
 
