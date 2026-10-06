@@ -73,4 +73,15 @@ class UsagePipelineTest {
         assertThat(rest.getForEntity("/swagger-ui.html", String.class).getStatusCode().is2xxSuccessful()
                 || rest.getForEntity("/swagger-ui/index.html", String.class).getStatusCode().is2xxSuccessful()).isTrue();
     }
+
+    /** The stored event comes back over HTTP in Limitless's shapes, for the app's corpus. */
+    @Test
+    void theCorpusIsServed() {
+        kafka.send(Topics.STANDINGS_FETCHED, "it-corpus", Fixtures.tournament("it-corpus"));
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
+                assertThat(rest.getForObject("/v1/formats/reg-m-a/tournaments", String.class)).contains("it-corpus"));
+        var standings = rest.getForObject("/v1/tournaments/it-corpus/standings", String.class);
+        assertThat(standings).contains("player").contains("p1").contains("incineroar").contains("Fake Out");
+        assertThat(rest.getForEntity("/v1/tournaments/missing/standings", String.class).getStatusCode().value()).isEqualTo(404);
+    }
 }

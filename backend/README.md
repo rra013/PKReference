@@ -64,6 +64,14 @@ annotations in `MetaController` and `MetaResponses`.
   first core it contains. Each archetype has its usage, top-cut rate, record, and record against each
   other archetype.
 
+- The corpus, for the app's Team Search: the stored events in Limitless's own shapes, answering the two
+  calls the app makes to Limitless, so a device can build its corpus from the server instead:
+  ```sh
+  curl 'localhost:8080/v1/formats/M-C/tournaments?page=1&limit=50'   # newest first, like GET /tournaments
+  curl 'localhost:8080/v1/tournaments/<id>/standings'                 # like GET /tournaments/{id}/standings
+  ```
+  The standings come back as Limitless sent them, except its `deck` label, which isn't kept.
+
 `MetaService` works these out from the team store when asked, and keeps each result until the store
 changes (`store_version`, which every write bumps in its transaction) or the hour does. Shares are 0 to 1.
 Definitions are in [the plan](../BackendIntegration-PLAN.md) (§4.2).
