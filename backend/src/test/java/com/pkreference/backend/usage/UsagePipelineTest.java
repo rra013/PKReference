@@ -63,4 +63,14 @@ class UsagePipelineTest {
             assertThat(config.get(TopicConfig.MAX_MESSAGE_BYTES_CONFIG).value()).isEqualTo("5242880");
         }
     }
+
+    /** springdoc's OpenAPI document (Swagger UI's source) has /v1 and its descriptions. */
+    @Test
+    void theApiIsDocumented() {
+        var docs = rest.getForObject("/v3/api-docs", String.class);
+        assertThat(docs).contains("/v1/formats/{format}/archetypes").contains("Archetypes and their matchups")
+                .contains("Mirror matches");
+        assertThat(rest.getForEntity("/swagger-ui.html", String.class).getStatusCode().is2xxSuccessful()
+                || rest.getForEntity("/swagger-ui/index.html", String.class).getStatusCode().is2xxSuccessful()).isTrue();
+    }
 }

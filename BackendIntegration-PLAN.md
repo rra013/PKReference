@@ -338,7 +338,10 @@ Each phase is one PR into `backend-integration`, or two where it's large.
      cached with ETags and gzipped. Worked out from the team store when
      asked and memoized on its version, rather than kept in more tables:
      at a few thousand teams a format it takes milliseconds.
-   - **2b:** win rates from the pairings, cores and archetypes.
+   - **2b:** win rates from the pairings (mirrors left out, with 95% ranges,
+     none under 30 matches), cores (pairs and trios with their lift), and a
+     first version of archetypes (cores of four, with their records and
+     matchups). Swagger UI describes every endpoint and field.
 3. **The app's client, behind the setting.**
    - Client, disk cache, the setting and freshness labels.
    - Team Search's corpus and the Problem Solver's usage from the server,

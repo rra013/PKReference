@@ -105,6 +105,30 @@ public class MetaRepository {
         return new TopCut(teams, events);
     }
 
+    /** A match both players played: result is P1, P2, TIE or DOUBLE_LOSS (PairingResult). */
+    public record PairingRow(String eventId, String player1, String player2, String result) {
+        public String team1() {
+            return eventId + "|" + player1;
+        }
+
+        public String team2() {
+            return eventId + "|" + player2;
+        }
+    }
+
+    /** Every played match at events of the format in [from, to): byes and no-shows aren't games. */
+    public List<PairingRow> pairings(String format, Instant from, Instant to) {
+        var args = new ArrayList<Object>(List.of(format, timestamp(to)));
+        String since = from == null ? "" : " and e.event_date >= ?";
+        if (from != null) args.add(timestamp(from));
+        return jdbc.query("""
+                select p.event_id, p.player1, p.player2, p.result from pairing p join event e on e.id = p.event_id
+                where p.result in ('P1', 'P2', 'TIE', 'DOUBLE_LOSS')
+                  and upper(e.format) = upper(?) and e.event_date < ?""" + since,
+                (rs, n) -> new PairingRow(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4)),
+                args.toArray());
+    }
+
     private static Instant instant(ResultSet rs, int column) throws SQLException {
         var value = rs.getObject(column, OffsetDateTime.class);
         return value == null ? null : value.toInstant();

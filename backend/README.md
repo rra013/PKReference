@@ -44,12 +44,25 @@ when it was worked out, and how many events, teams and top-cut teams it rests on
 curl 'localhost:8080/v1/formats'
 curl 'localhost:8080/v1/formats/M-C/pokemon?window=30d'                # 14d, 30d or regulation
 curl 'localhost:8080/v1/formats/M-C/pokemon/arcanine:hisui?window=30d'
+curl 'localhost:8080/v1/formats/M-C/cores?window=30d'
+curl 'localhost:8080/v1/formats/M-C/archetypes?window=30d'
 ```
+**Full reference:** with the backend running, Swagger UI at
+[localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) describes every endpoint, parameter
+and field, and lets you try them; the OpenAPI document is at `/v3/api-docs`. Both come from the
+annotations in `MetaController` and `MetaResponses`.
 - The list: each Pokémon's `usage` (share of teams), `topCutUsage` (share of top-cut teams, null when the
-  window had no top cut) and `trend` (usage in the last 14 days less the 14 before; null when either
-  period has under 50 teams).
+  window had no top cut), `trend` (usage in the last 14 days less the 14 before; null when either
+  period has under 50 teams) and `record`: wins, losses and ties from the pairings, leaving out mirror
+  matches, with a win rate (a tie is half a win) and its 95% range, null under 30 matches.
 - A Pokémon's page: its items, abilities, natures, moves, Mega Stones and teammates, its 10 most common
   whole sets, and its usage week by week.
+- Cores: the 20 most common pairs and trios (on 4 teams or more), with `lift`, their share over what
+  chance would give.
+- Archetypes: teams grouped by a core of four. Cores are the most common sets of four that share at most
+  two Pokémon with any more common core (on at least 4 teams and 2% of them); each team belongs to the
+  first core it contains. Each archetype has its usage, top-cut rate, record, and record against each
+  other archetype.
 
 `MetaService` works these out from the team store when asked, and keeps each result until the store
 changes (`store_version`, which every write bumps in its transaction) or the hour does. Shares are 0 to 1.

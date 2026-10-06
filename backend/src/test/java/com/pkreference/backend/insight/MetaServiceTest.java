@@ -1,8 +1,10 @@
 package com.pkreference.backend.insight;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pkreference.backend.insight.MetaResponses.Core;
 import com.pkreference.backend.insight.MetaResponses.PokemonUsage;
 import com.pkreference.backend.insight.MetaResponses.Share;
+import com.pkreference.backend.insight.MetaResponses.WinRecord;
 import com.pkreference.backend.model.Events.PairingsFetched;
 import com.pkreference.backend.model.Events.StandingsFetched;
 import com.pkreference.backend.model.Events.Tournament;
@@ -84,9 +86,12 @@ class MetaServiceTest {
         assertThat(list.sample().topCutTeams()).isEqualTo(16);
         assertThat(list.pokemon()).extracting(PokemonUsage::key)
                 .startsWith("rillaboom", "incineroar", "gholdengo", "raichu", "garchomp", "sneasler");
-        assertThat(list.pokemon().get(0))
-                .isEqualTo(new PokemonUsage("rillaboom", 44, 0.5301, 9, 0.5625, null));
-        assertThat(find(list.pokemon(), "garchomp")).isEqualTo(new PokemonUsage("garchomp", 26, 0.3133, 3, 0.1875, null));
+        // Records leave out mirror matches; the ranges are 95% Wilson intervals.
+        assertThat(list.pokemon().get(0)).isEqualTo(new PokemonUsage("rillaboom", 44, 0.5301, 9, 0.5625, null,
+                new WinRecord(46, 51, 0, 97, 0.4742, 0.3777, 0.5727)));
+        assertThat(find(list.pokemon(), "garchomp")).isEqualTo(new PokemonUsage("garchomp", 26, 0.3133, 3, 0.1875, null,
+                new WinRecord(36, 42, 0, 78, 0.4615, 0.3553, 0.5714)));
+        assertThat(find(list.pokemon(), "incineroar").record()).isEqualTo(new WinRecord(47, 49, 0, 96, 0.4896, 0.3919, 0.588));
         // The format's case doesn't matter.
         assertThat(meta.pokemon("m-c", MetaWindow.DAYS_30).sample().teams()).isEqualTo(83);
     }
@@ -117,6 +122,56 @@ class MetaServiceTest {
                 .startsWith(new Share("raichunitey", 26, 0.9286));
         assertThatThrownBy(() -> meta.pokemon("M-C", "missingno", MetaWindow.DAYS_30))
                 .isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
+    void thinRecordsHaveNoRate() {
+        var thin = list().pokemon().stream().filter(u -> u.record().matches() > 0 && u.record().matches() < 30).findFirst();
+        assertThat(thin).hasValueSatisfying(u -> assertThat(u.record().winRate()).isNull());
+    }
+
+    @Test
+    void cores() {
+        var cores = meta.cores("M-C", MetaWindow.DAYS_30);
+        assertThat(cores.pairs().get(0)).isEqualTo(new Core(List.of("gholdengo", "rillaboom"), 24, 0.2892, 1.6169));
+        assertThat(cores.pairs().get(1)).isEqualTo(new Core(List.of("raichu", "rillaboom"), 24, 0.2892, 1.6169));
+        assertThat(cores.pairs().get(2).members()).containsExactly("incineroar", "rillaboom");
+        assertThat(cores.pairs().get(2).lift()).isEqualTo(1.3147);
+        assertThat(cores.trios().get(0).members()).containsExactly("gholdengo", "raichu", "rillaboom");
+        assertThat(cores.trios().get(0).teams()).isEqualTo(19);
+        assertThat(cores.pairs()).hasSizeLessThanOrEqualTo(20).allSatisfy(c -> assertThat(c.teams()).isGreaterThanOrEqualTo(4));
+    }
+
+    @Test
+    void archetypes() {
+        var archetypes = meta.archetypes("M-C", MetaWindow.DAYS_30);
+        assertThat(archetypes.other()).isEqualTo(59);
+        var first = archetypes.archetypes().get(0);
+        assertThat(first.id()).isEqualTo("garchomp+gholdengo+rillaboom+volcarona");
+        assertThat(first.name()).isEqualTo("rillaboom+gholdengo");
+        assertThat(first.teams()).isEqualTo(9);
+        assertThat(first.usage()).isEqualTo(0.1084);
+        assertThat(first.topCutTeams()).isZero();
+        assertThat(first.record().wins()).isEqualTo(12);
+        assertThat(first.record().losses()).isEqualTo(17);
+        assertThat(first.record().winRate()).as("under 30 matches").isNull();
+        assertThat(first.matchups()).filteredOn(m -> m.against().equals("gholdengo+incineroar+raichu+rillaboom"))
+                .singleElement().satisfies(m -> {
+                    assertThat(m.record().wins()).isEqualTo(3);
+                    assertThat(m.record().losses()).isEqualTo(1);
+                });
+        var second = archetypes.archetypes().get(1);
+        assertThat(second.id()).isEqualTo("arcanine:hisui+gholdengo+raichu+staraptor");
+        assertThat(second.name()).isEqualTo("gholdengo+raichu");
+        assertThat(second.topCutTeams()).isEqualTo(2);
+        assertThat(second.record().wins()).isEqualTo(14);
+        assertThat(second.record().losses()).isEqualTo(13);
+        // Each team is in one archetype at most.
+        assertThat(archetypes.archetypes().stream().mapToInt(a -> a.teams()).sum() + archetypes.other()).isEqualTo(83);
+    }
+
+    private MetaResponses.PokemonList list() {
+        return meta.pokemon("M-C", MetaWindow.DAYS_30);
     }
 
     @Test

@@ -1,8 +1,13 @@
 package com.pkreference.backend.insight;
 
+import com.pkreference.backend.insight.MetaResponses.Archetypes;
+import com.pkreference.backend.insight.MetaResponses.Cores;
 import com.pkreference.backend.insight.MetaResponses.Formats;
 import com.pkreference.backend.insight.MetaResponses.PokemonDetail;
 import com.pkreference.backend.insight.MetaResponses.PokemonList;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,18 +24,17 @@ import java.util.NoSuchElementException;
 
 /**
  * API v1: read-only, the same for everyone, and cached. Responses may be reused for 15 minutes,
- * and carry an ETag, so a client that has the current one gets a 304 with no body.
- *
- * <pre>
- * GET /v1/formats
- * GET /v1/formats/M-C/pokemon?window=30d          (14d, 30d or regulation)
- * GET /v1/formats/M-C/pokemon/arcanine:hisui?window=30d
- * </pre>
+ * and carry a weak ETag, so a client that has the current one gets a 304 with no body. Swagger UI
+ * at /swagger-ui.html shows it, from these annotations.
  */
 @RestController
 @RequestMapping("/v1")
+@Tag(name = "Meta", description = """
+        Tournament insights from Limitless events: usage, top-cut rate, trends, win rates, sets, cores and \
+        archetypes. Read-only and cached (15 minutes, with ETags). Shares are 0 to 1.""")
 public class MetaController {
     static final CacheControl CACHE = CacheControl.maxAge(Duration.ofMinutes(15)).cachePublic();
+    private static final String WINDOW = "14d, 30d (the default) or regulation (every stored event of the format).";
 
     private final MetaService meta;
 
@@ -39,20 +43,49 @@ public class MetaController {
     }
 
     @GetMapping("/formats")
+    @Operation(summary = "The formats with data",
+            description = "Each Limitless format stored: its events, teams, first and last event, and when it was last fetched.")
     public ResponseEntity<Formats> formats() {
         return ResponseEntity.ok().cacheControl(CACHE).body(meta.formats());
     }
 
     @GetMapping("/formats/{format}/pokemon")
-    public ResponseEntity<PokemonList> pokemon(@PathVariable String format,
-                                               @RequestParam(required = false) String window) {
+    @Operation(summary = "Every Pokémon's usage",
+            description = "Each Pokémon on a team in the window: usage, top-cut rate, trend and win record, most used first.")
+    public ResponseEntity<PokemonList> pokemon(
+            @Parameter(description = "Limitless format id.", example = "M-C") @PathVariable String format,
+            @Parameter(description = WINDOW) @RequestParam(required = false) String window) {
         return ResponseEntity.ok().cacheControl(CACHE).body(meta.pokemon(format, MetaWindow.parse(window)));
     }
 
     @GetMapping("/formats/{format}/pokemon/{key}")
-    public ResponseEntity<PokemonDetail> pokemon(@PathVariable String format, @PathVariable String key,
-                                                 @RequestParam(required = false) String window) {
+    @Operation(summary = "One Pokémon's page",
+            description = "Its usage and record, items, abilities, natures, moves, Mega Stones, teammates, top whole "
+                    + "sets and weekly usage. 404 when no team in the window had it.")
+    public ResponseEntity<PokemonDetail> pokemon(
+            @Parameter(description = "Limitless format id.", example = "M-C") @PathVariable String format,
+            @Parameter(description = "The app's species key.", example = "rillaboom") @PathVariable String key,
+            @Parameter(description = WINDOW) @RequestParam(required = false) String window) {
         return ResponseEntity.ok().cacheControl(CACHE).body(meta.pokemon(format, key, MetaWindow.parse(window)));
+    }
+
+    @GetMapping("/formats/{format}/cores")
+    @Operation(summary = "Pokémon chosen together",
+            description = "The 20 most common pairs and trios (on at least 4 teams), with their lift over chance.")
+    public ResponseEntity<Cores> cores(
+            @Parameter(description = "Limitless format id.", example = "M-C") @PathVariable String format,
+            @Parameter(description = WINDOW) @RequestParam(required = false) String window) {
+        return ResponseEntity.ok().cacheControl(CACHE).body(meta.cores(format, MetaWindow.parse(window)));
+    }
+
+    @GetMapping("/formats/{format}/archetypes")
+    @Operation(summary = "Archetypes and their matchups",
+            description = "Teams grouped by their core of four: each archetype's usage, top-cut rate, record, and "
+                    + "record against each other archetype.")
+    public ResponseEntity<Archetypes> archetypes(
+            @Parameter(description = "Limitless format id.", example = "M-C") @PathVariable String format,
+            @Parameter(description = WINDOW) @RequestParam(required = false) String window) {
+        return ResponseEntity.ok().cacheControl(CACHE).body(meta.archetypes(format, MetaWindow.parse(window)));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
