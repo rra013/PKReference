@@ -22,14 +22,14 @@ import Observation
 @MainActor
 @Observable
 final class MetaModel {
-    enum Source: Equatable, Sendable {
+    nonisolated enum Source: Equatable, Sendable {
         case server
         case device
     }
 
     /// What the home shows: one source's numbers for one regulation and
     /// window.
-    struct Snapshot: Sendable {
+    nonisolated struct Snapshot: Sendable {
         let source: Source
         let regulation: ChampionsRegulation
         let window: MetaAPI.Window
@@ -41,6 +41,23 @@ final class MetaModel {
         let updated: Date?
         /// Events of the regulation in all, for the empty-window warning.
         let allEvents: Int
+        /// Where a Pokémon's page comes from: the server's answers, or the
+        /// device's numbers.
+        let pages: PageSource
+    }
+
+    /// Where pages come from, kept with the snapshot so a page matches it.
+    nonisolated enum PageSource: Sendable {
+        case server(MetaInsights)
+        case device(MetaDeviceInsights)
+    }
+
+    /// One Pokémon's page: its numbers, and the cores it's in.
+    nonisolated struct Page: Sendable {
+        let source: Source
+        let detail: MetaAPI.PokemonDetail
+        let pairs: [MetaAPI.Core]
+        let trios: [MetaAPI.Core]
     }
 
     enum Status: Equatable {
@@ -142,6 +159,33 @@ final class MetaModel {
         await load(regulation, window: window)
     }
 
+    /// A Pokémon's page from the snapshot's source, in its window: the
+    /// server's (cached by the rule in MetaCache.swift) or the device's. nil
+    /// when the server can't answer, or no team in the window has it.
+    nonisolated static func page(_ key: String, in snapshot: Snapshot) async -> Page? {
+        let format = snapshot.regulation.limitlessFormat
+        switch snapshot.pages {
+        case .server(let insights):
+            guard let detail = try? await insights.load(MetaAPI.pokemon(format: format, key: key,
+                                                                        window: snapshot.window)) else { return nil }
+            let cores = try? await insights.load(MetaAPI.cores(format: format, window: snapshot.window))
+            return Page(source: .server, detail: detail.value,
+                        pairs: cores?.value.pairs.filter { $0.members.contains(key) } ?? [],
+                        trios: cores?.value.trios.filter { $0.members.contains(key) } ?? [])
+        case .device(let device):
+            return await devicePage(key, device, snapshot.window)
+        }
+    }
+
+    @concurrent
+    nonisolated private static func devicePage(_ key: String, _ device: MetaDeviceInsights,
+                                               _ window: MetaAPI.Window) async -> Page? {
+        guard let detail = device.pokemon(key: key, window: window) else { return nil }
+        let cores = device.cores(window: window)
+        return Page(source: .device, detail: detail, pairs: cores.pairs.filter { $0.members.contains(key) },
+                    trios: cores.trios.filter { $0.members.contains(key) })
+    }
+
     // MARK: Sources
 
     private struct Shown {
@@ -165,7 +209,7 @@ final class MetaModel {
         let events = try? await insights.load(MetaAPI.events(format: format), force: force)
         let snapshot = Snapshot(source: .server, regulation: regulation, window: window, list: list.value,
                                 events: events?.value.events ?? [], updated: stored.lastFetched,
-                                allEvents: stored.events)
+                                allEvents: stored.events, pages: .server(insights))
         return Shown(snapshot: snapshot, warning: Self.emptyWindow(snapshot),
                      problem: formats.refreshError ?? list.refreshError)
     }
@@ -195,7 +239,7 @@ final class MetaModel {
         let device = MetaDeviceInsights(corpus: corpus, vocabulary: vocabulary, names: names, now: now)
         return Snapshot(source: .device, regulation: regulation, window: window, list: device.pokemon(window: window),
                         events: device.events(limit: 10).events, updated: corpus.listFetchedAt,
-                        allEvents: Set(device.teams.map(\.tournament.id)).count)
+                        allEvents: Set(device.teams.map(\.tournament.id)).count, pages: .device(device))
     }
 
     private func apply(_ snapshot: Snapshot?, warning: String?, problem: MetaFailure?) {
@@ -215,6 +259,37 @@ final class MetaModel {
     private static func emptyWindow(_ snapshot: Snapshot) -> String? {
         snapshot.list.sample.teams == 0
             ? MetaText.emptyWindow(snapshot.regulation, snapshot.window, allEvents: snapshot.allEvents) : nil
+    }
+}
+
+// MARK: - A set to save or calc
+
+/// One of a Pokémon's top sets, for Save Set and Calc Against This: as a
+/// Limitless team member, so the importer Events uses resolves it.
+nonisolated struct MetaSetRequest: Hashable, Sendable {
+    /// The species key: "arcanine:hisui".
+    let key: String
+    /// "Arcanine (Hisui)".
+    let name: String
+    let item: String?
+    let ability: String?
+    let nature: String?
+    let moves: [String]
+
+    init(key: String, name: String, set: MetaAPI.PokemonSet?) {
+        self.key = key
+        self.name = name
+        item = set?.item == MetaNames.noItem ? nil : set?.item
+        ability = set?.ability
+        nature = set?.nature
+        moves = set?.moves ?? []
+    }
+
+    /// The set as Limitless would list it. The slug is the key with its form
+    /// words ("arcanine-hisui"), as Limitless's slugs mostly are.
+    var member: LimitlessStanding.TeamMember {
+        LimitlessStanding.TeamMember(name: name, limitlessID: key.replacingOccurrences(of: ":", with: "-"),
+                                     item: item, ability: ability, attacks: moves, nature: nature, tera: nil)
     }
 }
 
@@ -314,8 +389,76 @@ nonisolated enum MetaText {
         return text
     }
 
+    /// "55%"; under 1%, "<1%".
+    static func percent(_ share: Double) -> String {
+        let value = share * 100
+        if value > 0 && value < 1 { return "<1%" }
+        return "\(Int(value.rounded()))%"
+    }
+
+    /// "▲ 6 points", "▼ 0.4 points", "no change"; nil when there's no trend.
+    static func trend(_ trend: Double?) -> String? {
+        guard let trend else { return nil }
+        let points = trend * 100
+        let size = abs(points)
+        guard size >= 0.05 else { return "no change" }
+        let number = size >= 10 ? String(Int(size.rounded())) : String(format: "%.1f", size)
+        return "\(points > 0 ? "▲" : "▼") \(number) point\(number == "1.0" ? "" : "s")"
+    }
+
+    /// "Wins 48% (46–50%) of 2,965 matches"; "29 matches: too few for a rate".
+    static func record(_ record: MetaAPI.WinRecord?, source: MetaModel.Source) -> String? {
+        guard let record, record.matches > 0 else { return nil }
+        let matches = count(record.matches, "match", plural: "matches")
+        guard let rate = record.winRate else { return "\(matches): too few for a rate" }
+        var text = source == .server ? "Wins \(percent(rate))" : "Team record \(percent(rate))"
+        if let low = record.winRateLow, let high = record.winRateHigh {
+            text += " (\(Int((low * 100).rounded()))–\(percent(high)))"
+        }
+        return text + " of \(matches)"
+    }
+
+    /// The top-cut rate's label for a source.
+    static func topCutLabel(_ source: MetaModel.Source) -> String {
+        source == .server ? "top cut" : "top 8"
+    }
+
+    /// What's winning, in a sentence: the most-used Pokémon, and the top
+    /// five's biggest gap between its top-cut rate and its usage when it's
+    /// 5 points or more.
+    static func whatsWinning(_ pokemon: [MetaAPI.PokemonUsage], source: MetaModel.Source,
+                             name: (String) -> String) -> String? {
+        guard let first = pokemon.first else { return nil }
+        let teams = source == .server ? "top-cut teams" : "top-8 teams"
+        var text = "\(name(first.key)) is on \(percent(first.usage)) of teams"
+        if let top = first.topCutUsage { text += " and \(percent(top)) of \(teams)" }
+        text += "."
+        let gaps = pokemon.prefix(5).compactMap { p in p.topCutUsage.map { (p, $0 - p.usage) } }
+        if let (p, gap) = gaps.max(by: { abs($0.1) < abs($1.1) }), abs(gap) >= 0.05 {
+            text += " \(name(p.key)) does \(gap > 0 ? "better" : "worse") than its usage says: "
+                + "\(percent(p.usage)) of teams, \(percent(p.topCutUsage!)) of \(teams)."
+        }
+        return text
+    }
+
+    /// One Pokémon's numbers for VoiceOver, in a sentence.
+    static func spoken(_ p: MetaAPI.PokemonUsage, name: String, source: MetaModel.Source) -> String {
+        var parts = ["\(name). On \(percent(p.usage)) of teams"]
+        if let top = p.topCutUsage {
+            parts[0] += ", \(percent(top)) of \(source == .server ? "top-cut" : "top-8") teams"
+        }
+        parts[0] += "."
+        if let record = record(p.record, source: source) { parts.append(record + ".") }
+        if let trend = trend(p.trend) {
+            parts.append("Trend \(trend.replacingOccurrences(of: "▲", with: "up").replacingOccurrences(of: "▼", with: "down")).")
+        } else {
+            parts.append("No trend yet.")
+        }
+        return parts.joined(separator: " ")
+    }
+
     /// "1 event", "46 events".
-    static func count(_ n: Int, _ noun: String) -> String {
-        "\(n.formatted()) \(noun)\(n == 1 ? "" : "s")"
+    static func count(_ n: Int, _ noun: String, plural: String? = nil) -> String {
+        "\(n.formatted()) \(n == 1 ? noun : plural ?? noun + "s")"
     }
 }

@@ -47,6 +47,9 @@ final class AppNavigator {
         /// An index, with its search field filled in: the Mon, Move or
         /// Ability Index.
         case indexSearch(AppTab, String)
+        /// The calc with one of the meta's top sets as the defender, keeping
+        /// the attacker, from a Meta Pokémon page.
+        case calcDefender(MetaSetRequest)
         /// Settings, as the Meta tab's Change in Settings opens it on iPhone
         /// and iPad. The Mac opens its Settings window instead.
         case settings
@@ -54,7 +57,7 @@ final class AppNavigator {
         var tab: AppTab {
             switch self {
             case .pokemon: .monIndex
-            case .calc, .calcSet, .calcSides: .damageCalc
+            case .calc, .calcSet, .calcSides, .calcDefender: .damageCalc
             case .teamSearch: .teamSearch
             case .speed: .speedTiers
             case .savedSet: .sets

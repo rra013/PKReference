@@ -39,7 +39,7 @@ not yet in `main`.
 Before that, #23–#56 were the UI pass, game data into JSON, iPad fixes, the
 Mac app, Siri Phase 1 and the rename to PK Reference.
 
-Full suite on 2026-10-06, on `backend-integration` with Phase 4d: 1,314 tests,
+Full suite on 2026-10-06, on `backend-integration` with Phase 4e: 1,319 tests,
 all passing on the iPhone 17 Pro Max simulator. The iOS and Mac builds had no warnings.
 
 ---
@@ -510,6 +510,8 @@ xcodebuild build -project PKReference.xcodeproj -scheme PKReference -destination
   - `-debugOpenSheet metaEvents` (Events, from the Meta tab) and
     `metaEventFilters` (its filter sheet), with `-defaultTab meta`. Events
     loads from Limitless, so give it `-debugSnapshotDelay 8`.
+    `metaPokemon` opens the most-used Pokémon's page and `metaInfo` the usage
+    info sheet; with the server on, give them `-debugSnapshotDelay 8` too.
   - `-debugOpenSettings YES`: the Settings window, as `<name>-Settings`.
   - `-debugMenus YES` prints the menu bar with shortcuts, as `[menu]` lines.
 

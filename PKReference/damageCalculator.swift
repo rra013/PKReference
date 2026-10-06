@@ -648,6 +648,13 @@ struct DamageCalculatorView: View {
             let descriptor = FetchDescriptor<SavedSpread>(predicate: #Predicate { $0.persistentModelID == id })
             guard let spread = try? modelContext.fetch(descriptor).first else { return }
             vm.side1.loadSpread(spread, allPokemon: allPokemon, allMoves: allMoves)
+        case .calcDefender(let set):
+            AppNavigator.shared.request = nil
+            // The meta's set, with stat points from the predictor, as Save Set
+            // saves it; not inserted into the store.
+            guard case .success(let spread) = LimitlessTeamImporter(allPokemon: allPokemon, allMoves: allMoves)
+                .planSpread(set.member, taken: [], predictStats: true) else { return }
+            vm.side2.loadSpread(spread, allPokemon: allPokemon, allMoves: allMoves)
         case .calcSides(let sides):
             AppNavigator.shared.request = nil
             let requested = DamageCalcVM()

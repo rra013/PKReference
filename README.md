@@ -250,6 +250,20 @@ the last 14 days, 30 days or the whole regulation: how many events and teams
 the numbers rest on, where they come from and how old they are, and the
 newest events with their winners' teams. It replaced the Tournaments tab.
 
+- **What's Winning:** the most-used Pokémon, led by a sentence ("Rillaboom
+  is on 52% of teams and 51% of top-cut teams"), with each one's top-cut
+  rate, win rate and trend; All Pokémon lists every one, sortable and
+  searchable.
+- **Rising and Falling:** the biggest changes in usage over the last two
+  weeks.
+- **A Pokémon's page:** its usage, top-cut rate, win rate and trend, usage
+  week by week, its most common whole sets (each with **Save Set** and
+  **Calc Against This**, which fill in stat points with the on-device
+  predictor), its items, abilities, moves, natures and Mega Stones, its
+  teammates and the cores it's in, and links to the Mon Index and Team
+  Search.
+- **Definitions:** every number has an ⓘ saying exactly what it counts.
+
 - **Where the numbers come from:** with Settings → PK Reference Server (Beta)
   on, from the server. Otherwise, or when the server can't be reached, the
   app works them out itself from the events Team Search downloaded
@@ -497,7 +511,7 @@ project has no Swift package dependencies.
    later launches work offline, except for Events and Team Search's new
    events. The Mac app is sandboxed, with outgoing network access.
 
-**Tests:** 1,314 tests written with Swift Testing. They cover the damage engines
+**Tests:** 1,319 tests written with Swift Testing. They cover the damage engines
 and the port, the battle engine by mechanic tier, the EV and two-hit solvers,
 speed tiers, paste parsing and import, Champions filters and legality, RNG
 tools, ML parity, the tournament import and data store, Team Search's parser,

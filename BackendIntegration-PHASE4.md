@@ -445,7 +445,11 @@ lists what was and wasn't checked.
    `EventsView`; `TabLayout` also reads the old tab name wherever one is
    stored, so a very old saved tab list keeps it.
 5. **4e, app: Meta home's cards and the Pokémon page**, with the full list
-   and the info sheets.
+   and the info sheets. Built: `MetaPokemonViews.swift` (What's Winning,
+   Rising and Falling, All Pokémon, the page), `MetaDefinition.swift` (the
+   ⓘ sheets, checked against §4.2 by a test) and `AppNavigator.calcDefender`.
+   Save Set and Calc Against This fill stat points in with the on-device
+   predictor, since Limitless doesn't publish them.
 6. **4f, app: Teams to beat and the archetype page**, with the links to
    Team Search.
 7. **4g, app: Mon Index's card.**
