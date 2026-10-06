@@ -82,6 +82,7 @@
 #include <Core/Gen5/Generators/IDGenerator5.hpp>
 #include <Core/Gen5/Searchers/IVSearcher5.hpp>
 #include <Core/Gen5/Searchers/IDSearcher5.hpp>
+#include <Core/Gen5/Searchers/Searcher5.hpp>
 #include <Core/Gen5/Searchers/ProfileSearcher5.hpp>
 #include <Core/RNG/SHA1.hpp>
 #include <Core/Gen5/States/ProfileSearcherState5.hpp>
@@ -2450,73 +2451,6 @@ extern "C" PFStaticTemplate *pf_getStaticEncounters5(int type, int *outCount)
     return out;
 }
 
-// MARK: - Gen 5 Egg Generator
-
-extern "C" PFEggGeneratorState5 *pf_eggGenerate5(uint64_t seed,
-                                                    uint32_t initialAdvances,
-                                                    uint32_t maxAdvances,
-                                                    uint32_t offset,
-                                                    const uint8_t parentAIVs[6], const uint8_t parentBIVs[6],
-                                                    uint8_t parentAAbility, uint8_t parentBAbility,
-                                                    uint8_t parentAGender, uint8_t parentBGender,
-                                                    uint8_t parentAItem, uint8_t parentBItem,
-                                                    uint8_t parentANature, uint8_t parentBNature,
-                                                    uint16_t eggSpecie, bool masuda,
-                                                    uint16_t tid, uint16_t sid,
-                                                    uint32_t game,
-                                                    uint64_t mac, const bool keypresses[9],
-                                                    uint8_t vcount, uint8_t gxstat, uint8_t vframe,
-                                                    bool skipLR, uint16_t timer0Min, uint16_t timer0Max,
-                                                    bool memoryLink, bool shinyCharm,
-                                                    uint8_t dsType, uint8_t language,
-                                                    uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
-                                                    const uint8_t ivMin[6], const uint8_t ivMax[6],
-                                                    const bool natures[25], const bool powers[16],
-                                                    int *outCount)
-{
-    Profile5 profile = makeProfile5(static_cast<Game>(game), tid, sid,
-                                     mac, keypresses, vcount, gxstat, vframe,
-                                     skipLR, timer0Min, timer0Max,
-                                     memoryLink, shinyCharm, dsType, language);
-    StateFilter filter = makeFilter(filterGender, filterAbility, filterShiny, ivMin, ivMax, natures, powers);
-
-    std::array<std::array<u8, 6>, 2> parentIVs;
-    std::copy(parentAIVs, parentAIVs + 6, parentIVs[0].begin());
-    std::copy(parentBIVs, parentBIVs + 6, parentIVs[1].begin());
-
-    std::array<u8, 2> abilities = { parentAAbility, parentBAbility };
-    std::array<u8, 2> genders = { parentAGender, parentBGender };
-    std::array<u8, 2> items = { parentAItem, parentBItem };
-    std::array<u8, 2> dcNatures = { parentANature, parentBNature };
-
-    Daycare daycare(parentIVs, abilities, genders, items, dcNatures, eggSpecie, masuda);
-
-    EggGenerator5 generator(initialAdvances, maxAdvances, offset, daycare, profile, filter);
-
-    auto results = generator.generate(seed);
-    *outCount = static_cast<int>(results.size());
-    if (results.empty()) return nullptr;
-
-    auto *out = static_cast<PFEggGeneratorState5 *>(malloc(sizeof(PFEggGeneratorState5) * results.size()));
-    for (size_t i = 0; i < results.size(); i++) {
-        auto &s = results[i];
-        out[i].pid = s.getPID();
-        out[i].advances = s.getAdvances();
-        auto ivs = s.getIVs();
-        auto inh = s.getInheritance();
-        for (int j = 0; j < 6; j++) {
-            out[i].ivs[j] = ivs[j];
-            out[i].inheritance[j] = inh[j];
-        }
-        out[i].nature = s.getNature();
-        out[i].ability = s.getAbility();
-        out[i].gender = s.getGender();
-        out[i].shiny = s.getShiny();
-        out[i].chatot = s.getChatot();
-    }
-    return out;
-}
-
 // MARK: - Gen 5 ID Generator
 
 extern "C" PFIDState5 *pf_idGenerate5(uint64_t seed,
@@ -2892,6 +2826,144 @@ extern "C" uint64_t pf_gen5InitialSeed(uint32_t game, const PFProfile5 *p, uint1
     auto alpha = sha.precompute();
     sha.setTime(hour, minute, second, static_cast<DSType>(p->dsType));
     return sha.hashSeed(alpha);
+}
+
+// MARK: - Gen 5 Egg Generator
+
+static Daycare makeDaycare(const PFDaycare *d)
+{
+    std::array<std::array<u8, 6>, 2> parentIVs;
+    std::copy(d->parentAIVs, d->parentAIVs + 6, parentIVs[0].begin());
+    std::copy(d->parentBIVs, d->parentBIVs + 6, parentIVs[1].begin());
+    return Daycare(parentIVs, { d->abilities[0], d->abilities[1] }, { d->genders[0], d->genders[1] },
+                   { d->items[0], d->items[1] }, { d->natures[0], d->natures[1] }, d->specie, d->masuda);
+}
+
+static PFEggGeneratorState5 convertEggState5(const EggState5 &s)
+{
+    PFEggGeneratorState5 r;
+    r.advances = s.getAdvances();
+    r.pid = s.getPID();
+    auto ivs = s.getIVs();
+    auto inh = s.getInheritance();
+    for (int j = 0; j < 6; j++) {
+        r.ivs[j] = ivs[j];
+        r.inheritance[j] = inh[j];
+    }
+    r.nature = s.getNature();
+    r.ability = s.getAbility();
+    r.gender = s.getGender();
+    r.shiny = s.getShiny();
+    r.hiddenPower = s.getHiddenPower();
+    r.chatot = s.getChatot();
+    return r;
+}
+
+extern "C" PFEggGeneratorState5 *pf_eggGenerate5(uint64_t seed,
+                                                    uint32_t initialAdvances,
+                                                    uint32_t maxAdvances,
+                                                    uint32_t offset,
+                                                    uint32_t game, uint16_t tid, uint16_t sid,
+                                                    const PFProfile5 *p,
+                                                    const PFDaycare *d,
+                                                    uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
+                                                    const uint8_t ivMin[6], const uint8_t ivMax[6],
+                                                    const bool natures[25], const bool powers[16],
+                                                    int *outCount)
+{
+    Profile5 profile = makeProfile5(static_cast<Game>(game), tid, sid, p);
+    StateFilter filter = makeFilter(filterGender, filterAbility, filterShiny, ivMin, ivMax, natures, powers);
+    EggGenerator5 generator(initialAdvances, maxAdvances, offset, makeDaycare(d), profile, filter);
+
+    auto results = generator.generate(seed);
+    *outCount = static_cast<int>(results.size());
+    if (results.empty()) return nullptr;
+
+    auto *out = static_cast<PFEggGeneratorState5 *>(malloc(sizeof(PFEggGeneratorState5) * results.size()));
+    for (size_t i = 0; i < results.size(); i++) out[i] = convertEggState5(results[i]);
+    return out;
+}
+
+// MARK: - Gen 5 Egg Searcher
+
+/// PokéFinder's EggSearcher5.
+using EggSearcher5 = Searcher5<EggGenerator5, EggState5>;
+
+struct PFEggSearch5 {
+    EggSearcher5 *searcher;
+    std::thread thread;
+    std::atomic<bool> done { false };
+
+    ~PFEggSearch5() {
+        if (thread.joinable()) thread.join();
+        delete searcher;
+    }
+};
+
+extern "C" PFEggSearch5Handle pf_eggSearch5_start(uint32_t game, uint16_t tid, uint16_t sid,
+                                                  const PFProfile5 *p, const PFDaycare *d,
+                                                  uint16_t startYear, uint8_t startMonth, uint8_t startDay,
+                                                  uint16_t endYear, uint8_t endMonth, uint8_t endDay,
+                                                  uint32_t initialAdvances, uint32_t maxAdvances,
+                                                  uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
+                                                  const uint8_t ivMin[6], const uint8_t ivMax[6],
+                                                  const bool natures[25], const bool powers[16])
+{
+    Date start(startYear, startMonth, startDay);
+    Date end(endYear, endMonth, endDay);
+    if (start > end || p->timer0Min > p->timer0Max) return nullptr;
+
+    Profile5 profile = makeProfile5(static_cast<Game>(game), tid, sid, p);
+    StateFilter filter = makeFilter(filterGender, filterAbility, filterShiny, ivMin, ivMax, natures, powers);
+    EggGenerator5 generator(initialAdvances, maxAdvances, 0, makeDaycare(d), profile, filter);
+    auto *searcher = new EggSearcher5(generator, profile);
+    searcher->setMaxProgress(std::max<u64>(1, searcher->getMaxProgress(start, end)));
+
+    auto *handle = new PFEggSearch5();
+    handle->searcher = searcher;
+    handle->thread = std::thread([handle, searcher, start, end]() {
+        int threads = static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
+        searcher->startSearch(threads, start, end);
+        handle->done = true;
+    });
+    return handle;
+}
+
+extern "C" int pf_eggSearch5_progress(PFEggSearch5Handle h)
+{
+    return static_cast<PFEggSearch5 *>(h)->searcher->getProgress();
+}
+
+extern "C" bool pf_eggSearch5_done(PFEggSearch5Handle h)
+{
+    return static_cast<PFEggSearch5 *>(h)->done;
+}
+
+extern "C" PFEggSearchResult5 *pf_eggSearch5_getResults(PFEggSearch5Handle h, int *outCount)
+{
+    auto results = static_cast<PFEggSearch5 *>(h)->searcher->getResults();
+    *outCount = static_cast<int>(results.size());
+    if (results.empty()) return nullptr;
+    auto *out = static_cast<PFEggSearchResult5 *>(malloc(sizeof(PFEggSearchResult5) * results.size()));
+    for (size_t i = 0; i < results.size(); i++) {
+        const auto &s = results[i];
+        out[i].dateTime = convertDateTime(s.getDateTime());
+        out[i].seed = s.getInitialSeed();
+        out[i].timer0 = s.getTimer0();
+        out[i].buttons = static_cast<uint16_t>(s.getButtons());
+        out[i].egg = convertEggState5(s.getState());
+    }
+    return out;
+}
+
+extern "C" void pf_eggSearch5_cancel(PFEggSearch5Handle h)
+{
+    static_cast<PFEggSearch5 *>(h)->searcher->cancelSearch();
+}
+
+extern "C" void pf_eggSearch5_free(PFEggSearch5Handle h)
+{
+    delete static_cast<PFEggSearch5 *>(h);
 }
 
 // MARK: - Gen 5 IDs
