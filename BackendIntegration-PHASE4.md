@@ -339,6 +339,16 @@ on but unreachable, a banner says so above the device's numbers, with
 Team Search and the Problem Solver already use) into the same models the
 server's answers decode into, so the screens don't care where the numbers
 came from. A few thousand teams take milliseconds, off the main actor.
+Items, abilities, natures and moves are standardized by `MetaNames`, a port
+of the server's `NameStandardizer` built from the same bundled regulation
+and Showdown files. The server also reads a snapshot of Serebii's Champions
+item page, which the app doesn't bundle, so an item in no regulation's list
+can be spelled differently on the device.
+
+Built in 4c. `MetaDeviceInsightsTests` checks it against the backend's
+`golden/meta-fixture.json`, and on 2026-10-06 it matched the owner's server
+on live data (46 events, 2,633 teams): usage, trends, cores, archetypes, the
+25 most-used Pokémon's pages and the newest events' winners were identical.
 
 | Metric | On the device |
 |---|---|
@@ -425,8 +435,9 @@ lists what was and wasn't checked.
    Search's refresh see new events at once.
 2. **4b, backend: events and archetypes** (§5), and the shared golden file
    of the fixture event's insights (§10).
-3. **4c, app: insights on the device.** `MetaDeviceInsights` (§6.2),
-   checked against the golden file. No new screens.
+3. **4c, app: insights on the device.** `MetaDeviceInsights` and
+   `MetaNames` (§6.2), checked against the golden file, and the app's models
+   and requests for 4b's events and archetype pages. No new screens.
 4. **4d, app: the Meta tab.** The rename and its migration, Events inside
    Meta, the regulation header and its warnings, the window choice, the
    source rule and the states (§6), with Recent events.

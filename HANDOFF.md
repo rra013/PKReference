@@ -39,7 +39,7 @@ not yet in `main`.
 Before that, #23–#56 were the UI pass, game data into JSON, iPad fixes, the
 Mac app, Siri Phase 1 and the rename to PK Reference.
 
-Full suite on 2026-10-06, on `backend-integration` with Phase 4a: 1,295 tests,
+Full suite on 2026-10-06, on `backend-integration` with Phase 4c: 1,303 tests,
 all passing on the iPhone 17 Pro Max simulator. The iOS and Mac builds had no warnings.
 
 ---
@@ -114,7 +114,12 @@ answer. `MetaServerClient`'s session has no URL cache, so nothing it asks is
 answered from an old copy. `MetaAPI.swift` decodes the `/v1` insights, and
 `MetaCache.swift` keeps them on disk with the rule for when to ask again
 (`MetaInsights.load`); tests read real answers saved in
-`PKReferenceTests/MetaFixtures/`.
+`PKReferenceTests/MetaFixtures/`. Without the server, `MetaDeviceInsights.swift`
+works the same insights out from Team Search's corpus, in the same shapes,
+with `MetaNames.swift` (a port of the backend's `NameStandardizer`) for the
+names. It counts as the backend's `MetaService` does, so a change to how
+either side counts must keep `MetaDeviceInsightsTests` and the backend's
+`MetaGoldenFileTest` passing against `golden/meta-fixture.json`.
 
 **RNG tools** (`RNGToolsView.swift` and the files beside it): PokéFinder's
 C++ core is called through `PFBridge.h`/`.mm`, with `PFBridgeSwift.swift` as
