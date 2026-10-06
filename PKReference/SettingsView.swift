@@ -22,6 +22,10 @@ struct SettingsView: View {
     @AppStorage(AppSettings.warnBeforeLeavingTab) private var warnBeforeLeavingTab: Bool
     @AppStorage(AppSettings.instantSetDelete) private var instantSetDelete: Bool
     @AppStorage(AppSettings.championsRegulation) private var championsRegulationRaw: String
+    @AppStorage(AppSettings.metaServerEnabled) private var metaServerEnabled: Bool
+    @AppStorage(AppSettings.metaServerAddress) private var metaServerAddress: String
+    @State private var metaServerStatus: String?
+    @State private var isTestingMetaServer = false
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -202,6 +206,41 @@ struct SettingsView: View {
                     Text("Swiping to delete a saved set asks first. Choosing Delete & Don't Ask Again in that prompt turns this off.")
                 }
 
+                // MARK: - PK Reference Server
+                Section {
+                    Toggle("Use PK Reference Server", isOn: $metaServerEnabled)
+                    if metaServerEnabled {
+                        LabeledContent("Address") {
+                            TextField(MetaServerSettings.defaultAddress, text: $metaServerAddress)
+                                .multilineTextAlignment(.trailing)
+                                .autocorrectionDisabled()
+                                #if os(iOS)
+                                .textInputAutocapitalization(.never)
+                                .keyboardType(.URL)
+                                #endif
+                        }
+                        Button {
+                            testMetaServer()
+                        } label: {
+                            HStack {
+                                Label("Test Connection", systemImage: "network")
+                                Spacer()
+                                if isTestingMetaServer { ProgressView() }
+                            }
+                        }
+                        .disabled(isTestingMetaServer)
+                        if let metaServerStatus {
+                            Text(metaServerStatus)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("PK Reference Server (Beta)")
+                } footer: {
+                    Text("Team Search and the Problem Solver read tournament teams from your PK Reference server instead of downloading them from Limitless. Whenever the server can't be reached, they use Limitless as before.")
+                }
+
                 // MARK: - Data Management
                 Section("Data Management") {
                     Button {
@@ -308,6 +347,24 @@ struct SettingsView: View {
             } message: {
                 Text("This will restore the app to a fresh install state, deleting all downloaded data, saved spreads, teams, and preferences. The app will re-sync on next launch.")
             }
+        }
+    }
+
+    /// Asks the server what it has, and says so under the button.
+    private func testMetaServer() {
+        guard let url = MetaServerSettings.url(from: metaServerAddress) else {
+            metaServerStatus = "That address doesn't look like one: try http://localhost:8080."
+            return
+        }
+        isTestingMetaServer = true
+        metaServerStatus = nil
+        Task {
+            do {
+                metaServerStatus = try await MetaServerFormats.fetch(from: url).summary
+            } catch {
+                metaServerStatus = "Couldn't reach \(url.absoluteString): \(error.localizedDescription)"
+            }
+            isTestingMetaServer = false
         }
     }
 

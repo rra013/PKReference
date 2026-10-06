@@ -143,7 +143,7 @@ actor TeamCorpusStore {
         URL.cachesDirectory.appending(path: "TeamSearch", directoryHint: .isDirectory)
     }
 
-    init(fetcher: any TeamCorpusFetching = LimitlessCorpusFetcher(),
+    init(fetcher: any TeamCorpusFetching = PreferredCorpusFetcher(),
          directory: URL = TeamCorpusStore.defaultDirectory,
          configuration: TeamCorpusConfiguration = TeamCorpusConfiguration(),
          now: @escaping @Sendable () -> Date = { Date() },

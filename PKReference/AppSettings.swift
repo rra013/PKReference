@@ -48,6 +48,11 @@ enum AppSettings {
     /// Turned on by "Delete & Don't Ask Again"; Settings shows it inverted,
     /// as "Ask Before Deleting a Set".
     static let instantSetDelete = SettingKey(name: "instantSetDelete", defaultValue: false)
+    /// Off by default: Team Search and the Problem Solver read tournament
+    /// teams from the PK Reference server, falling back to Limitless.
+    static let metaServerEnabled = SettingKey(name: MetaServerSettings.enabledKey, defaultValue: false)
+    static let metaServerAddress = SettingKey(name: MetaServerSettings.addressKey,
+                                              defaultValue: MetaServerSettings.defaultAddress)
 }
 
 extension AppStorage {

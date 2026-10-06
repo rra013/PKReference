@@ -269,7 +269,10 @@ lists every name that failed.
 
 Describe the team you're thinking of, such as *"Trick Room with Mega
 Gardevoir, no Incineroar"*, and Team Search finds the teams that match in
-recent Limitless events for the chosen Champions regulation.
+recent Limitless events for the chosen Champions regulation. With Settings →
+PK Reference Server (Beta) on, it reads those events from a PK Reference
+server (`backend/`) instead of downloading them from Limitless, and falls
+back to Limitless whenever the server can't be reached.
 
 - **What it understands:** Pokémon (with nicknames such as "Chomp", regional
   and gendered forms such as "Hisuian Arcanine" or "Indeedee ♀", and Megas
@@ -472,7 +475,7 @@ project has no Swift package dependencies.
    later launches work offline, except for Tournaments. The Mac app is
    sandboxed, with outgoing network access.
 
-**Tests:** 1,281 tests written with Swift Testing. They cover the damage engines
+**Tests:** 1,285 tests written with Swift Testing. They cover the damage engines
 and the port, the battle engine by mechanic tier, the EV and two-hit solvers,
 speed tiers, paste parsing and import, Champions filters and legality, RNG
 tools, ML parity, the tournament import and data store, Team Search's parser,
