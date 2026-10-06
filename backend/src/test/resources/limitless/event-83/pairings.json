@@ -1,0 +1,1499 @@
+[
+ {
+  "round": 1,
+  "phase": 1,
+  "table": null,
+  "winner": -1,
+  "player1": "player-16"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": null,
+  "winner": -1,
+  "player1": "player-83"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": null,
+  "winner": -1,
+  "player1": "player-44"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": null,
+  "winner": -1,
+  "player1": "player-63"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": null,
+  "winner": -1,
+  "player1": "player-55"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 1,
+  "winner": "player-14",
+  "player1": "player-14",
+  "player2": "player-68"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 2,
+  "winner": "player-47",
+  "player1": "player-72",
+  "player2": "player-47"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 3,
+  "winner": "player-09",
+  "player1": "player-66",
+  "player2": "player-09"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 4,
+  "winner": "player-21",
+  "player1": "player-58",
+  "player2": "player-21"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 5,
+  "winner": "player-50",
+  "player1": "player-29",
+  "player2": "player-50"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 6,
+  "winner": "player-43",
+  "player1": "player-77",
+  "player2": "player-43"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 7,
+  "winner": "player-33",
+  "player1": "player-33",
+  "player2": "player-04"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 8,
+  "winner": "player-31",
+  "player1": "player-31",
+  "player2": "player-60"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 9,
+  "winner": "player-26",
+  "player1": "player-26",
+  "player2": "player-12"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 10,
+  "winner": "player-10",
+  "player1": "player-34",
+  "player2": "player-10"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 11,
+  "winner": "player-20",
+  "player1": "player-38",
+  "player2": "player-20"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 12,
+  "winner": "player-22",
+  "player1": "player-52",
+  "player2": "player-22"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 13,
+  "winner": "player-32",
+  "player1": "player-32",
+  "player2": "player-48"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 14,
+  "winner": "player-03",
+  "player1": "player-03",
+  "player2": "player-37"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 15,
+  "winner": "player-35",
+  "player1": "player-35",
+  "player2": "player-78"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 16,
+  "winner": "player-28",
+  "player1": "player-64",
+  "player2": "player-28"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 17,
+  "winner": "player-05",
+  "player1": "player-05",
+  "player2": "player-41"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 18,
+  "winner": "player-40",
+  "player1": "player-40",
+  "player2": "player-61"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 19,
+  "winner": "player-24",
+  "player1": "player-73",
+  "player2": "player-24"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 20,
+  "winner": "player-02",
+  "player1": "player-02",
+  "player2": "player-25"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 21,
+  "winner": "player-19",
+  "player1": "player-19",
+  "player2": "player-65"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 22,
+  "winner": "player-11",
+  "player1": "player-11",
+  "player2": "player-57"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 23,
+  "winner": "player-17",
+  "player1": "player-70",
+  "player2": "player-17"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 24,
+  "winner": "player-49",
+  "player1": "player-80",
+  "player2": "player-49"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 25,
+  "winner": "player-13",
+  "player1": "player-67",
+  "player2": "player-13"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 26,
+  "winner": "player-59",
+  "player1": "player-81",
+  "player2": "player-59"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 27,
+  "winner": "player-56",
+  "player1": "player-45",
+  "player2": "player-56"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 28,
+  "winner": "player-42",
+  "player1": "player-42",
+  "player2": "player-74"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 29,
+  "winner": "player-54",
+  "player1": "player-54",
+  "player2": "player-75"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 30,
+  "winner": "player-51",
+  "player1": "player-82",
+  "player2": "player-51"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 31,
+  "winner": "player-15",
+  "player1": "player-15",
+  "player2": "player-01"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 32,
+  "winner": "player-36",
+  "player1": "player-36",
+  "player2": "player-53"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 33,
+  "winner": "player-46",
+  "player1": "player-07",
+  "player2": "player-46"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 34,
+  "winner": "player-23",
+  "player1": "player-23",
+  "player2": "player-30"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 35,
+  "winner": "player-18",
+  "player1": "player-18",
+  "player2": "player-76"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 36,
+  "winner": "player-06",
+  "player1": "player-06",
+  "player2": "player-39"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 37,
+  "winner": "player-27",
+  "player1": "player-79",
+  "player2": "player-27"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 38,
+  "winner": "player-08",
+  "player1": "player-08",
+  "player2": "player-69"
+ },
+ {
+  "round": 1,
+  "phase": 1,
+  "table": 39,
+  "winner": "player-62",
+  "player1": "player-71",
+  "player2": "player-62"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": null,
+  "winner": -1,
+  "player1": "player-55"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 1,
+  "winner": "player-19",
+  "player1": "player-15",
+  "player2": "player-19"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 2,
+  "winner": "player-05",
+  "player1": "player-05",
+  "player2": "player-35"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 3,
+  "winner": "player-14",
+  "player1": "player-22",
+  "player2": "player-14"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 4,
+  "winner": "player-32",
+  "player1": "player-32",
+  "player2": "player-03"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 5,
+  "winner": "player-09",
+  "player1": "player-09",
+  "player2": "player-24"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 6,
+  "winner": "player-10",
+  "player1": "player-10",
+  "player2": "player-17"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 7,
+  "winner": "player-21",
+  "player1": "player-59",
+  "player2": "player-21"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 8,
+  "winner": "player-36",
+  "player1": "player-36",
+  "player2": "player-43"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 9,
+  "winner": "player-33",
+  "player1": "player-33",
+  "player2": "player-26"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 10,
+  "winner": "player-13",
+  "player1": "player-54",
+  "player2": "player-13"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 11,
+  "winner": "player-18",
+  "player1": "player-18",
+  "player2": "player-08"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 12,
+  "winner": "player-42",
+  "player1": "player-42",
+  "player2": "player-46"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 13,
+  "winner": "player-20",
+  "player1": "player-20",
+  "player2": "player-31"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 14,
+  "winner": "player-11",
+  "player1": "player-50",
+  "player2": "player-11"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 15,
+  "winner": "player-40",
+  "player1": "player-27",
+  "player2": "player-40"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 16,
+  "winner": "player-06",
+  "player1": "player-51",
+  "player2": "player-06"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 17,
+  "winner": "player-28",
+  "player1": "player-47",
+  "player2": "player-28"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 18,
+  "winner": "player-02",
+  "player1": "player-02",
+  "player2": "player-49"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 19,
+  "winner": "player-23",
+  "player1": "player-56",
+  "player2": "player-23"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 20,
+  "winner": "player-52",
+  "player1": "player-83",
+  "player2": "player-52"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 21,
+  "winner": "player-45",
+  "player1": "player-45",
+  "player2": "player-77"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 22,
+  "winner": "player-07",
+  "player1": "player-07",
+  "player2": "player-29"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 23,
+  "winner": "player-41",
+  "player1": "player-72",
+  "player2": "player-41"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 24,
+  "winner": "player-30",
+  "player1": "player-30",
+  "player2": "player-66"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 25,
+  "winner": "player-37",
+  "player1": "player-37",
+  "player2": "player-57"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 26,
+  "winner": "player-63",
+  "player1": "player-81",
+  "player2": "player-63"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 27,
+  "winner": "player-01",
+  "player1": "player-01",
+  "player2": "player-25"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 28,
+  "winner": "player-12",
+  "player1": "player-53",
+  "player2": "player-12"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 29,
+  "winner": "player-39",
+  "player1": "player-39",
+  "player2": "player-76"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 30,
+  "winner": "player-60",
+  "player1": "player-60",
+  "player2": "player-79"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 31,
+  "winner": "player-48",
+  "player1": "player-78",
+  "player2": "player-48"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 32,
+  "winner": "player-61",
+  "player1": "player-71",
+  "player2": "player-61"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 33,
+  "winner": "player-58",
+  "player1": "player-58",
+  "player2": "player-80"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 34,
+  "winner": "player-34",
+  "player1": "player-44",
+  "player2": "player-34"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 35,
+  "winner": "player-04",
+  "player1": "player-04",
+  "player2": "player-16"
+ },
+ {
+  "round": 2,
+  "phase": 1,
+  "table": 36,
+  "winner": "player-38",
+  "player1": "player-75",
+  "player2": "player-38"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 1,
+  "winner": "player-09",
+  "player1": "player-09",
+  "player2": "player-13"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 2,
+  "winner": "player-11",
+  "player1": "player-42",
+  "player2": "player-11"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 3,
+  "winner": "player-19",
+  "player1": "player-36",
+  "player2": "player-19"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 4,
+  "winner": "player-05",
+  "player1": "player-05",
+  "player2": "player-18"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 5,
+  "winner": "player-06",
+  "player1": "player-21",
+  "player2": "player-06"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 6,
+  "winner": "player-02",
+  "player1": "player-02",
+  "player2": "player-40"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 7,
+  "winner": "player-28",
+  "player1": "player-28",
+  "player2": "player-32"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 8,
+  "winner": "player-10",
+  "player1": "player-10",
+  "player2": "player-20"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 9,
+  "winner": "player-23",
+  "player1": "player-33",
+  "player2": "player-23"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 10,
+  "winner": "player-12",
+  "player1": "player-14",
+  "player2": "player-12"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 11,
+  "winner": "player-08",
+  "player1": "player-08",
+  "player2": "player-52"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 12,
+  "winner": "player-26",
+  "player1": "player-26",
+  "player2": "player-56"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 13,
+  "winner": "player-01",
+  "player1": "player-39",
+  "player2": "player-01"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 14,
+  "winner": "player-37",
+  "player1": "player-15",
+  "player2": "player-37"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 15,
+  "winner": "player-35",
+  "player1": "player-58",
+  "player2": "player-35"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 16,
+  "winner": "player-41",
+  "player1": "player-61",
+  "player2": "player-41"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 17,
+  "winner": "player-24",
+  "player1": "player-60",
+  "player2": "player-24"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 18,
+  "winner": "player-30",
+  "player1": "player-30",
+  "player2": "player-51"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 19,
+  "winner": "player-27",
+  "player1": "player-59",
+  "player2": "player-27"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 20,
+  "winner": "player-03",
+  "player1": "player-03",
+  "player2": "player-48"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 21,
+  "winner": "player-43",
+  "player1": "player-43",
+  "player2": "player-04"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 22,
+  "winner": "player-34",
+  "player1": "player-17",
+  "player2": "player-34"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 23,
+  "winner": "player-22",
+  "player1": "player-22",
+  "player2": "player-31"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 24,
+  "winner": "player-07",
+  "player1": "player-49",
+  "player2": "player-07"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 25,
+  "winner": "player-38",
+  "player1": "player-38",
+  "player2": "player-45"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 26,
+  "winner": "player-16",
+  "player1": "player-16",
+  "player2": "player-29"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 27,
+  "winner": "player-25",
+  "player1": "player-80",
+  "player2": "player-25"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 28,
+  "winner": "player-55",
+  "player1": "player-55",
+  "player2": "player-57"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 29,
+  "winner": "player-53",
+  "player1": "player-77",
+  "player2": "player-53"
+ },
+ {
+  "round": 3,
+  "phase": 1,
+  "table": 30,
+  "winner": "player-44",
+  "player1": "player-44",
+  "player2": "player-81"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 1,
+  "winner": "player-09",
+  "player1": "player-09",
+  "player2": "player-10"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 2,
+  "winner": "player-06",
+  "player1": "player-23",
+  "player2": "player-06"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 3,
+  "winner": "player-11",
+  "player1": "player-02",
+  "player2": "player-11"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 4,
+  "winner": "player-05",
+  "player1": "player-05",
+  "player2": "player-19"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 5,
+  "winner": "player-14",
+  "player1": "player-30",
+  "player2": "player-14"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 6,
+  "winner": "player-20",
+  "player1": "player-40",
+  "player2": "player-20"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 7,
+  "winner": "player-08",
+  "player1": "player-08",
+  "player2": "player-33"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 8,
+  "winner": "player-27",
+  "player1": "player-27",
+  "player2": "player-26"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 9,
+  "winner": "player-01",
+  "player1": "player-01",
+  "player2": "player-35"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 10,
+  "winner": "player-21",
+  "player1": "player-21",
+  "player2": "player-37"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 11,
+  "winner": "player-22",
+  "player1": "player-42",
+  "player2": "player-22"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 12,
+  "winner": "player-07",
+  "player1": "player-24",
+  "player2": "player-07"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 13,
+  "winner": "player-13",
+  "player1": "player-13",
+  "player2": "player-34"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 14,
+  "winner": "player-12",
+  "player1": "player-36",
+  "player2": "player-12"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 15,
+  "winner": "player-03",
+  "player1": "player-38",
+  "player2": "player-03"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 16,
+  "winner": "player-18",
+  "player1": "player-18",
+  "player2": "player-43"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 17,
+  "winner": "player-04",
+  "player1": "player-04",
+  "player2": "player-44"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 18,
+  "winner": "player-25",
+  "player1": "player-56",
+  "player2": "player-25"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 19,
+  "winner": "player-15",
+  "player1": "player-55",
+  "player2": "player-15"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 20,
+  "winner": "player-45",
+  "player1": "player-60",
+  "player2": "player-45"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 21,
+  "winner": "player-16",
+  "player1": "player-16",
+  "player2": "player-52"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 22,
+  "winner": "player-31",
+  "player1": "player-31",
+  "player2": "player-49"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 23,
+  "winner": "player-17",
+  "player1": "player-17",
+  "player2": "player-48"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 24,
+  "winner": "player-39",
+  "player1": "player-61",
+  "player2": "player-39"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 25,
+  "winner": "player-29",
+  "player1": "player-81",
+  "player2": "player-29"
+ },
+ {
+  "round": 4,
+  "phase": 1,
+  "table": 26,
+  "winner": "player-57",
+  "player1": "player-57"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 1,
+  "winner": "player-05",
+  "player1": "player-05",
+  "player2": "player-06"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 2,
+  "winner": "player-09",
+  "player1": "player-11",
+  "player2": "player-09"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 3,
+  "winner": "player-07",
+  "player1": "player-22",
+  "player2": "player-07"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 4,
+  "winner": "player-10",
+  "player1": "player-10",
+  "player2": "player-01"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 5,
+  "winner": "player-03",
+  "player1": "player-03",
+  "player2": "player-21"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 6,
+  "winner": "player-12",
+  "player1": "player-12",
+  "player2": "player-18"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 7,
+  "winner": "player-02",
+  "player1": "player-02",
+  "player2": "player-20"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 8,
+  "winner": "player-13",
+  "player1": "player-27",
+  "player2": "player-13"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 9,
+  "winner": "player-08",
+  "player1": "player-14",
+  "player2": "player-08"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 10,
+  "winner": "player-16",
+  "player1": "player-16",
+  "player2": "player-34"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 11,
+  "winner": "player-17",
+  "player1": "player-17",
+  "player2": "player-31"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 12,
+  "winner": "player-24",
+  "player1": "player-40",
+  "player2": "player-24"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 13,
+  "winner": "player-04",
+  "player1": "player-04",
+  "player2": "player-38"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 14,
+  "winner": "player-30",
+  "player1": "player-30",
+  "player2": "player-39"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 15,
+  "winner": "player-15",
+  "player1": "player-25",
+  "player2": "player-15"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 16,
+  "winner": "player-26",
+  "player1": "player-26",
+  "player2": "player-45"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 17,
+  "winner": "player-29",
+  "player1": "player-57",
+  "player2": "player-29"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 18,
+  "winner": "player-44",
+  "player1": "player-56",
+  "player2": "player-44"
+ },
+ {
+  "round": 5,
+  "phase": 1,
+  "table": 19,
+  "winner": -1,
+  "player1": "player-61",
+  "player2": "player-81"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 1,
+  "winner": "player-05",
+  "player1": "player-09",
+  "player2": "player-05"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 2,
+  "winner": "player-03",
+  "player1": "player-08",
+  "player2": "player-03"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 3,
+  "winner": "player-10",
+  "player1": "player-11",
+  "player2": "player-10"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 4,
+  "winner": "player-07",
+  "player1": "player-12",
+  "player2": "player-07"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 5,
+  "winner": "player-02",
+  "player1": "player-02",
+  "player2": "player-13"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 6,
+  "winner": "player-06",
+  "player1": "player-06",
+  "player2": "player-27"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 7,
+  "winner": "player-01",
+  "player1": "player-01",
+  "player2": "player-21"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 8,
+  "winner": "player-04",
+  "player1": "player-20",
+  "player2": "player-04"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 9,
+  "winner": "player-15",
+  "player1": "player-26",
+  "player2": "player-15"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 10,
+  "winner": "player-16",
+  "player1": "player-22",
+  "player2": "player-16"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 11,
+  "winner": "player-17",
+  "player1": "player-17",
+  "player2": "player-18"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 12,
+  "winner": "player-14",
+  "player1": "player-24",
+  "player2": "player-14"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 13,
+  "winner": "player-31",
+  "player1": "player-31",
+  "player2": "player-44"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 14,
+  "winner": "player-25",
+  "player1": "player-40",
+  "player2": "player-25"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 15,
+  "winner": "player-29",
+  "player1": "player-29",
+  "player2": "player-39"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 16,
+  "winner": -1,
+  "player1": "player-56",
+  "player2": "player-61"
+ },
+ {
+  "round": 6,
+  "phase": 1,
+  "table": 17,
+  "winner": -1,
+  "player1": "player-57",
+  "player2": "player-81"
+ },
+ {
+  "phase": 2,
+  "round": 7,
+  "winner": "player-02",
+  "match": "T16-8",
+  "player1": "player-02",
+  "player2": "player-13"
+ },
+ {
+  "phase": 2,
+  "round": 7,
+  "winner": "player-06",
+  "match": "T16-3",
+  "player1": "player-06",
+  "player2": "player-15"
+ },
+ {
+  "phase": 2,
+  "round": 7,
+  "winner": "player-02",
+  "match": "T4-2",
+  "player1": "player-04",
+  "player2": "player-02"
+ },
+ {
+  "phase": 2,
+  "round": 7,
+  "winner": "player-04",
+  "match": "T8-3",
+  "player1": "player-04",
+  "player2": "player-07"
+ },
+ {
+  "phase": 2,
+  "round": 7,
+  "winner": "player-03",
+  "match": "T8-2",
+  "player1": "player-06",
+  "player2": "player-03"
+ },
+ {
+  "phase": 2,
+  "round": 7,
+  "winner": "player-03",
+  "match": "T16-4",
+  "player1": "player-03",
+  "player2": "player-14"
+ },
+ {
+  "phase": 2,
+  "round": 7,
+  "winner": "player-04",
+  "match": "T16-5",
+  "player1": "player-09",
+  "player2": "player-04"
+ },
+ {
+  "phase": 2,
+  "round": 7,
+  "winner": "player-01",
+  "match": "T4-1",
+  "player1": "player-01",
+  "player2": "player-03"
+ },
+ {
+  "phase": 2,
+  "round": 7,
+  "winner": "player-01",
+  "match": "T16-2",
+  "player1": "player-11",
+  "player2": "player-01"
+ },
+ {
+  "phase": 2,
+  "round": 7,
+  "winner": "player-05",
+  "match": "T16-1",
+  "player1": "player-05",
+  "player2": "player-16"
+ },
+ {
+  "phase": 2,
+  "round": 7,
+  "winner": "player-01",
+  "match": "T8-1",
+  "player1": "player-05",
+  "player2": "player-01"
+ },
+ {
+  "phase": 2,
+  "round": 7,
+  "winner": "player-07",
+  "match": "T16-6",
+  "player1": "player-07",
+  "player2": "player-12"
+ },
+ {
+  "phase": 2,
+  "round": 7,
+  "winner": "player-08",
+  "match": "T16-7",
+  "player1": "player-10",
+  "player2": "player-08"
+ },
+ {
+  "phase": 2,
+  "round": 7,
+  "winner": "player-02",
+  "match": "T8-4",
+  "player1": "player-08",
+  "player2": "player-02"
+ },
+ {
+  "phase": 2,
+  "round": 7,
+  "winner": "player-01",
+  "match": "T2-1",
+  "player1": "player-01",
+  "player2": "player-02"
+ }
+]

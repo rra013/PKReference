@@ -44,9 +44,21 @@ spring:
 pkref:
   limitless:
     game: ${LIMITLESS_GAME:VGC}      # check GET /games for the right id
-    format: ${LIMITLESS_FORMAT:}
+    # Comma-separated Limitless format ids ("M-C,M-B"); empty lists every format of the game.
+    # LIMITLESS_FORMAT, the old single format, still works.
+    formats: ${LIMITLESS_FORMATS:${LIMITLESS_FORMAT:}}
     ingest-enabled: true
     poll-interval: 30m
+    # How far back each poll walks the list. Set it longer once (say 120d) to backfill; at
+    # three requests an event, a backfill takes hours under the throttle.
+    lookback: ${LIMITLESS_LOOKBACK:7d}
+    max-pages: 40
+    # The app's rules (TeamCorpusConfiguration): events of 16 or more, final 48 hours after they
+    # start, fetched again every 6 hours until then.
+    min-players: 16
+    settle-after: 48h
+    refetch-after: 6h
+    pending-timeout: 24h
     # Limitless allows 50 requests in 5 minutes without a key. Leave room for the app,
     # which shares the address when it runs on the same machine.
     requests-per-window: 40

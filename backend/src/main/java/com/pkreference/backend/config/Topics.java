@@ -10,6 +10,7 @@ import org.springframework.kafka.config.TopicBuilder;
 public class Topics {
     public static final String TOURNAMENTS_DISCOVERED = "tournaments.discovered";
     public static final String STANDINGS_FETCHED = "standings.fetched";
+    public static final String PAIRINGS_FETCHED = "pairings.fetched";
     public static final String POKEMON_USAGE = "pokemon.usage";
 
     private static final int PARTITIONS = 3;
@@ -42,6 +43,23 @@ public class Topics {
     @Bean
     NewTopic tournamentsDiscoveredDlt() {
         return TopicBuilder.name(TOURNAMENTS_DISCOVERED + ".DLT").partitions(PARTITIONS).replicas(1).build();
+    }
+
+    /** Every event's matches, kept for good as standings.fetched is. */
+    @Bean
+    NewTopic pairingsFetched() {
+        return TopicBuilder.name(PAIRINGS_FETCHED).partitions(PARTITIONS).replicas(1)
+                .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_COMPACT)
+                .config(TopicConfig.RETENTION_MS_CONFIG, "-1")
+                .config(TopicConfig.MAX_MESSAGE_BYTES_CONFIG, MAX_MESSAGE_BYTES)
+                .build();
+    }
+
+    @Bean
+    NewTopic pairingsFetchedDlt() {
+        return TopicBuilder.name(PAIRINGS_FETCHED + ".DLT").partitions(PARTITIONS).replicas(1)
+                .config(TopicConfig.MAX_MESSAGE_BYTES_CONFIG, MAX_MESSAGE_BYTES)
+                .build();
     }
 
     /** Takes the same records as standings.fetched, with the failure in their headers. */

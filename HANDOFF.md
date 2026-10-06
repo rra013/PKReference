@@ -93,12 +93,16 @@ effects (`HeldItem.builtIns`, with `typeBoostingItemMap` and
 their own code, and the damage engines.
 
 **`backend/`**: an optional Java 21 / Spring Boot service, separate from the
-app ([`backend/README.md`](backend/README.md)). It polls Limitless every 30
-minutes, within its keyless limit of 50 requests in 5 minutes, streams
-tournaments and standings through Kafka, counts usage into Postgres, and
-serves it at `GET /api/usage`. `standings.fetched` keeps every event for good,
-so the counts can be rebuilt from it. `docker compose up -d` runs Kafka and
-Postgres, with their data in volumes. Its `NameStandardizer` reads every repo-root
+app ([`backend/README.md`](backend/README.md)). Every 30 minutes it walks
+Limitless's tournament list back through a lookback (longer once to backfill),
+within its keyless limit of 50 requests in 5 minutes, and fetches each event's
+details, standings and matches by the app's rules (16 players or more, final
+48 hours after the start). It streams them through Kafka, stores every team and
+match in Postgres (the team store), counts usage from final standings, and
+serves the counts at `GET /api/usage`. `standings.fetched` and
+`pairings.fetched` keep every event for good, so anything built from them can
+be rebuilt. `docker compose up -d` runs Kafka and Postgres, with their data in
+volumes; the store's tests also run on Postgres through Testcontainers. Its `NameStandardizer` reads every repo-root
 `champions-*.json` and `showdown-champions-data.json`, which Maven bundles at
 build time, so a new regulation needs nothing there. `mvn verify` runs its tests. The app doesn't
 call it yet (see [What's next](#whats-next)).
