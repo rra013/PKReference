@@ -8,7 +8,8 @@
 //  the same two calls they make to Limitless, which the server answers in
 //  Limitless's own shapes. When the server can't answer, they ask Limitless,
 //  as they always have. The switch is off by default
-//  (BackendIntegration-PLAN.md §4.4).
+//  (BackendIntegration-PLAN.md §4.4). The Meta tab's insights come from the
+//  same server, through MetaAPI.swift and MetaCache.swift.
 //
 
 import Foundation
@@ -47,11 +48,15 @@ nonisolated enum MetaServerSettings {
 nonisolated enum MetaServerError: LocalizedError, Equatable {
     case http(status: Int)
     case notHTTP
+    /// The answer came, but not in a shape this version of the app reads.
+    case unreadable
 
     var errorDescription: String? {
         switch self {
         case .http(let status): return "The server answered HTTP \(status)."
         case .notHTTP: return "The server's answer wasn't HTTP."
+        case .unreadable:
+            return "The server's answer is in a format this version can't read. Update the app or the server."
         }
     }
 }
@@ -62,20 +67,46 @@ nonisolated struct MetaServerClient: Sendable {
     let baseURL: URL
     var session: URLSession = MetaServerClient.session
 
-    static let session: URLSession = {
+    /// No URL cache. The server says its answers may be reused for 15
+    /// minutes, and URLSession's cache did, so Settings' connection test and
+    /// Team Search's refresh missed new events for that long. MetaCache is
+    /// the app's one cache of the server's answers, and decides when to ask.
+    static let session = URLSession(configuration: configuration())
+
+    static func configuration() -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 8
         configuration.timeoutIntervalForResource = 30
-        return URLSession(configuration: configuration)
-    }()
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return configuration
+    }
+
+    /// An answer, or word that the one the app has is still current.
+    enum Fetched: Sendable, Equatable {
+        case fresh(Data, etag: String?)
+        case notModified
+    }
 
     func get<T: Decodable>(_ type: T.Type, path: String, query: [URLQueryItem] = []) async throws -> T {
         var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false)!
         if !query.isEmpty { components.queryItems = query }
-        let (data, response) = try await session.data(from: components.url!)
-        guard let http = response as? HTTPURLResponse else { throw MetaServerError.notHTTP }
-        guard (200..<300).contains(http.statusCode) else { throw MetaServerError.http(status: http.statusCode) }
+        guard case .fresh(let data, _) = try await fetch(components.url!, etag: nil) else {
+            throw MetaServerError.http(status: 304)
+        }
         return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    /// GETs `url`, sending `etag` as If-None-Match, so an unchanged answer
+    /// comes back as `.notModified` with no body.
+    func fetch(_ url: URL, etag: String?) async throws -> Fetched {
+        var request = URLRequest(url: url)
+        if let etag { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw MetaServerError.notHTTP }
+        if http.statusCode == 304, etag != nil { return .notModified }
+        guard (200..<300).contains(http.statusCode) else { throw MetaServerError.http(status: http.statusCode) }
+        return .fresh(data, etag: http.value(forHTTPHeaderField: "ETag"))
     }
 }
 
@@ -114,30 +145,5 @@ nonisolated struct PreferredCorpusFetcher: TeamCorpusFetching {
             return standings
         }
         return try await limitless.standings(tournamentID: tournamentID)
-    }
-}
-
-// MARK: - Settings' connection test
-
-/// The server's `/v1/formats`, for Settings to say what it has.
-nonisolated struct MetaServerFormats: Decodable, Sendable {
-    let formats: [Format]
-
-    struct Format: Decodable, Sendable {
-        let format: String
-        let events: Int
-        let teams: Int
-        let lastFetched: String?
-    }
-
-    /// "M-C: 212 events, 9,410 teams" for each format, newest first.
-    var summary: String {
-        guard !formats.isEmpty else { return "Connected, but the server has no events yet." }
-        return formats.map { "\($0.format): \($0.events.formatted()) events, \($0.teams.formatted()) teams" }
-            .joined(separator: "\n")
-    }
-
-    static func fetch(from baseURL: URL) async throws -> MetaServerFormats {
-        try await MetaServerClient(baseURL: baseURL).get(MetaServerFormats.self, path: "v1/formats")
     }
 }

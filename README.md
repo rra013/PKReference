@@ -313,8 +313,8 @@ back to Limitless whenever the server can't be reached.
   regulation's stats are used, and labelled as such.
 - **Data:** each event's results are downloaded once and cached; pull to
   refresh for new events. If Limitless is limiting requests, the app waits
-  and retries. Smogon's stats are cached per month. Settings → Clear Team
-  Search Data frees both caches.
+  and retries. Smogon's stats are cached per month. Settings → Clear Tournament
+  Data frees both caches, and the PK Reference server's answers.
 
 ### Settings
 
@@ -323,8 +323,9 @@ back to Limitless whenever the server can't be reached.
 - **Default generation:** the Mon Index list the app opens with.
 - **Champions regulation:** the active format. New installs default to the
   newest regulation.
-- **Data management:** re-download the Pokémon and move data, clear Team
-  Search's cached tournament data, or reset all data.
+- **Data management:** re-download the Pokémon and move data, clear the
+  cached tournament data (Team Search's, Smogon's and the PK Reference
+  server's), or reset all data.
 - **PK Reference Server (Beta):** off by default. With it on, Team Search
   and the Problem Solver read tournament teams from a PK Reference server
   (`backend/`) at the address given, `http://localhost:8080` by default, and
@@ -481,7 +482,7 @@ project has no Swift package dependencies.
    later launches work offline, except for Tournaments and Team Search's new
    events. The Mac app is sandboxed, with outgoing network access.
 
-**Tests:** 1,285 tests written with Swift Testing. They cover the damage engines
+**Tests:** 1,295 tests written with Swift Testing. They cover the damage engines
 and the port, the battle engine by mechanic tier, the EV and two-hit solvers,
 speed tiers, paste parsing and import, Champions filters and legality, RNG
 tools, ML parity, the tournament import and data store, Team Search's parser,

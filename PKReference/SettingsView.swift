@@ -266,11 +266,12 @@ struct SettingsView: View {
                         Task {
                             try? await TeamCorpusStore.shared.clearCache()
                             try? await SmogonUsageStore.shared.clearCache()
+                            try? await MetaCache.shared.clear()
                             teamSearchCacheBytes = await teamSearchCacheSize()
                         }
                     } label: {
                         HStack {
-                            Label("Clear Team Search Data", systemImage: "trash")
+                            Label("Clear Tournament Data", systemImage: "trash")
                             Spacer()
                             if let bytes = teamSearchCacheBytes {
                                 Text(bytes.formatted(.byteCount(style: .file)))
@@ -360,9 +361,15 @@ struct SettingsView: View {
         metaServerStatus = nil
         Task {
             do {
-                metaServerStatus = try await MetaServerFormats.fetch(from: url).summary
+                // Always asks the server, so the counts are today's.
+                let answer = try await MetaInsights(baseURL: url).load(MetaAPI.formats, force: true)
+                if let failure = answer.refreshError {
+                    metaServerStatus = "Couldn't reach \(url.absoluteString). \(failure.message)"
+                } else {
+                    metaServerStatus = answer.value.summary
+                }
             } catch {
-                metaServerStatus = "Couldn't reach \(url.absoluteString): \(error.localizedDescription)"
+                metaServerStatus = "Couldn't reach \(url.absoluteString). \(MetaFailure(error).message)"
             }
             isTestingMetaServer = false
         }
@@ -433,15 +440,18 @@ struct SettingsView: View {
         Task {
             try? await TeamCorpusStore.shared.clearCache()
             try? await SmogonUsageStore.shared.clearCache()
+            try? await MetaCache.shared.clear()
             teamSearchCacheBytes = 0
         }
     }
 
-    /// Team Search's tournament teams plus its Smogon usage stats.
+    /// Team Search's tournament teams and Smogon usage stats, and the PK
+    /// Reference server's answers.
     private func teamSearchCacheSize() async -> Int {
         let teams = await TeamCorpusStore.shared.cacheSize()
         let usage = await SmogonUsageStore.shared.cacheSize()
-        return teams + usage
+        let meta = await MetaCache.shared.size()
+        return teams + usage + meta
     }
 }
 
