@@ -9,7 +9,8 @@ Limitless --poll--> EventDiscovery    --> tournaments.discovered
                     EventFetcher      --> standings.fetched + pairings.fetched (details, standings, matches)
                     TeamStoreConsumer --> Postgres: event, event_phase, team, team_member(_move), pairing
                     UsageConsumer     --> Postgres counters + pokemon.usage (compacted)
-                    UsageController   --> GET /api/usage?format=...
+                    MetaController    --> GET /v1/... (insights from the team store)
+                    UsageController   --> GET /api/usage?format=... (the older all-time counts)
 ```
 
 ## Run
@@ -34,6 +35,25 @@ tables (`src/main/resources/db/migration`).
 The counters used to be in an H2 file under `backend/data/`. They move to Postgres and start empty, so
 delete `backend/data/`. The first `docker compose up -d` after this change recreates the Kafka container
 with its volume; the topics it held inside the container are lost, as on any recreate before.
+
+### API v1
+Read-only and the same for everyone. Responses may be reused for 15 minutes (`Cache-Control`), carry a
+weak ETag (a matching `If-None-Match` gets a 304), and are gzipped. Each says what it covers: the window,
+when it was worked out, and how many events, teams and top-cut teams it rests on.
+```sh
+curl 'localhost:8080/v1/formats'
+curl 'localhost:8080/v1/formats/M-C/pokemon?window=30d'                # 14d, 30d or regulation
+curl 'localhost:8080/v1/formats/M-C/pokemon/arcanine:hisui?window=30d'
+```
+- The list: each Pokémon's `usage` (share of teams), `topCutUsage` (share of top-cut teams, null when the
+  window had no top cut) and `trend` (usage in the last 14 days less the 14 before; null when either
+  period has under 50 teams).
+- A Pokémon's page: its items, abilities, natures, moves, Mega Stones and teammates, its 10 most common
+  whole sets, and its usage week by week.
+
+`MetaService` works these out from the team store when asked, and keeps each result until the store
+changes (`store_version`, which every write bumps in its transaction) or the hour does. Shares are 0 to 1.
+Definitions are in [the plan](../BackendIntegration-PLAN.md) (§4.2).
 
 ### Finding events, and backfilling
 Every 30 minutes `EventDiscovery` walks each format's tournament list back through the lookback

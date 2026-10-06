@@ -43,6 +43,7 @@ public class TeamStore {
 
         // Cascades to its phases, teams, members and moves.
         jdbc.update("delete from event where id = ?", t.id());
+        bumpVersion();
         TournamentDetails d = fetched.details();
         jdbc.update("""
                 insert into event (id, game, format, name, event_date, players, organizer, platform, online,
@@ -101,6 +102,7 @@ public class TeamStore {
         if (isStale(fetched.fetchedAt(), "select fetched_at from pairing_fetch where event_id = ?", id)) return;
 
         jdbc.update("delete from pairing where event_id = ?", id);
+        bumpVersion();
         jdbc.update("delete from pairing_fetch where event_id = ?", id);
         jdbc.update("insert into pairing_fetch (event_id, fetched_at) values (?, ?)", id, timestamp(fetched.fetchedAt()));
         List<Pairing> pairings = fetched.pairings() == null ? List.of() : fetched.pairings();
@@ -113,6 +115,11 @@ public class TeamStore {
         jdbc.batchUpdate("""
                 insert into pairing (event_id, ordinal, round, phase, table_no, label, player1, player2, winner, result)
                 values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", rows);
+    }
+
+    /** Committed with the write, so readers see a new version exactly when they see new rows. */
+    private void bumpVersion() {
+        jdbc.update("update store_version set version = version + 1 where id = 1");
     }
 
     /** Whether a fetch is older than the one already stored. Records from before fetchedAt existed never are. */

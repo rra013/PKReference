@@ -63,3 +63,10 @@ pkref:
     # which shares the address when it runs on the same machine.
     requests-per-window: 40
     window: 5m
+
+# The /v1 responses are JSON lists; gzip them.
+server:
+  compression:
+    enabled: true
+    mime-types: application/json
+    min-response-size: 2KB
