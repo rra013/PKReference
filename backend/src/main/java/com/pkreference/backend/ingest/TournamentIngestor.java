@@ -1,5 +1,6 @@
 package com.pkreference.backend.ingest;
 
+import com.pkreference.backend.config.KafkaSends;
 import com.pkreference.backend.config.Topics;
 import com.pkreference.backend.model.Events.Tournament;
 import com.pkreference.backend.model.Events.TournamentDiscovered;
@@ -43,8 +44,13 @@ public class TournamentIngestor {
         int sent = 0;
         for (Tournament t : page) {
             if (processed.existsById(t.id())) continue;
-            kafka.send(Topics.TOURNAMENTS_DISCOVERED, t.id(), new TournamentDiscovered(t));
-            sent++;
+            try {
+                KafkaSends.await(kafka.send(Topics.TOURNAMENTS_DISCOVERED, t.id(), new TournamentDiscovered(t)));
+                sent++;
+            } catch (RuntimeException e) {
+                // Not processed, so the next poll offers it again.
+                log.error("Could not queue tournament {}", t.id(), e);
+            }
         }
         log.info("Ingest: {} tournaments listed, {} new", page.size(), sent);
     }

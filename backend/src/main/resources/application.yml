@@ -1,15 +1,26 @@
 spring:
   application:
     name: pkreference-backend
+  # Postgres from docker-compose.yml. Flyway owns the schema (src/main/resources/db/migration);
+  # Hibernate only checks the entities against it.
   datasource:
-    url: jdbc:h2:file:./data/pkref;AUTO_SERVER=TRUE   # swap for Postgres in prod (driver already on classpath)
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/pkref}
+    username: ${DATABASE_USER:pkref}
+    password: ${DATABASE_PASSWORD:pkref}
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
+    open-in-view: false
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    admin:
+      # Topics.java's settings (retention, sizes) reach topics that already exist.
+      modify-topic-configs: true
     producer:
       acks: all
+      # Standings are about 1.2 KB of JSON a player; compressed, a big event stays well
+      # under the topic's limit.
+      compression-type: zstd
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
@@ -17,9 +28,15 @@ spring:
         max.request.size: 5242880        # full decklists for large events
     consumer:
       auto-offset-reset: earliest
+      # The standings fetcher waits its turn under Limitless's limit, up to 5 minutes a request.
+      # A consumer that goes longer than max.poll.interval.ms between polls is dropped and its
+      # records sent again (fetched again, spending the limit), so take few at a time and allow
+      # long gaps.
+      max-poll-records: 10
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
+        max.poll.interval.ms: 900000
         spring.json.trusted.packages: com.pkreference.backend.model
         max.partition.fetch.bytes: 5242880
         fetch.max.bytes: 52428800
@@ -30,3 +47,7 @@ pkref:
     format: ${LIMITLESS_FORMAT:}
     ingest-enabled: true
     poll-interval: 30m
+    # Limitless allows 50 requests in 5 minutes without a key. Leave room for the app,
+    # which shares the address when it runs on the same machine.
+    requests-per-window: 40
+    window: 5m

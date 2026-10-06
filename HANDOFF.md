@@ -94,8 +94,11 @@ their own code, and the damage engines.
 
 **`backend/`**: an optional Java 21 / Spring Boot service, separate from the
 app ([`backend/README.md`](backend/README.md)). It polls Limitless every 30
-minutes, streams tournaments and standings through Kafka, and serves usage
-counts at `GET /api/usage`. Its `NameStandardizer` reads every repo-root
+minutes, within its keyless limit of 50 requests in 5 minutes, streams
+tournaments and standings through Kafka, counts usage into Postgres, and
+serves it at `GET /api/usage`. `standings.fetched` keeps every event for good,
+so the counts can be rebuilt from it. `docker compose up -d` runs Kafka and
+Postgres, with their data in volumes. Its `NameStandardizer` reads every repo-root
 `champions-*.json` and `showdown-champions-data.json`, which Maven bundles at
 build time, so a new regulation needs nothing there. `mvn verify` runs its tests. The app doesn't
 call it yet (see [What's next](#whats-next)).

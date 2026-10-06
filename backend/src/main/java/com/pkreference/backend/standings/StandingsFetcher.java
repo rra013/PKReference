@@ -1,5 +1,6 @@
 package com.pkreference.backend.standings;
 
+import com.pkreference.backend.config.KafkaSends;
 import com.pkreference.backend.config.Topics;
 import com.pkreference.backend.ingest.LimitlessClient;
 import com.pkreference.backend.model.Events.StandingsFetched;
@@ -28,6 +29,7 @@ public class StandingsFetcher {
         var t = event.tournament();
         var standings = client.standings(t.id());
         log.info("Fetched {} standings for {}", standings.size(), t.id());
-        kafka.send(Topics.STANDINGS_FETCHED, t.id(), new StandingsFetched(t, standings));
+        // A failed send throws, so the record retries and then goes to the DLT.
+        KafkaSends.await(kafka.send(Topics.STANDINGS_FETCHED, t.id(), new StandingsFetched(t, standings)));
     }
 }

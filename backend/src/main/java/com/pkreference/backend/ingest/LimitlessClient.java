@@ -5,12 +5,16 @@ import com.pkreference.backend.model.Events.Standing;
 import com.pkreference.backend.model.Events.Tournament;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
+import java.io.InterruptedIOException;
+import java.time.Clock;
 import java.util.List;
 
 /** Thin client for the Limitless play API, same endpoints as the app's LimitlessAPI actor. */
@@ -22,9 +26,27 @@ public class LimitlessClient {
     private final RestClient http;
     private final LimitlessProperties props;
 
+    @Autowired
     public LimitlessClient(RestClient.Builder builder, LimitlessProperties props) {
+        this(builder, props, new RequestThrottle(props.requestsPerWindow(), props.window(),
+                Clock.systemUTC(), d -> Thread.sleep(d.toMillis())));
+    }
+
+    LimitlessClient(RestClient.Builder builder, LimitlessProperties props, RequestThrottle throttle) {
         this.props = props;
-        this.http = builder.baseUrl(props.baseUrl()).build();
+        // Every request, retries included, waits its turn and reports Limitless's count back.
+        ClientHttpRequestInterceptor throttled = (request, body, execution) -> {
+            try {
+                throttle.acquire();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new InterruptedIOException("Interrupted waiting to call Limitless");
+            }
+            var response = execution.execute(request, body);
+            throttle.observe(response.getHeaders().getFirst("ratelimit"));
+            return response;
+        };
+        this.http = builder.baseUrl(props.baseUrl()).requestInterceptor(throttled).build();
     }
 
     public List<Tournament> tournaments(int page) {
