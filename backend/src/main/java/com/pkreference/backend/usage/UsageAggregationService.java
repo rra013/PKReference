@@ -36,6 +36,8 @@ public class UsageAggregationService {
      */
     @Transactional
     public List<UsageUpdated> apply(StandingsFetched event) {
+        // Counted once, so only once its standings won't change; the fetcher fetches it again until then.
+        if (!event.isFinal()) return List.of();
         var tournament = event.tournament();
         if (processed.existsById(tournament.id())) return List.of();
 

@@ -1,8 +1,10 @@
 package com.pkreference.backend.ingest;
 
 import com.pkreference.backend.config.LimitlessProperties;
+import com.pkreference.backend.model.Events.Pairing;
 import com.pkreference.backend.model.Events.Standing;
 import com.pkreference.backend.model.Events.Tournament;
+import com.pkreference.backend.model.Events.TournamentDetails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,18 +51,34 @@ public class LimitlessClient {
         this.http = builder.baseUrl(props.baseUrl()).requestInterceptor(throttled).build();
     }
 
-    public List<Tournament> tournaments(int page) {
+    /** One page of the game's tournaments, newest first: all formats when format is null. */
+    public List<Tournament> tournaments(String format, int page) {
         return withRetry(() -> http.get().uri(uri -> {
             var b = uri.path("/tournaments").queryParam("limit", props.pageSize()).queryParam("page", page);
             if (props.game() != null && !props.game().isBlank()) b.queryParam("game", props.game());
-            if (props.format() != null && !props.format().isBlank()) b.queryParam("format", props.format());
+            if (format != null && !format.isBlank()) b.queryParam("format", format);
             return b.build();
         }).retrieve().body(new ParameterizedTypeReference<List<Tournament>>() {}));
+    }
+
+    public TournamentDetails details(String tournamentId) {
+        return withRetry(() -> http.get().uri("/tournaments/{id}/details", tournamentId)
+                .retrieve().body(TournamentDetails.class));
     }
 
     public List<Standing> standings(String tournamentId) {
         return withRetry(() -> http.get().uri("/tournaments/{id}/standings", tournamentId)
                 .retrieve().body(new ParameterizedTypeReference<List<Standing>>() {}));
+    }
+
+    /** The event's matches; none for an event Limitless has no pairings for (HTTP 404). */
+    public List<Pairing> pairings(String tournamentId) {
+        try {
+            return withRetry(() -> http.get().uri("/tournaments/{id}/pairings", tournamentId)
+                    .retrieve().body(new ParameterizedTypeReference<List<Pairing>>() {}));
+        } catch (HttpClientErrorException.NotFound e) {
+            return List.of();
+        }
     }
 
     /** Honors 429 + Retry-After (capped at 30s), like LimitlessAPI.swift. */

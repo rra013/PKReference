@@ -81,6 +81,13 @@ What stands in the way of insight:
      fetched again on every poll.
    - **The first poll makes 51 requests at once** (the list and 50
      standings), over Limitless's limit of 50 in 5 minutes.
+
+   Phase 1a found two more:
+   - **Events were counted while they ran.** Page 1 of the list includes
+     events in progress; their part-way standings were counted, marked
+     done, and never fetched again.
+   - **H2 passed SQL that Postgres rejects** (a column named `placing`, a
+     reserved word there), so the store's tests also run on Postgres.
 6. **It doesn't fetch match results**, though Limitless has them.
 
 ## 3. Data sources
@@ -301,9 +308,9 @@ date. Then:
 
 ## 6. Phases
 
-Each phase is one PR into `backend-integration`.
+Each phase is one PR into `backend-integration`, or two where it's large.
 
-0. **Make it real** (backend only).
+0. **Make it real** (backend only). Done: #94, and the CI job in #95.
    - Run it once against Kafka (`docker compose`) and live Limitless,
      gently, and fix what breaks.
    - A throttle in `LimitlessClient` that keeps to 50 requests in 5
@@ -312,11 +319,16 @@ Each phase is one PR into `backend-integration`.
    - Postgres and Flyway in `docker-compose.yml`.
    - Compacted, never-deleted fetched topics.
    - A GitHub Actions job running `mvn verify` (the repo has no CI).
-1. **Keep everything, normalize once.**
-   - `TeamStore` tables (events, teams, members, matches).
-   - `TeamNormalizer` on the app's vocabulary.
-   - A throttled, resumable backfill of the current and previous regulation.
-   - Pairings and details fetched and stored.
+1. **Keep everything, normalize once.** Two PRs:
+   - **1a, keep everything:**
+     - `EventDiscovery` walks each format's list back through a lookback,
+       with the app's rules; a longer lookback, once, is the backfill.
+     - `EventFetcher` fetches details, standings and pairings.
+     - `TeamStore` tables: events, phases, teams, members, moves, matches.
+     - The usage counters count only final standings. Before, an event
+       fetched while it ran was counted once, part-way, and never fixed.
+   - **1b, normalize once:** `TeamNormalizer` on the app's vocabulary, with
+     golden files both test suites read.
 2. **Insight projections and API v1.**
    - Usage windows, top-cut rate, trends, cores, full sets, win rates, and a
      first version of archetypes.

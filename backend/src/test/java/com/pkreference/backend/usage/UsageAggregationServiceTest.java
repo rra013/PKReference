@@ -1,6 +1,7 @@
 package com.pkreference.backend.usage;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pkreference.backend.model.Events.StandingsFetched;
 import com.pkreference.backend.standardize.NameStandardizer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,6 +66,21 @@ class UsageAggregationServiceTest {
 
         assertThat(replay).isEmpty();
         assertThat(count(UsageCounter.SPECIES, "incineroar", "")).isEqualTo(4);
+    }
+
+    /** Standings that may still change are left until they're final, so they're counted once. */
+    @Test
+    void unsettledStandingsWait() {
+        var final_ = Fixtures.tournament("t1");
+        var unsettled = new StandingsFetched(final_.tournament(), final_.standings(), null,
+                java.time.Instant.parse("2026-09-01T02:00:00Z"), false);
+
+        assertThat(service.apply(unsettled)).isEmpty();
+        assertThat(count(UsageCounter.TEAMS, "*", "")).isZero();
+
+        service.apply(new StandingsFetched(final_.tournament(), final_.standings(), null,
+                java.time.Instant.parse("2026-09-03T02:00:00Z"), true));
+        assertThat(count(UsageCounter.TEAMS, "*", "")).isEqualTo(4);
     }
 
     @Test

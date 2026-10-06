@@ -8,6 +8,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.startsWith;
@@ -22,7 +23,7 @@ class LimitlessClientTest {
         var throttle = new RequestThrottle(40, Duration.ofMinutes(5), clock, clock::sleep);
         var builder = RestClient.builder();
         var server = MockRestServiceServer.bindTo(builder).build();
-        var props = new LimitlessProperties(null, "VGC", "M-C", 0, false, null, 0, null);
+        var props = LimitlessProperties.defaults("VGC", List.of("M-C"));
         var client = new LimitlessClient(builder, props, throttle);
 
         var spent = new HttpHeaders();
@@ -32,7 +33,7 @@ class LimitlessClientTest {
         server.expect(requestTo("https://play.limitlesstcg.com/api/tournaments/abc/standings"))
                 .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
 
-        assertThat(client.tournaments(1)).isEmpty();
+        assertThat(client.tournaments("M-C", 1)).isEmpty();
         assertThat(clock.slept).isZero();
         assertThat(client.standings("abc")).isEmpty();
         assertThat(clock.slept).isEqualTo(Duration.ofSeconds(90));
