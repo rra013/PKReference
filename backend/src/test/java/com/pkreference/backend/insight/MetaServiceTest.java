@@ -168,6 +168,63 @@ class MetaServiceTest {
         assertThat(second.record().losses()).isEqualTo(13);
         // Each team is in one archetype at most.
         assertThat(archetypes.archetypes().stream().mapToInt(a -> a.teams()).sum() + archetypes.other()).isEqualTo(83);
+        // Two cores' two most-used members are Rillaboom and Incineroar: the one with fewer teams adds its third.
+        assertThat(archetypes.archetypes()).extracting(MetaResponses.Archetype::name).containsExactly(
+                "rillaboom+gholdengo", "gholdengo+raichu", "rillaboom+incineroar", "rillaboom+incineroar+gholdengo",
+                "incineroar+raichu");
+        assertThat(archetypes.archetypes().get(3).id()).isEqualTo("gholdengo+incineroar+raichu+rillaboom");
+    }
+
+    @Test
+    void anArchetypesPage() {
+        var page = meta.archetype("M-C", "garchomp+gholdengo+rillaboom+volcarona", MetaWindow.DAYS_30);
+        assertThat(page.archetype().name()).isEqualTo("rillaboom+gholdengo");
+        assertThat(page.sample().teams()).isEqualTo(83);
+        // Its five best-placed teams of nine.
+        assertThat(page.examples()).extracting(MetaResponses.ExampleTeam::placing).containsExactly(19, 23, 26, 33, 46);
+        var best = page.examples().get(0);
+        assertThat(best.player()).isEqualTo("Player 19");
+        assertThat(best.eventName()).isEqualTo("Test Event");
+        assertThat(best.players()).isEqualTo(83);
+        assertThat(best.wins()).isEqualTo(3);
+        assertThat(best.losses()).isEqualTo(1);
+        assertThat(best.members()).hasSize(6);
+        assertThat(best.members().get(0)).isEqualTo(new MetaResponses.ExampleMember("gholdengo", "Gholdengo",
+                "Life Orb", "Good as Gold", "Modest", List.of("Protect", "Shadow Ball", "Nasty Plot", "Make It Rain")));
+        assertThat(best.members()).extracting(MetaResponses.ExampleMember::key)
+                .contains("garchomp", "gholdengo", "rillaboom", "volcarona");
+
+        assertThatThrownBy(() -> meta.archetype("M-C", "a+b+c+d", MetaWindow.DAYS_30))
+                .isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
+    void events() {
+        put("older", "2026-09-01T18:00:00.000Z", 83);
+        var events = meta.events("M-C", 10);
+        assertThat(events.events()).extracting(MetaResponses.EventSummary::id).containsExactly("event-83", "older");
+        var newest = events.events().get(0);
+        assertThat(newest.name()).isEqualTo("Test Event");
+        assertThat(newest.date()).isEqualTo(Instant.parse("2026-10-05T18:00:00Z"));
+        assertThat(newest.players()).isEqualTo(83);
+        assertThat(newest.standingsFinal()).isTrue();
+        assertThat(newest.topCutPlayers()).isEqualTo(16);
+        assertThat(newest.winner()).isEqualTo(new MetaResponses.EventWinner("Player 01", 8, 2, 0,
+                List.of("grimmsnarl", "golisopod", "pelipper", "charizard", "basculegion", "archaludon")));
+        assertThat(meta.events("M-C", 1).events()).hasSize(1);
+        assertThat(meta.events("M-B", 10).events()).isEmpty();
+    }
+
+    @Test
+    void namesAreUnique() {
+        var record = new WinRecord(0, 0, 0, 0, null, null, null);
+        var named = MetaService.named(List.of(
+                new MetaResponses.Archetype("a+b+c+d", null, List.of("a", "b", "c", "d"), 9, 0, 0, null, record, List.of()),
+                new MetaResponses.Archetype("a+b+e+f", null, List.of("a", "b", "e", "f"), 8, 0, 0, null, record, List.of()),
+                new MetaResponses.Archetype("a+b+e+g", null, List.of("a", "b", "e", "g"), 7, 0, 0, null, record, List.of()),
+                new MetaResponses.Archetype("b+c+g+h", null, List.of("b", "a", "g", "h"), 6, 0, 0, null, record, List.of())));
+        assertThat(named).extracting(MetaResponses.Archetype::name)
+                .containsExactly("a+b", "a+b+e", "a+b+e+g", "b+a");
     }
 
     private MetaResponses.PokemonList list() {

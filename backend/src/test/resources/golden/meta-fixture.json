@@ -1,0 +1,2843 @@
+{
+  "about" : "The PK Reference server's insights for the fixture event (limitless/event-83: M-C, 83 players, 2026-10-05), as MetaService works them out at 2026-10-06T12:00:00Z in the 30-day window. Recorded by the backend's MetaGoldenFileTest, which checks it; the app's version worked out on the device checks against it too, so the two give the same numbers. \"event\" has the event alone. \"trends\" adds a copy of its first 60 teams dated 2026-09-15 (three weeks earlier), so both fortnights have 50 teams or more. Items, abilities, natures and moves are standardized by NameStandardizer; species keys are the app's (golden/species-identity.json). Shares are 0 to 1, rounded to 4 places; lists are cut to the server's lengths (12 values, 10 sets, 20 cores).",
+  "event" : {
+    "sample" : {
+      "events" : 1,
+      "teams" : 83
+    },
+    "pokemon" : [ {
+      "key" : "rillaboom",
+      "teams" : 44,
+      "usage" : 0.5301
+    }, {
+      "key" : "incineroar",
+      "teams" : 33,
+      "usage" : 0.3976
+    }, {
+      "key" : "gholdengo",
+      "teams" : 28,
+      "usage" : 0.3373
+    }, {
+      "key" : "raichu",
+      "teams" : 28,
+      "usage" : 0.3373
+    }, {
+      "key" : "garchomp",
+      "teams" : 26,
+      "usage" : 0.3133
+    }, {
+      "key" : "sneasler",
+      "teams" : 24,
+      "usage" : 0.2892
+    }, {
+      "key" : "arcanine:hisui",
+      "teams" : 15,
+      "usage" : 0.1807
+    }, {
+      "key" : "volcarona",
+      "teams" : 14,
+      "usage" : 0.1687
+    }, {
+      "key" : "charizard",
+      "teams" : 13,
+      "usage" : 0.1566
+    }, {
+      "key" : "archaludon",
+      "teams" : 12,
+      "usage" : 0.1446
+    }, {
+      "key" : "basculegion",
+      "teams" : 11,
+      "usage" : 0.1325
+    }, {
+      "key" : "sylveon",
+      "teams" : 11,
+      "usage" : 0.1325
+    }, {
+      "key" : "kingambit",
+      "teams" : 10,
+      "usage" : 0.1205
+    }, {
+      "key" : "primarina",
+      "teams" : 10,
+      "usage" : 0.1205
+    }, {
+      "key" : "pelipper",
+      "teams" : 9,
+      "usage" : 0.1084
+    }, {
+      "key" : "salamence",
+      "teams" : 9,
+      "usage" : 0.1084
+    }, {
+      "key" : "staraptor",
+      "teams" : 9,
+      "usage" : 0.1084
+    }, {
+      "key" : "farigiraf",
+      "teams" : 8,
+      "usage" : 0.0964
+    }, {
+      "key" : "gengar",
+      "teams" : 8,
+      "usage" : 0.0964
+    }, {
+      "key" : "indeedee",
+      "teams" : 7,
+      "usage" : 0.0843
+    }, {
+      "key" : "indeedee:female",
+      "teams" : 7,
+      "usage" : 0.0843
+    }, {
+      "key" : "sinistcha",
+      "teams" : 7,
+      "usage" : 0.0843
+    }, {
+      "key" : "golisopod",
+      "teams" : 6,
+      "usage" : 0.0723
+    }, {
+      "key" : "kommoo",
+      "teams" : 6,
+      "usage" : 0.0723
+    }, {
+      "key" : "lucario",
+      "teams" : 6,
+      "usage" : 0.0723
+    }, {
+      "key" : "swampert",
+      "teams" : 6,
+      "usage" : 0.0723
+    }, {
+      "key" : "tyranitar",
+      "teams" : 6,
+      "usage" : 0.0723
+    }, {
+      "key" : "venusaur",
+      "teams" : 6,
+      "usage" : 0.0723
+    }, {
+      "key" : "annihilape",
+      "teams" : 5,
+      "usage" : 0.0602
+    }, {
+      "key" : "corviknight",
+      "teams" : 5,
+      "usage" : 0.0602
+    }, {
+      "key" : "excadrill",
+      "teams" : 5,
+      "usage" : 0.0602
+    }, {
+      "key" : "floette",
+      "teams" : 5,
+      "usage" : 0.0602
+    }, {
+      "key" : "gardevoir",
+      "teams" : 5,
+      "usage" : 0.0602
+    }, {
+      "key" : "politoed",
+      "teams" : 5,
+      "usage" : 0.0602
+    }, {
+      "key" : "dragonite",
+      "teams" : 4,
+      "usage" : 0.0482
+    }, {
+      "key" : "froslass",
+      "teams" : 4,
+      "usage" : 0.0482
+    }, {
+      "key" : "grimmsnarl",
+      "teams" : 4,
+      "usage" : 0.0482
+    }, {
+      "key" : "milotic",
+      "teams" : 4,
+      "usage" : 0.0482
+    }, {
+      "key" : "whimsicott",
+      "teams" : 4,
+      "usage" : 0.0482
+    }, {
+      "key" : "delphox",
+      "teams" : 3,
+      "usage" : 0.0361
+    }, {
+      "key" : "dragapult",
+      "teams" : 3,
+      "usage" : 0.0361
+    }, {
+      "key" : "metagross",
+      "teams" : 3,
+      "usage" : 0.0361
+    }, {
+      "key" : "sableye",
+      "teams" : 3,
+      "usage" : 0.0361
+    }, {
+      "key" : "absol",
+      "teams" : 2,
+      "usage" : 0.0241
+    }, {
+      "key" : "aerodactyl",
+      "teams" : 2,
+      "usage" : 0.0241
+    }, {
+      "key" : "baxcalibur",
+      "teams" : 2,
+      "usage" : 0.0241
+    }, {
+      "key" : "espathra",
+      "teams" : 2,
+      "usage" : 0.0241
+    }, {
+      "key" : "kleavor",
+      "teams" : 2,
+      "usage" : 0.0241
+    }, {
+      "key" : "mamoswine",
+      "teams" : 2,
+      "usage" : 0.0241
+    }, {
+      "key" : "maushold",
+      "teams" : 2,
+      "usage" : 0.0241
+    }, {
+      "key" : "mimikyu",
+      "teams" : 2,
+      "usage" : 0.0241
+    }, {
+      "key" : "ninetales:alola",
+      "teams" : 2,
+      "usage" : 0.0241
+    }, {
+      "key" : "pawmot",
+      "teams" : 2,
+      "usage" : 0.0241
+    }, {
+      "key" : "rotom",
+      "teams" : 2,
+      "usage" : 0.0241
+    }, {
+      "key" : "torkoal",
+      "teams" : 2,
+      "usage" : 0.0241
+    }, {
+      "key" : "toxapex",
+      "teams" : 2,
+      "usage" : 0.0241
+    }, {
+      "key" : "weavile",
+      "teams" : 2,
+      "usage" : 0.0241
+    }, {
+      "key" : "aegislash",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "armarouge",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "azumarill",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "blastoise",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "camerupt",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "ceruledge",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "chandelure",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "chesnaught",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "clefable",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "conkeldurr",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "decidueye:hisui",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "glalie",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "glimmora",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "hatterene",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "hawlucha",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "infernape",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "lopunny",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "medicham",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "meowstic",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "mrrime",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "noivern",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "pikachu",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "pyroar",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "sceptile",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "serperior",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "skarmory",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "slowbro",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "snorlax",
+      "teams" : 1,
+      "usage" : 0.012
+    }, {
+      "key" : "vivillon",
+      "teams" : 1,
+      "usage" : 0.012
+    } ],
+    "pages" : {
+      "rillaboom" : {
+        "items" : [ {
+          "value" : "Miracle Seed",
+          "count" : 38,
+          "share" : 0.8636
+        }, {
+          "value" : "Eject Button",
+          "count" : 4,
+          "share" : 0.0909
+        }, {
+          "value" : "Occa Berry",
+          "count" : 1,
+          "share" : 0.0227
+        }, {
+          "value" : "Sitrus Berry",
+          "count" : 1,
+          "share" : 0.0227
+        } ],
+        "abilities" : [ {
+          "value" : "Grassy Surge",
+          "count" : 44,
+          "share" : 1.0
+        } ],
+        "natures" : [ {
+          "value" : "Adamant",
+          "count" : 39,
+          "share" : 0.8864
+        }, {
+          "value" : "Careful",
+          "count" : 2,
+          "share" : 0.0455
+        }, {
+          "value" : "Sassy",
+          "count" : 2,
+          "share" : 0.0455
+        }, {
+          "value" : "Brave",
+          "count" : 1,
+          "share" : 0.0227
+        } ],
+        "moves" : [ {
+          "value" : "Fake Out",
+          "count" : 44,
+          "share" : 1.0
+        }, {
+          "value" : "Grassy Glide",
+          "count" : 44,
+          "share" : 1.0
+        }, {
+          "value" : "Wood Hammer",
+          "count" : 39,
+          "share" : 0.8864
+        }, {
+          "value" : "High Horsepower",
+          "count" : 26,
+          "share" : 0.5909
+        }, {
+          "value" : "U-turn",
+          "count" : 18,
+          "share" : 0.4091
+        }, {
+          "value" : "Protect",
+          "count" : 4,
+          "share" : 0.0909
+        }, {
+          "value" : "Stomping Tantrum",
+          "count" : 1,
+          "share" : 0.0227
+        } ],
+        "megaStones" : [ ],
+        "teammates" : [ {
+          "value" : "gholdengo",
+          "count" : 24,
+          "share" : 0.5455
+        }, {
+          "value" : "raichu",
+          "count" : 24,
+          "share" : 0.5455
+        }, {
+          "value" : "incineroar",
+          "count" : 23,
+          "share" : 0.5227
+        }, {
+          "value" : "garchomp",
+          "count" : 16,
+          "share" : 0.3636
+        }, {
+          "value" : "sneasler",
+          "count" : 15,
+          "share" : 0.3409
+        }, {
+          "value" : "arcanine:hisui",
+          "count" : 12,
+          "share" : 0.2727
+        }, {
+          "value" : "volcarona",
+          "count" : 12,
+          "share" : 0.2727
+        }, {
+          "value" : "staraptor",
+          "count" : 7,
+          "share" : 0.1591
+        }, {
+          "value" : "sylveon",
+          "count" : 7,
+          "share" : 0.1591
+        }, {
+          "value" : "gengar",
+          "count" : 6,
+          "share" : 0.1364
+        }, {
+          "value" : "primarina",
+          "count" : 6,
+          "share" : 0.1364
+        }, {
+          "value" : "floette",
+          "count" : 5,
+          "share" : 0.1136
+        } ],
+        "sets" : [ {
+          "item" : "Miracle Seed",
+          "ability" : "Grassy Surge",
+          "nature" : "Adamant",
+          "moves" : [ "Fake Out", "Grassy Glide", "High Horsepower", "Wood Hammer" ],
+          "count" : 24,
+          "share" : 0.5455
+        }, {
+          "item" : "Miracle Seed",
+          "ability" : "Grassy Surge",
+          "nature" : "Adamant",
+          "moves" : [ "Fake Out", "Grassy Glide", "U-turn", "Wood Hammer" ],
+          "count" : 11,
+          "share" : 0.25
+        }, {
+          "item" : "Eject Button",
+          "ability" : "Grassy Surge",
+          "nature" : "Adamant",
+          "moves" : [ "Fake Out", "Grassy Glide", "Stomping Tantrum", "U-turn" ],
+          "count" : 1,
+          "share" : 0.0227
+        }, {
+          "item" : "Eject Button",
+          "ability" : "Grassy Surge",
+          "nature" : "Adamant",
+          "moves" : [ "Fake Out", "Grassy Glide", "U-turn", "Wood Hammer" ],
+          "count" : 1,
+          "share" : 0.0227
+        }, {
+          "item" : "Eject Button",
+          "ability" : "Grassy Surge",
+          "nature" : "Careful",
+          "moves" : [ "Fake Out", "Grassy Glide", "Protect", "U-turn" ],
+          "count" : 1,
+          "share" : 0.0227
+        }, {
+          "item" : "Eject Button",
+          "ability" : "Grassy Surge",
+          "nature" : "Sassy",
+          "moves" : [ "Fake Out", "Grassy Glide", "Protect", "U-turn" ],
+          "count" : 1,
+          "share" : 0.0227
+        }, {
+          "item" : "Miracle Seed",
+          "ability" : "Grassy Surge",
+          "nature" : "Brave",
+          "moves" : [ "Fake Out", "Grassy Glide", "U-turn", "Wood Hammer" ],
+          "count" : 1,
+          "share" : 0.0227
+        }, {
+          "item" : "Miracle Seed",
+          "ability" : "Grassy Surge",
+          "nature" : "Careful",
+          "moves" : [ "Fake Out", "Grassy Glide", "High Horsepower", "Wood Hammer" ],
+          "count" : 1,
+          "share" : 0.0227
+        }, {
+          "item" : "Miracle Seed",
+          "ability" : "Grassy Surge",
+          "nature" : "Sassy",
+          "moves" : [ "Fake Out", "Grassy Glide", "Protect", "U-turn" ],
+          "count" : 1,
+          "share" : 0.0227
+        }, {
+          "item" : "Occa Berry",
+          "ability" : "Grassy Surge",
+          "nature" : "Adamant",
+          "moves" : [ "Fake Out", "Grassy Glide", "Protect", "U-turn" ],
+          "count" : 1,
+          "share" : 0.0227
+        } ]
+      },
+      "incineroar" : {
+        "items" : [ {
+          "value" : "Sitrus Berry",
+          "count" : 27,
+          "share" : 0.8182
+        }, {
+          "value" : "Passho Berry",
+          "count" : 3,
+          "share" : 0.0909
+        }, {
+          "value" : "Chople Berry",
+          "count" : 2,
+          "share" : 0.0606
+        }, {
+          "value" : "Charcoal",
+          "count" : 1,
+          "share" : 0.0303
+        } ],
+        "abilities" : [ {
+          "value" : "Intimidate",
+          "count" : 33,
+          "share" : 1.0
+        } ],
+        "natures" : [ {
+          "value" : "Careful",
+          "count" : 13,
+          "share" : 0.3939
+        }, {
+          "value" : "Impish",
+          "count" : 9,
+          "share" : 0.2727
+        }, {
+          "value" : "Adamant",
+          "count" : 6,
+          "share" : 0.1818
+        }, {
+          "value" : "Relaxed",
+          "count" : 2,
+          "share" : 0.0606
+        }, {
+          "value" : "Sassy",
+          "count" : 2,
+          "share" : 0.0606
+        }, {
+          "value" : "Brave",
+          "count" : 1,
+          "share" : 0.0303
+        } ],
+        "moves" : [ {
+          "value" : "Fake Out",
+          "count" : 33,
+          "share" : 1.0
+        }, {
+          "value" : "Parting Shot",
+          "count" : 33,
+          "share" : 1.0
+        }, {
+          "value" : "Flare Blitz",
+          "count" : 30,
+          "share" : 0.9091
+        }, {
+          "value" : "Darkest Lariat",
+          "count" : 14,
+          "share" : 0.4242
+        }, {
+          "value" : "Throat Chop",
+          "count" : 13,
+          "share" : 0.3939
+        }, {
+          "value" : "Protect",
+          "count" : 5,
+          "share" : 0.1515
+        }, {
+          "value" : "Taunt",
+          "count" : 2,
+          "share" : 0.0606
+        }, {
+          "value" : "Helping Hand",
+          "count" : 1,
+          "share" : 0.0303
+        }, {
+          "value" : "Snarl",
+          "count" : 1,
+          "share" : 0.0303
+        } ],
+        "megaStones" : [ ],
+        "teammates" : [ {
+          "value" : "rillaboom",
+          "count" : 23,
+          "share" : 0.697
+        }, {
+          "value" : "garchomp",
+          "count" : 14,
+          "share" : 0.4242
+        }, {
+          "value" : "gholdengo",
+          "count" : 11,
+          "share" : 0.3333
+        }, {
+          "value" : "raichu",
+          "count" : 11,
+          "share" : 0.3333
+        }, {
+          "value" : "sneasler",
+          "count" : 10,
+          "share" : 0.303
+        }, {
+          "value" : "volcarona",
+          "count" : 9,
+          "share" : 0.2727
+        }, {
+          "value" : "gengar",
+          "count" : 6,
+          "share" : 0.1818
+        }, {
+          "value" : "floette",
+          "count" : 5,
+          "share" : 0.1515
+        }, {
+          "value" : "basculegion",
+          "count" : 4,
+          "share" : 0.1212
+        }, {
+          "value" : "charizard",
+          "count" : 4,
+          "share" : 0.1212
+        }, {
+          "value" : "kommoo",
+          "count" : 4,
+          "share" : 0.1212
+        }, {
+          "value" : "politoed",
+          "count" : 4,
+          "share" : 0.1212
+        } ],
+        "sets" : [ {
+          "item" : "Sitrus Berry",
+          "ability" : "Intimidate",
+          "nature" : "Impish",
+          "moves" : [ "Fake Out", "Flare Blitz", "Parting Shot", "Throat Chop" ],
+          "count" : 5,
+          "share" : 0.1515
+        }, {
+          "item" : "Sitrus Berry",
+          "ability" : "Intimidate",
+          "nature" : "Careful",
+          "moves" : [ "Darkest Lariat", "Fake Out", "Flare Blitz", "Parting Shot" ],
+          "count" : 4,
+          "share" : 0.1212
+        }, {
+          "item" : "Sitrus Berry",
+          "ability" : "Intimidate",
+          "nature" : "Careful",
+          "moves" : [ "Fake Out", "Flare Blitz", "Parting Shot", "Throat Chop" ],
+          "count" : 4,
+          "share" : 0.1212
+        }, {
+          "item" : "Sitrus Berry",
+          "ability" : "Intimidate",
+          "nature" : "Impish",
+          "moves" : [ "Darkest Lariat", "Fake Out", "Flare Blitz", "Parting Shot" ],
+          "count" : 4,
+          "share" : 0.1212
+        }, {
+          "item" : "Sitrus Berry",
+          "ability" : "Intimidate",
+          "nature" : "Adamant",
+          "moves" : [ "Darkest Lariat", "Fake Out", "Flare Blitz", "Parting Shot" ],
+          "count" : 3,
+          "share" : 0.0909
+        }, {
+          "item" : "Sitrus Berry",
+          "ability" : "Intimidate",
+          "nature" : "Careful",
+          "moves" : [ "Darkest Lariat", "Fake Out", "Parting Shot", "Taunt" ],
+          "count" : 2,
+          "share" : 0.0606
+        }, {
+          "item" : "Charcoal",
+          "ability" : "Intimidate",
+          "nature" : "Adamant",
+          "moves" : [ "Fake Out", "Flare Blitz", "Parting Shot", "Throat Chop" ],
+          "count" : 1,
+          "share" : 0.0303
+        }, {
+          "item" : "Chople Berry",
+          "ability" : "Intimidate",
+          "nature" : "Adamant",
+          "moves" : [ "Darkest Lariat", "Fake Out", "Flare Blitz", "Parting Shot" ],
+          "count" : 1,
+          "share" : 0.0303
+        }, {
+          "item" : "Chople Berry",
+          "ability" : "Intimidate",
+          "nature" : "Relaxed",
+          "moves" : [ "Fake Out", "Flare Blitz", "Parting Shot", "Protect" ],
+          "count" : 1,
+          "share" : 0.0303
+        }, {
+          "item" : "Passho Berry",
+          "ability" : "Intimidate",
+          "nature" : "Careful",
+          "moves" : [ "Fake Out", "Flare Blitz", "Parting Shot", "Protect" ],
+          "count" : 1,
+          "share" : 0.0303
+        } ]
+      },
+      "gholdengo" : {
+        "items" : [ {
+          "value" : "Life Orb",
+          "count" : 26,
+          "share" : 0.9286
+        }, {
+          "value" : "Choice Scarf",
+          "count" : 1,
+          "share" : 0.0357
+        }, {
+          "value" : "Occa Berry",
+          "count" : 1,
+          "share" : 0.0357
+        } ],
+        "abilities" : [ {
+          "value" : "Good as Gold",
+          "count" : 28,
+          "share" : 1.0
+        } ],
+        "natures" : [ {
+          "value" : "Modest",
+          "count" : 20,
+          "share" : 0.7143
+        }, {
+          "value" : "Timid",
+          "count" : 8,
+          "share" : 0.2857
+        } ],
+        "moves" : [ {
+          "value" : "Make It Rain",
+          "count" : 28,
+          "share" : 1.0
+        }, {
+          "value" : "Shadow Ball",
+          "count" : 28,
+          "share" : 1.0
+        }, {
+          "value" : "Protect",
+          "count" : 27,
+          "share" : 0.9643
+        }, {
+          "value" : "Nasty Plot",
+          "count" : 25,
+          "share" : 0.8929
+        }, {
+          "value" : "Power Gem",
+          "count" : 3,
+          "share" : 0.1071
+        }, {
+          "value" : "Trick",
+          "count" : 1,
+          "share" : 0.0357
+        } ],
+        "megaStones" : [ ],
+        "teammates" : [ {
+          "value" : "rillaboom",
+          "count" : 24,
+          "share" : 0.8571
+        }, {
+          "value" : "raichu",
+          "count" : 19,
+          "share" : 0.6786
+        }, {
+          "value" : "garchomp",
+          "count" : 12,
+          "share" : 0.4286
+        }, {
+          "value" : "incineroar",
+          "count" : 11,
+          "share" : 0.3929
+        }, {
+          "value" : "volcarona",
+          "count" : 10,
+          "share" : 0.3571
+        }, {
+          "value" : "arcanine:hisui",
+          "count" : 9,
+          "share" : 0.3214
+        }, {
+          "value" : "sneasler",
+          "count" : 8,
+          "share" : 0.2857
+        }, {
+          "value" : "primarina",
+          "count" : 7,
+          "share" : 0.25
+        }, {
+          "value" : "staraptor",
+          "count" : 7,
+          "share" : 0.25
+        }, {
+          "value" : "salamence",
+          "count" : 4,
+          "share" : 0.1429
+        }, {
+          "value" : "floette",
+          "count" : 3,
+          "share" : 0.1071
+        }, {
+          "value" : "sylveon",
+          "count" : 3,
+          "share" : 0.1071
+        } ],
+        "sets" : [ {
+          "item" : "Life Orb",
+          "ability" : "Good as Gold",
+          "nature" : "Modest",
+          "moves" : [ "Make It Rain", "Nasty Plot", "Protect", "Shadow Ball" ],
+          "count" : 17,
+          "share" : 0.6071
+        }, {
+          "item" : "Life Orb",
+          "ability" : "Good as Gold",
+          "nature" : "Timid",
+          "moves" : [ "Make It Rain", "Nasty Plot", "Protect", "Shadow Ball" ],
+          "count" : 7,
+          "share" : 0.25
+        }, {
+          "item" : "Choice Scarf",
+          "ability" : "Good as Gold",
+          "nature" : "Modest",
+          "moves" : [ "Make It Rain", "Power Gem", "Shadow Ball", "Trick" ],
+          "count" : 1,
+          "share" : 0.0357
+        }, {
+          "item" : "Life Orb",
+          "ability" : "Good as Gold",
+          "nature" : "Modest",
+          "moves" : [ "Make It Rain", "Power Gem", "Protect", "Shadow Ball" ],
+          "count" : 1,
+          "share" : 0.0357
+        }, {
+          "item" : "Life Orb",
+          "ability" : "Good as Gold",
+          "nature" : "Timid",
+          "moves" : [ "Make It Rain", "Power Gem", "Protect", "Shadow Ball" ],
+          "count" : 1,
+          "share" : 0.0357
+        }, {
+          "item" : "Occa Berry",
+          "ability" : "Good as Gold",
+          "nature" : "Modest",
+          "moves" : [ "Make It Rain", "Nasty Plot", "Protect", "Shadow Ball" ],
+          "count" : 1,
+          "share" : 0.0357
+        } ]
+      },
+      "raichu" : {
+        "items" : [ {
+          "value" : "Raichunite Y",
+          "count" : 26,
+          "share" : 0.9286
+        }, {
+          "value" : "Raichunite X",
+          "count" : 2,
+          "share" : 0.0714
+        } ],
+        "abilities" : [ {
+          "value" : "Lightning Rod",
+          "count" : 27,
+          "share" : 0.9643
+        }, {
+          "value" : "Static",
+          "count" : 1,
+          "share" : 0.0357
+        } ],
+        "natures" : [ {
+          "value" : "Timid",
+          "count" : 26,
+          "share" : 0.9286
+        }, {
+          "value" : "Modest",
+          "count" : 2,
+          "share" : 0.0714
+        } ],
+        "moves" : [ {
+          "value" : "Protect",
+          "count" : 27,
+          "share" : 0.9643
+        }, {
+          "value" : "Focus Blast",
+          "count" : 26,
+          "share" : 0.9286
+        }, {
+          "value" : "Zap Cannon",
+          "count" : 25,
+          "share" : 0.8929
+        }, {
+          "value" : "Fake Out",
+          "count" : 22,
+          "share" : 0.7857
+        }, {
+          "value" : "Encore",
+          "count" : 4,
+          "share" : 0.1429
+        }, {
+          "value" : "Rising Voltage",
+          "count" : 2,
+          "share" : 0.0714
+        }, {
+          "value" : "Alluring Voice",
+          "count" : 1,
+          "share" : 0.0357
+        }, {
+          "value" : "Discharge",
+          "count" : 1,
+          "share" : 0.0357
+        }, {
+          "value" : "Electro Shot",
+          "count" : 1,
+          "share" : 0.0357
+        }, {
+          "value" : "Light Screen",
+          "count" : 1,
+          "share" : 0.0357
+        }, {
+          "value" : "Reflect",
+          "count" : 1,
+          "share" : 0.0357
+        }, {
+          "value" : "Upper Hand",
+          "count" : 1,
+          "share" : 0.0357
+        } ],
+        "megaStones" : [ {
+          "value" : "raichunitey",
+          "count" : 26,
+          "share" : 0.9286
+        }, {
+          "value" : "raichunitex",
+          "count" : 2,
+          "share" : 0.0714
+        } ],
+        "teammates" : [ {
+          "value" : "rillaboom",
+          "count" : 24,
+          "share" : 0.8571
+        }, {
+          "value" : "gholdengo",
+          "count" : 19,
+          "share" : 0.6786
+        }, {
+          "value" : "garchomp",
+          "count" : 12,
+          "share" : 0.4286
+        }, {
+          "value" : "incineroar",
+          "count" : 11,
+          "share" : 0.3929
+        }, {
+          "value" : "volcarona",
+          "count" : 10,
+          "share" : 0.3571
+        }, {
+          "value" : "arcanine:hisui",
+          "count" : 9,
+          "share" : 0.3214
+        }, {
+          "value" : "primarina",
+          "count" : 8,
+          "share" : 0.2857
+        }, {
+          "value" : "staraptor",
+          "count" : 8,
+          "share" : 0.2857
+        }, {
+          "value" : "sneasler",
+          "count" : 4,
+          "share" : 0.1429
+        }, {
+          "value" : "sylveon",
+          "count" : 4,
+          "share" : 0.1429
+        }, {
+          "value" : "salamence",
+          "count" : 3,
+          "share" : 0.1071
+        }, {
+          "value" : "annihilape",
+          "count" : 2,
+          "share" : 0.0714
+        } ],
+        "sets" : [ {
+          "item" : "Raichunite Y",
+          "ability" : "Lightning Rod",
+          "nature" : "Timid",
+          "moves" : [ "Fake Out", "Focus Blast", "Protect", "Zap Cannon" ],
+          "count" : 20,
+          "share" : 0.7143
+        }, {
+          "item" : "Raichunite Y",
+          "ability" : "Lightning Rod",
+          "nature" : "Timid",
+          "moves" : [ "Encore", "Focus Blast", "Protect", "Zap Cannon" ],
+          "count" : 3,
+          "share" : 0.1071
+        }, {
+          "item" : "Raichunite X",
+          "ability" : "Lightning Rod",
+          "nature" : "Timid",
+          "moves" : [ "Fake Out", "Light Screen", "Reflect", "Rising Voltage" ],
+          "count" : 1,
+          "share" : 0.0357
+        }, {
+          "item" : "Raichunite X",
+          "ability" : "Static",
+          "nature" : "Modest",
+          "moves" : [ "Discharge", "Protect", "Rising Voltage", "Upper Hand" ],
+          "count" : 1,
+          "share" : 0.0357
+        }, {
+          "item" : "Raichunite Y",
+          "ability" : "Lightning Rod",
+          "nature" : "Modest",
+          "moves" : [ "Fake Out", "Focus Blast", "Protect", "Zap Cannon" ],
+          "count" : 1,
+          "share" : 0.0357
+        }, {
+          "item" : "Raichunite Y",
+          "ability" : "Lightning Rod",
+          "nature" : "Timid",
+          "moves" : [ "Alluring Voice", "Focus Blast", "Protect", "Zap Cannon" ],
+          "count" : 1,
+          "share" : 0.0357
+        }, {
+          "item" : "Raichunite Y",
+          "ability" : "Lightning Rod",
+          "nature" : "Timid",
+          "moves" : [ "Electro Shot", "Encore", "Focus Blast", "Protect" ],
+          "count" : 1,
+          "share" : 0.0357
+        } ]
+      },
+      "garchomp" : {
+        "items" : [ {
+          "value" : "Garchompite Z",
+          "count" : 19,
+          "share" : 0.7308
+        }, {
+          "value" : "Choice Scarf",
+          "count" : 4,
+          "share" : 0.1538
+        }, {
+          "value" : "Life Orb",
+          "count" : 2,
+          "share" : 0.0769
+        }, {
+          "value" : "Focus Sash",
+          "count" : 1,
+          "share" : 0.0385
+        } ],
+        "abilities" : [ {
+          "value" : "Rough Skin",
+          "count" : 25,
+          "share" : 0.9615
+        }, {
+          "value" : "Sand Veil",
+          "count" : 1,
+          "share" : 0.0385
+        } ],
+        "natures" : [ {
+          "value" : "Modest",
+          "count" : 18,
+          "share" : 0.6923
+        }, {
+          "value" : "Adamant",
+          "count" : 5,
+          "share" : 0.1923
+        }, {
+          "value" : "Jolly",
+          "count" : 2,
+          "share" : 0.0769
+        }, {
+          "value" : "Timid",
+          "count" : 1,
+          "share" : 0.0385
+        } ],
+        "moves" : [ {
+          "value" : "Protect",
+          "count" : 22,
+          "share" : 0.8462
+        }, {
+          "value" : "Power Gem",
+          "count" : 18,
+          "share" : 0.6923
+        }, {
+          "value" : "Earth Power",
+          "count" : 16,
+          "share" : 0.6154
+        }, {
+          "value" : "Dragon Pulse",
+          "count" : 13,
+          "share" : 0.5
+        }, {
+          "value" : "Rock Slide",
+          "count" : 7,
+          "share" : 0.2692
+        }, {
+          "value" : "Stomping Tantrum",
+          "count" : 7,
+          "share" : 0.2692
+        }, {
+          "value" : "Draco Meteor",
+          "count" : 6,
+          "share" : 0.2308
+        }, {
+          "value" : "Dragon Claw",
+          "count" : 6,
+          "share" : 0.2308
+        }, {
+          "value" : "Flamethrower",
+          "count" : 4,
+          "share" : 0.1538
+        }, {
+          "value" : "Earthquake",
+          "count" : 3,
+          "share" : 0.1154
+        }, {
+          "value" : "Dragon Rush",
+          "count" : 1,
+          "share" : 0.0385
+        }, {
+          "value" : "Poison Jab",
+          "count" : 1,
+          "share" : 0.0385
+        } ],
+        "megaStones" : [ {
+          "value" : "garchompitez",
+          "count" : 19,
+          "share" : 0.7308
+        } ],
+        "teammates" : [ {
+          "value" : "rillaboom",
+          "count" : 16,
+          "share" : 0.6154
+        }, {
+          "value" : "incineroar",
+          "count" : 14,
+          "share" : 0.5385
+        }, {
+          "value" : "gholdengo",
+          "count" : 12,
+          "share" : 0.4615
+        }, {
+          "value" : "raichu",
+          "count" : 12,
+          "share" : 0.4615
+        }, {
+          "value" : "volcarona",
+          "count" : 10,
+          "share" : 0.3846
+        }, {
+          "value" : "charizard",
+          "count" : 7,
+          "share" : 0.2692
+        }, {
+          "value" : "sneasler",
+          "count" : 6,
+          "share" : 0.2308
+        }, {
+          "value" : "sylveon",
+          "count" : 5,
+          "share" : 0.1923
+        }, {
+          "value" : "archaludon",
+          "count" : 4,
+          "share" : 0.1538
+        }, {
+          "value" : "venusaur",
+          "count" : 4,
+          "share" : 0.1538
+        }, {
+          "value" : "farigiraf",
+          "count" : 3,
+          "share" : 0.1154
+        }, {
+          "value" : "pelipper",
+          "count" : 3,
+          "share" : 0.1154
+        } ],
+        "sets" : [ {
+          "item" : "Garchompite Z",
+          "ability" : "Rough Skin",
+          "nature" : "Modest",
+          "moves" : [ "Dragon Pulse", "Earth Power", "Power Gem", "Protect" ],
+          "count" : 12,
+          "share" : 0.4615
+        }, {
+          "item" : "Choice Scarf",
+          "ability" : "Rough Skin",
+          "nature" : "Adamant",
+          "moves" : [ "Dragon Claw", "Earthquake", "Rock Slide", "Stomping Tantrum" ],
+          "count" : 3,
+          "share" : 0.1154
+        }, {
+          "item" : "Garchompite Z",
+          "ability" : "Rough Skin",
+          "nature" : "Modest",
+          "moves" : [ "Draco Meteor", "Flamethrower", "Power Gem", "Protect" ],
+          "count" : 3,
+          "share" : 0.1154
+        }, {
+          "item" : "Garchompite Z",
+          "ability" : "Rough Skin",
+          "nature" : "Modest",
+          "moves" : [ "Draco Meteor", "Earth Power", "Power Gem", "Protect" ],
+          "count" : 2,
+          "share" : 0.0769
+        }, {
+          "item" : "Choice Scarf",
+          "ability" : "Rough Skin",
+          "nature" : "Adamant",
+          "moves" : [ "Dragon Claw", "Poison Jab", "Rock Slide", "Stomping Tantrum" ],
+          "count" : 1,
+          "share" : 0.0385
+        }, {
+          "item" : "Focus Sash",
+          "ability" : "Rough Skin",
+          "nature" : "Jolly",
+          "moves" : [ "Dragon Rush", "Protect", "Rock Slide", "Stomping Tantrum" ],
+          "count" : 1,
+          "share" : 0.0385
+        }, {
+          "item" : "Garchompite Z",
+          "ability" : "Rough Skin",
+          "nature" : "Modest",
+          "moves" : [ "Draco Meteor", "Earth Power", "Flamethrower", "Protect" ],
+          "count" : 1,
+          "share" : 0.0385
+        }, {
+          "item" : "Garchompite Z",
+          "ability" : "Sand Veil",
+          "nature" : "Timid",
+          "moves" : [ "Dragon Pulse", "Earth Power", "Power Gem", "Protect" ],
+          "count" : 1,
+          "share" : 0.0385
+        }, {
+          "item" : "Life Orb",
+          "ability" : "Rough Skin",
+          "nature" : "Adamant",
+          "moves" : [ "Dragon Claw", "Protect", "Rock Slide", "Stomping Tantrum" ],
+          "count" : 1,
+          "share" : 0.0385
+        }, {
+          "item" : "Life Orb",
+          "ability" : "Rough Skin",
+          "nature" : "Jolly",
+          "moves" : [ "Dragon Claw", "Protect", "Rock Slide", "Stomping Tantrum" ],
+          "count" : 1,
+          "share" : 0.0385
+        } ]
+      },
+      "sneasler" : {
+        "items" : [ {
+          "value" : "White Herb",
+          "count" : 11,
+          "share" : 0.4583
+        }, {
+          "value" : "Grassy Seed",
+          "count" : 7,
+          "share" : 0.2917
+        }, {
+          "value" : "Focus Sash",
+          "count" : 4,
+          "share" : 0.1667
+        }, {
+          "value" : "Psychic Seed",
+          "count" : 2,
+          "share" : 0.0833
+        } ],
+        "abilities" : [ {
+          "value" : "Unburden",
+          "count" : 20,
+          "share" : 0.8333
+        }, {
+          "value" : "Poison Touch",
+          "count" : 4,
+          "share" : 0.1667
+        } ],
+        "natures" : [ {
+          "value" : "Adamant",
+          "count" : 14,
+          "share" : 0.5833
+        }, {
+          "value" : "Jolly",
+          "count" : 9,
+          "share" : 0.375
+        }, {
+          "value" : "Careful",
+          "count" : 1,
+          "share" : 0.0417
+        } ],
+        "moves" : [ {
+          "value" : "Close Combat",
+          "count" : 24,
+          "share" : 1.0
+        }, {
+          "value" : "Dire Claw",
+          "count" : 22,
+          "share" : 0.9167
+        }, {
+          "value" : "Protect",
+          "count" : 19,
+          "share" : 0.7917
+        }, {
+          "value" : "Fake Out",
+          "count" : 13,
+          "share" : 0.5417
+        }, {
+          "value" : "Coaching",
+          "count" : 7,
+          "share" : 0.2917
+        }, {
+          "value" : "Rock Slide",
+          "count" : 3,
+          "share" : 0.125
+        }, {
+          "value" : "Swords Dance",
+          "count" : 2,
+          "share" : 0.0833
+        }, {
+          "value" : "Acrobatics",
+          "count" : 1,
+          "share" : 0.0417
+        }, {
+          "value" : "Gunk Shot",
+          "count" : 1,
+          "share" : 0.0417
+        }, {
+          "value" : "Quick Guard",
+          "count" : 1,
+          "share" : 0.0417
+        }, {
+          "value" : "Rock Tomb",
+          "count" : 1,
+          "share" : 0.0417
+        }, {
+          "value" : "Throat Chop",
+          "count" : 1,
+          "share" : 0.0417
+        } ],
+        "megaStones" : [ ],
+        "teammates" : [ {
+          "value" : "rillaboom",
+          "count" : 15,
+          "share" : 0.625
+        }, {
+          "value" : "incineroar",
+          "count" : 10,
+          "share" : 0.4167
+        }, {
+          "value" : "gholdengo",
+          "count" : 8,
+          "share" : 0.3333
+        }, {
+          "value" : "garchomp",
+          "count" : 6,
+          "share" : 0.25
+        }, {
+          "value" : "indeedee",
+          "count" : 5,
+          "share" : 0.2083
+        }, {
+          "value" : "salamence",
+          "count" : 5,
+          "share" : 0.2083
+        }, {
+          "value" : "arcanine:hisui",
+          "count" : 4,
+          "share" : 0.1667
+        }, {
+          "value" : "charizard",
+          "count" : 4,
+          "share" : 0.1667
+        }, {
+          "value" : "kingambit",
+          "count" : 4,
+          "share" : 0.1667
+        }, {
+          "value" : "raichu",
+          "count" : 4,
+          "share" : 0.1667
+        }, {
+          "value" : "corviknight",
+          "count" : 3,
+          "share" : 0.125
+        }, {
+          "value" : "excadrill",
+          "count" : 3,
+          "share" : 0.125
+        } ],
+        "sets" : [ {
+          "item" : "White Herb",
+          "ability" : "Unburden",
+          "nature" : "Jolly",
+          "moves" : [ "Close Combat", "Dire Claw", "Fake Out", "Protect" ],
+          "count" : 4,
+          "share" : 0.1667
+        }, {
+          "item" : "Grassy Seed",
+          "ability" : "Unburden",
+          "nature" : "Adamant",
+          "moves" : [ "Close Combat", "Dire Claw", "Fake Out", "Protect" ],
+          "count" : 2,
+          "share" : 0.0833
+        }, {
+          "item" : "White Herb",
+          "ability" : "Unburden",
+          "nature" : "Adamant",
+          "moves" : [ "Close Combat", "Coaching", "Dire Claw", "Protect" ],
+          "count" : 2,
+          "share" : 0.0833
+        }, {
+          "item" : "Focus Sash",
+          "ability" : "Poison Touch",
+          "nature" : "Adamant",
+          "moves" : [ "Close Combat", "Coaching", "Dire Claw", "Fake Out" ],
+          "count" : 1,
+          "share" : 0.0417
+        }, {
+          "item" : "Focus Sash",
+          "ability" : "Poison Touch",
+          "nature" : "Jolly",
+          "moves" : [ "Close Combat", "Dire Claw", "Fake Out", "Protect" ],
+          "count" : 1,
+          "share" : 0.0417
+        }, {
+          "item" : "Focus Sash",
+          "ability" : "Poison Touch",
+          "nature" : "Jolly",
+          "moves" : [ "Close Combat", "Dire Claw", "Fake Out", "Quick Guard" ],
+          "count" : 1,
+          "share" : 0.0417
+        }, {
+          "item" : "Focus Sash",
+          "ability" : "Unburden",
+          "nature" : "Adamant",
+          "moves" : [ "Close Combat", "Rock Slide", "Swords Dance", "Throat Chop" ],
+          "count" : 1,
+          "share" : 0.0417
+        }, {
+          "item" : "Grassy Seed",
+          "ability" : "Unburden",
+          "nature" : "Adamant",
+          "moves" : [ "Acrobatics", "Close Combat", "Dire Claw", "Swords Dance" ],
+          "count" : 1,
+          "share" : 0.0417
+        }, {
+          "item" : "Grassy Seed",
+          "ability" : "Unburden",
+          "nature" : "Adamant",
+          "moves" : [ "Close Combat", "Coaching", "Dire Claw", "Protect" ],
+          "count" : 1,
+          "share" : 0.0417
+        }, {
+          "item" : "Grassy Seed",
+          "ability" : "Unburden",
+          "nature" : "Adamant",
+          "moves" : [ "Close Combat", "Dire Claw", "Protect", "Rock Slide" ],
+          "count" : 1,
+          "share" : 0.0417
+        } ]
+      },
+      "arcanine:hisui" : {
+        "items" : [ {
+          "value" : "Focus Sash",
+          "count" : 15,
+          "share" : 1.0
+        } ],
+        "abilities" : [ {
+          "value" : "Rock Head",
+          "count" : 15,
+          "share" : 1.0
+        } ],
+        "natures" : [ {
+          "value" : "Jolly",
+          "count" : 14,
+          "share" : 0.9333
+        }, {
+          "value" : "Adamant",
+          "count" : 1,
+          "share" : 0.0667
+        } ],
+        "moves" : [ {
+          "value" : "Flare Blitz",
+          "count" : 15,
+          "share" : 1.0
+        }, {
+          "value" : "Head Smash",
+          "count" : 15,
+          "share" : 1.0
+        }, {
+          "value" : "Protect",
+          "count" : 15,
+          "share" : 1.0
+        }, {
+          "value" : "Extreme Speed",
+          "count" : 14,
+          "share" : 0.9333
+        }, {
+          "value" : "Wild Charge",
+          "count" : 1,
+          "share" : 0.0667
+        } ],
+        "megaStones" : [ ],
+        "teammates" : [ {
+          "value" : "rillaboom",
+          "count" : 12,
+          "share" : 0.8
+        }, {
+          "value" : "gholdengo",
+          "count" : 9,
+          "share" : 0.6
+        }, {
+          "value" : "raichu",
+          "count" : 9,
+          "share" : 0.6
+        }, {
+          "value" : "staraptor",
+          "count" : 8,
+          "share" : 0.5333
+        }, {
+          "value" : "primarina",
+          "count" : 5,
+          "share" : 0.3333
+        }, {
+          "value" : "sneasler",
+          "count" : 4,
+          "share" : 0.2667
+        }, {
+          "value" : "sylveon",
+          "count" : 4,
+          "share" : 0.2667
+        }, {
+          "value" : "salamence",
+          "count" : 3,
+          "share" : 0.2
+        }, {
+          "value" : "basculegion",
+          "count" : 2,
+          "share" : 0.1333
+        }, {
+          "value" : "kingambit",
+          "count" : 2,
+          "share" : 0.1333
+        }, {
+          "value" : "absol",
+          "count" : 1,
+          "share" : 0.0667
+        }, {
+          "value" : "annihilape",
+          "count" : 1,
+          "share" : 0.0667
+        } ],
+        "sets" : [ {
+          "item" : "Focus Sash",
+          "ability" : "Rock Head",
+          "nature" : "Jolly",
+          "moves" : [ "Extreme Speed", "Flare Blitz", "Head Smash", "Protect" ],
+          "count" : 14,
+          "share" : 0.9333
+        }, {
+          "item" : "Focus Sash",
+          "ability" : "Rock Head",
+          "nature" : "Adamant",
+          "moves" : [ "Flare Blitz", "Head Smash", "Protect", "Wild Charge" ],
+          "count" : 1,
+          "share" : 0.0667
+        } ]
+      },
+      "volcarona" : {
+        "items" : [ {
+          "value" : "Rocky Helmet",
+          "count" : 7,
+          "share" : 0.5
+        }, {
+          "value" : "Grassy Seed",
+          "count" : 5,
+          "share" : 0.3571
+        }, {
+          "value" : "Charti Berry",
+          "count" : 1,
+          "share" : 0.0714
+        }, {
+          "value" : "Psychic Seed",
+          "count" : 1,
+          "share" : 0.0714
+        } ],
+        "abilities" : [ {
+          "value" : "Flame Body",
+          "count" : 14,
+          "share" : 1.0
+        } ],
+        "natures" : [ {
+          "value" : "Timid",
+          "count" : 8,
+          "share" : 0.5714
+        }, {
+          "value" : "Modest",
+          "count" : 4,
+          "share" : 0.2857
+        }, {
+          "value" : "Bold",
+          "count" : 2,
+          "share" : 0.1429
+        } ],
+        "moves" : [ {
+          "value" : "Rage Powder",
+          "count" : 9,
+          "share" : 0.6429
+        }, {
+          "value" : "Struggle Bug",
+          "count" : 9,
+          "share" : 0.6429
+        }, {
+          "value" : "Tailwind",
+          "count" : 8,
+          "share" : 0.5714
+        }, {
+          "value" : "Overheat",
+          "count" : 7,
+          "share" : 0.5
+        }, {
+          "value" : "Protect",
+          "count" : 6,
+          "share" : 0.4286
+        }, {
+          "value" : "Quiver Dance",
+          "count" : 5,
+          "share" : 0.3571
+        }, {
+          "value" : "Heat Wave",
+          "count" : 4,
+          "share" : 0.2857
+        }, {
+          "value" : "Bug Buzz",
+          "count" : 2,
+          "share" : 0.1429
+        }, {
+          "value" : "Fiery Dance",
+          "count" : 2,
+          "share" : 0.1429
+        }, {
+          "value" : "Giga Drain",
+          "count" : 2,
+          "share" : 0.1429
+        }, {
+          "value" : "Flamethrower",
+          "count" : 1,
+          "share" : 0.0714
+        }, {
+          "value" : "Will-O-Wisp",
+          "count" : 1,
+          "share" : 0.0714
+        } ],
+        "megaStones" : [ ],
+        "teammates" : [ {
+          "value" : "rillaboom",
+          "count" : 12,
+          "share" : 0.8571
+        }, {
+          "value" : "garchomp",
+          "count" : 10,
+          "share" : 0.7143
+        }, {
+          "value" : "gholdengo",
+          "count" : 10,
+          "share" : 0.7143
+        }, {
+          "value" : "raichu",
+          "count" : 10,
+          "share" : 0.7143
+        }, {
+          "value" : "incineroar",
+          "count" : 9,
+          "share" : 0.6429
+        }, {
+          "value" : "sneasler",
+          "count" : 3,
+          "share" : 0.2143
+        }, {
+          "value" : "kingambit",
+          "count" : 2,
+          "share" : 0.1429
+        }, {
+          "value" : "basculegion",
+          "count" : 1,
+          "share" : 0.0714
+        }, {
+          "value" : "blastoise",
+          "count" : 1,
+          "share" : 0.0714
+        }, {
+          "value" : "clefable",
+          "count" : 1,
+          "share" : 0.0714
+        }, {
+          "value" : "excadrill",
+          "count" : 1,
+          "share" : 0.0714
+        }, {
+          "value" : "floette",
+          "count" : 1,
+          "share" : 0.0714
+        } ],
+        "sets" : [ {
+          "item" : "Rocky Helmet",
+          "ability" : "Flame Body",
+          "nature" : "Timid",
+          "moves" : [ "Overheat", "Rage Powder", "Struggle Bug", "Tailwind" ],
+          "count" : 5,
+          "share" : 0.3571
+        }, {
+          "item" : "Charti Berry",
+          "ability" : "Flame Body",
+          "nature" : "Timid",
+          "moves" : [ "Overheat", "Protect", "Rage Powder", "Struggle Bug" ],
+          "count" : 1,
+          "share" : 0.0714
+        }, {
+          "item" : "Grassy Seed",
+          "ability" : "Flame Body",
+          "nature" : "Bold",
+          "moves" : [ "Fiery Dance", "Rage Powder", "Tailwind", "Will-O-Wisp" ],
+          "count" : 1,
+          "share" : 0.0714
+        }, {
+          "item" : "Grassy Seed",
+          "ability" : "Flame Body",
+          "nature" : "Modest",
+          "moves" : [ "Bug Buzz", "Heat Wave", "Protect", "Quiver Dance" ],
+          "count" : 1,
+          "share" : 0.0714
+        }, {
+          "item" : "Grassy Seed",
+          "ability" : "Flame Body",
+          "nature" : "Modest",
+          "moves" : [ "Giga Drain", "Heat Wave", "Protect", "Quiver Dance" ],
+          "count" : 1,
+          "share" : 0.0714
+        }, {
+          "item" : "Grassy Seed",
+          "ability" : "Flame Body",
+          "nature" : "Modest",
+          "moves" : [ "Heat Wave", "Protect", "Quiver Dance", "Struggle Bug" ],
+          "count" : 1,
+          "share" : 0.0714
+        }, {
+          "item" : "Grassy Seed",
+          "ability" : "Flame Body",
+          "nature" : "Timid",
+          "moves" : [ "Bug Buzz", "Heat Wave", "Protect", "Quiver Dance" ],
+          "count" : 1,
+          "share" : 0.0714
+        }, {
+          "item" : "Psychic Seed",
+          "ability" : "Flame Body",
+          "nature" : "Modest",
+          "moves" : [ "Fiery Dance", "Giga Drain", "Protect", "Quiver Dance" ],
+          "count" : 1,
+          "share" : 0.0714
+        }, {
+          "item" : "Rocky Helmet",
+          "ability" : "Flame Body",
+          "nature" : "Bold",
+          "moves" : [ "Overheat", "Rage Powder", "Struggle Bug", "Tailwind" ],
+          "count" : 1,
+          "share" : 0.0714
+        }, {
+          "item" : "Rocky Helmet",
+          "ability" : "Flame Body",
+          "nature" : "Timid",
+          "moves" : [ "Flamethrower", "Rage Powder", "Struggle Bug", "Tailwind" ],
+          "count" : 1,
+          "share" : 0.0714
+        } ]
+      },
+      "charizard" : {
+        "items" : [ {
+          "value" : "Charizardite Y",
+          "count" : 11,
+          "share" : 0.8462
+        }, {
+          "value" : "Charizardite X",
+          "count" : 2,
+          "share" : 0.1538
+        } ],
+        "abilities" : [ {
+          "value" : "Blaze",
+          "count" : 12,
+          "share" : 0.9231
+        }, {
+          "value" : "Drought",
+          "count" : 1,
+          "share" : 0.0769
+        } ],
+        "natures" : [ {
+          "value" : "Timid",
+          "count" : 6,
+          "share" : 0.4615
+        }, {
+          "value" : "Modest",
+          "count" : 5,
+          "share" : 0.3846
+        }, {
+          "value" : "Adamant",
+          "count" : 2,
+          "share" : 0.1538
+        } ],
+        "moves" : [ {
+          "value" : "Protect",
+          "count" : 13,
+          "share" : 1.0
+        }, {
+          "value" : "Heat Wave",
+          "count" : 11,
+          "share" : 0.8462
+        }, {
+          "value" : "Weather Ball",
+          "count" : 11,
+          "share" : 0.8462
+        }, {
+          "value" : "Ancient Power",
+          "count" : 6,
+          "share" : 0.4615
+        }, {
+          "value" : "Dragon Claw",
+          "count" : 2,
+          "share" : 0.1538
+        }, {
+          "value" : "Dragon Dance",
+          "count" : 2,
+          "share" : 0.1538
+        }, {
+          "value" : "Flare Blitz",
+          "count" : 2,
+          "share" : 0.1538
+        }, {
+          "value" : "Hurricane",
+          "count" : 2,
+          "share" : 0.1538
+        }, {
+          "value" : "Solar Beam",
+          "count" : 2,
+          "share" : 0.1538
+        }, {
+          "value" : "Roar",
+          "count" : 1,
+          "share" : 0.0769
+        } ],
+        "megaStones" : [ {
+          "value" : "charizarditey",
+          "count" : 11,
+          "share" : 0.8462
+        }, {
+          "value" : "charizarditex",
+          "count" : 2,
+          "share" : 0.1538
+        } ],
+        "teammates" : [ {
+          "value" : "garchomp",
+          "count" : 7,
+          "share" : 0.5385
+        }, {
+          "value" : "archaludon",
+          "count" : 5,
+          "share" : 0.3846
+        }, {
+          "value" : "kingambit",
+          "count" : 5,
+          "share" : 0.3846
+        }, {
+          "value" : "venusaur",
+          "count" : 5,
+          "share" : 0.3846
+        }, {
+          "value" : "incineroar",
+          "count" : 4,
+          "share" : 0.3077
+        }, {
+          "value" : "pelipper",
+          "count" : 4,
+          "share" : 0.3077
+        }, {
+          "value" : "rillaboom",
+          "count" : 4,
+          "share" : 0.3077
+        }, {
+          "value" : "sneasler",
+          "count" : 4,
+          "share" : 0.3077
+        }, {
+          "value" : "basculegion",
+          "count" : 3,
+          "share" : 0.2308
+        }, {
+          "value" : "farigiraf",
+          "count" : 3,
+          "share" : 0.2308
+        }, {
+          "value" : "grimmsnarl",
+          "count" : 3,
+          "share" : 0.2308
+        }, {
+          "value" : "sylveon",
+          "count" : 3,
+          "share" : 0.2308
+        } ],
+        "sets" : [ {
+          "item" : "Charizardite Y",
+          "ability" : "Blaze",
+          "nature" : "Timid",
+          "moves" : [ "Ancient Power", "Heat Wave", "Protect", "Weather Ball" ],
+          "count" : 4,
+          "share" : 0.3077
+        }, {
+          "item" : "Charizardite X",
+          "ability" : "Blaze",
+          "nature" : "Adamant",
+          "moves" : [ "Dragon Claw", "Dragon Dance", "Flare Blitz", "Protect" ],
+          "count" : 2,
+          "share" : 0.1538
+        }, {
+          "item" : "Charizardite Y",
+          "ability" : "Blaze",
+          "nature" : "Modest",
+          "moves" : [ "Ancient Power", "Heat Wave", "Protect", "Weather Ball" ],
+          "count" : 2,
+          "share" : 0.1538
+        }, {
+          "item" : "Charizardite Y",
+          "ability" : "Blaze",
+          "nature" : "Timid",
+          "moves" : [ "Heat Wave", "Hurricane", "Protect", "Weather Ball" ],
+          "count" : 2,
+          "share" : 0.1538
+        }, {
+          "item" : "Charizardite Y",
+          "ability" : "Blaze",
+          "nature" : "Modest",
+          "moves" : [ "Heat Wave", "Protect", "Roar", "Weather Ball" ],
+          "count" : 1,
+          "share" : 0.0769
+        }, {
+          "item" : "Charizardite Y",
+          "ability" : "Blaze",
+          "nature" : "Modest",
+          "moves" : [ "Heat Wave", "Protect", "Solar Beam", "Weather Ball" ],
+          "count" : 1,
+          "share" : 0.0769
+        }, {
+          "item" : "Charizardite Y",
+          "ability" : "Drought",
+          "nature" : "Modest",
+          "moves" : [ "Heat Wave", "Protect", "Solar Beam", "Weather Ball" ],
+          "count" : 1,
+          "share" : 0.0769
+        } ]
+      },
+      "archaludon" : {
+        "items" : [ {
+          "value" : "Leftovers",
+          "count" : 11,
+          "share" : 0.9167
+        }, {
+          "value" : "Sitrus Berry",
+          "count" : 1,
+          "share" : 0.0833
+        } ],
+        "abilities" : [ {
+          "value" : "Stamina",
+          "count" : 12,
+          "share" : 1.0
+        } ],
+        "natures" : [ {
+          "value" : "Modest",
+          "count" : 5,
+          "share" : 0.4167
+        }, {
+          "value" : "Calm",
+          "count" : 4,
+          "share" : 0.3333
+        }, {
+          "value" : "Bold",
+          "count" : 2,
+          "share" : 0.1667
+        }, {
+          "value" : "Impish",
+          "count" : 1,
+          "share" : 0.0833
+        } ],
+        "moves" : [ {
+          "value" : "Dragon Pulse",
+          "count" : 12,
+          "share" : 1.0
+        }, {
+          "value" : "Electro Shot",
+          "count" : 12,
+          "share" : 1.0
+        }, {
+          "value" : "Protect",
+          "count" : 12,
+          "share" : 1.0
+        }, {
+          "value" : "Flash Cannon",
+          "count" : 7,
+          "share" : 0.5833
+        }, {
+          "value" : "Aura Sphere",
+          "count" : 3,
+          "share" : 0.25
+        }, {
+          "value" : "Snarl",
+          "count" : 2,
+          "share" : 0.1667
+        } ],
+        "megaStones" : [ ],
+        "teammates" : [ {
+          "value" : "pelipper",
+          "count" : 9,
+          "share" : 0.75
+        }, {
+          "value" : "charizard",
+          "count" : 5,
+          "share" : 0.4167
+        }, {
+          "value" : "garchomp",
+          "count" : 4,
+          "share" : 0.3333
+        }, {
+          "value" : "golisopod",
+          "count" : 4,
+          "share" : 0.3333
+        }, {
+          "value" : "grimmsnarl",
+          "count" : 4,
+          "share" : 0.3333
+        }, {
+          "value" : "swampert",
+          "count" : 4,
+          "share" : 0.3333
+        }, {
+          "value" : "basculegion",
+          "count" : 3,
+          "share" : 0.25
+        }, {
+          "value" : "politoed",
+          "count" : 3,
+          "share" : 0.25
+        }, {
+          "value" : "rillaboom",
+          "count" : 3,
+          "share" : 0.25
+        }, {
+          "value" : "venusaur",
+          "count" : 3,
+          "share" : 0.25
+        }, {
+          "value" : "farigiraf",
+          "count" : 2,
+          "share" : 0.1667
+        }, {
+          "value" : "froslass",
+          "count" : 2,
+          "share" : 0.1667
+        } ],
+        "sets" : [ {
+          "item" : "Leftovers",
+          "ability" : "Stamina",
+          "nature" : "Calm",
+          "moves" : [ "Dragon Pulse", "Electro Shot", "Flash Cannon", "Protect" ],
+          "count" : 3,
+          "share" : 0.25
+        }, {
+          "item" : "Leftovers",
+          "ability" : "Stamina",
+          "nature" : "Modest",
+          "moves" : [ "Aura Sphere", "Dragon Pulse", "Electro Shot", "Protect" ],
+          "count" : 2,
+          "share" : 0.1667
+        }, {
+          "item" : "Leftovers",
+          "ability" : "Stamina",
+          "nature" : "Modest",
+          "moves" : [ "Dragon Pulse", "Electro Shot", "Flash Cannon", "Protect" ],
+          "count" : 2,
+          "share" : 0.1667
+        }, {
+          "item" : "Leftovers",
+          "ability" : "Stamina",
+          "nature" : "Bold",
+          "moves" : [ "Dragon Pulse", "Electro Shot", "Flash Cannon", "Protect" ],
+          "count" : 1,
+          "share" : 0.0833
+        }, {
+          "item" : "Leftovers",
+          "ability" : "Stamina",
+          "nature" : "Bold",
+          "moves" : [ "Dragon Pulse", "Electro Shot", "Protect", "Snarl" ],
+          "count" : 1,
+          "share" : 0.0833
+        }, {
+          "item" : "Leftovers",
+          "ability" : "Stamina",
+          "nature" : "Calm",
+          "moves" : [ "Dragon Pulse", "Electro Shot", "Protect", "Snarl" ],
+          "count" : 1,
+          "share" : 0.0833
+        }, {
+          "item" : "Leftovers",
+          "ability" : "Stamina",
+          "nature" : "Impish",
+          "moves" : [ "Dragon Pulse", "Electro Shot", "Flash Cannon", "Protect" ],
+          "count" : 1,
+          "share" : 0.0833
+        }, {
+          "item" : "Sitrus Berry",
+          "ability" : "Stamina",
+          "nature" : "Modest",
+          "moves" : [ "Aura Sphere", "Dragon Pulse", "Electro Shot", "Protect" ],
+          "count" : 1,
+          "share" : 0.0833
+        } ]
+      },
+      "basculegion" : {
+        "items" : [ {
+          "value" : "Choice Scarf",
+          "count" : 7,
+          "share" : 0.6364
+        }, {
+          "value" : "Life Orb",
+          "count" : 2,
+          "share" : 0.1818
+        }, {
+          "value" : "Mystic Water",
+          "count" : 2,
+          "share" : 0.1818
+        } ],
+        "abilities" : [ {
+          "value" : "Adaptability",
+          "count" : 10,
+          "share" : 0.9091
+        }, {
+          "value" : "Swift Swim",
+          "count" : 1,
+          "share" : 0.0909
+        } ],
+        "natures" : [ {
+          "value" : "Adamant",
+          "count" : 5,
+          "share" : 0.4545
+        }, {
+          "value" : "Jolly",
+          "count" : 5,
+          "share" : 0.4545
+        }, {
+          "value" : "Modest",
+          "count" : 1,
+          "share" : 0.0909
+        } ],
+        "moves" : [ {
+          "value" : "Last Respects",
+          "count" : 10,
+          "share" : 0.9091
+        }, {
+          "value" : "Aqua Jet",
+          "count" : 9,
+          "share" : 0.8182
+        }, {
+          "value" : "Wave Crash",
+          "count" : 9,
+          "share" : 0.8182
+        }, {
+          "value" : "Flip Turn",
+          "count" : 6,
+          "share" : 0.5455
+        }, {
+          "value" : "Protect",
+          "count" : 5,
+          "share" : 0.4545
+        }, {
+          "value" : "Ice Beam",
+          "count" : 1,
+          "share" : 0.0909
+        }, {
+          "value" : "Liquidation",
+          "count" : 1,
+          "share" : 0.0909
+        }, {
+          "value" : "Muddy Water",
+          "count" : 1,
+          "share" : 0.0909
+        }, {
+          "value" : "Shadow Ball",
+          "count" : 1,
+          "share" : 0.0909
+        }, {
+          "value" : "Soak",
+          "count" : 1,
+          "share" : 0.0909
+        } ],
+        "megaStones" : [ ],
+        "teammates" : [ {
+          "value" : "incineroar",
+          "count" : 4,
+          "share" : 0.3636
+        }, {
+          "value" : "rillaboom",
+          "count" : 4,
+          "share" : 0.3636
+        }, {
+          "value" : "archaludon",
+          "count" : 3,
+          "share" : 0.2727
+        }, {
+          "value" : "charizard",
+          "count" : 3,
+          "share" : 0.2727
+        }, {
+          "value" : "pelipper",
+          "count" : 3,
+          "share" : 0.2727
+        }, {
+          "value" : "arcanine:hisui",
+          "count" : 2,
+          "share" : 0.1818
+        }, {
+          "value" : "gardevoir",
+          "count" : 2,
+          "share" : 0.1818
+        }, {
+          "value" : "golisopod",
+          "count" : 2,
+          "share" : 0.1818
+        }, {
+          "value" : "indeedee:female",
+          "count" : 2,
+          "share" : 0.1818
+        }, {
+          "value" : "raichu",
+          "count" : 2,
+          "share" : 0.1818
+        }, {
+          "value" : "salamence",
+          "count" : 2,
+          "share" : 0.1818
+        }, {
+          "value" : "sneasler",
+          "count" : 2,
+          "share" : 0.1818
+        } ],
+        "sets" : [ {
+          "item" : "Choice Scarf",
+          "ability" : "Adaptability",
+          "nature" : "Jolly",
+          "moves" : [ "Aqua Jet", "Flip Turn", "Last Respects", "Wave Crash" ],
+          "count" : 4,
+          "share" : 0.3636
+        }, {
+          "item" : "Mystic Water",
+          "ability" : "Adaptability",
+          "nature" : "Adamant",
+          "moves" : [ "Aqua Jet", "Last Respects", "Protect", "Wave Crash" ],
+          "count" : 2,
+          "share" : 0.1818
+        }, {
+          "item" : "Choice Scarf",
+          "ability" : "Adaptability",
+          "nature" : "Adamant",
+          "moves" : [ "Aqua Jet", "Flip Turn", "Last Respects", "Wave Crash" ],
+          "count" : 1,
+          "share" : 0.0909
+        }, {
+          "item" : "Choice Scarf",
+          "ability" : "Adaptability",
+          "nature" : "Adamant",
+          "moves" : [ "Aqua Jet", "Last Respects", "Liquidation", "Protect" ],
+          "count" : 1,
+          "share" : 0.0909
+        }, {
+          "item" : "Choice Scarf",
+          "ability" : "Adaptability",
+          "nature" : "Jolly",
+          "moves" : [ "Flip Turn", "Last Respects", "Soak", "Wave Crash" ],
+          "count" : 1,
+          "share" : 0.0909
+        }, {
+          "item" : "Life Orb",
+          "ability" : "Adaptability",
+          "nature" : "Adamant",
+          "moves" : [ "Aqua Jet", "Last Respects", "Protect", "Wave Crash" ],
+          "count" : 1,
+          "share" : 0.0909
+        }, {
+          "item" : "Life Orb",
+          "ability" : "Swift Swim",
+          "nature" : "Modest",
+          "moves" : [ "Ice Beam", "Muddy Water", "Protect", "Shadow Ball" ],
+          "count" : 1,
+          "share" : 0.0909
+        } ]
+      },
+      "sylveon" : {
+        "items" : [ {
+          "value" : "Fairy Feather",
+          "count" : 10,
+          "share" : 0.9091
+        }, {
+          "value" : "Life Orb",
+          "count" : 1,
+          "share" : 0.0909
+        } ],
+        "abilities" : [ {
+          "value" : "Pixilate",
+          "count" : 11,
+          "share" : 1.0
+        } ],
+        "natures" : [ {
+          "value" : "Modest",
+          "count" : 10,
+          "share" : 0.9091
+        }, {
+          "value" : "Sassy",
+          "count" : 1,
+          "share" : 0.0909
+        } ],
+        "moves" : [ {
+          "value" : "Hyper Voice",
+          "count" : 11,
+          "share" : 1.0
+        }, {
+          "value" : "Detect",
+          "count" : 10,
+          "share" : 0.9091
+        }, {
+          "value" : "Hyper Beam",
+          "count" : 9,
+          "share" : 0.8182
+        }, {
+          "value" : "Quick Attack",
+          "count" : 7,
+          "share" : 0.6364
+        }, {
+          "value" : "Yawn",
+          "count" : 4,
+          "share" : 0.3636
+        }, {
+          "value" : "Calm Mind",
+          "count" : 1,
+          "share" : 0.0909
+        }, {
+          "value" : "Protect",
+          "count" : 1,
+          "share" : 0.0909
+        }, {
+          "value" : "Weather Ball",
+          "count" : 1,
+          "share" : 0.0909
+        } ],
+        "megaStones" : [ ],
+        "teammates" : [ {
+          "value" : "rillaboom",
+          "count" : 7,
+          "share" : 0.6364
+        }, {
+          "value" : "garchomp",
+          "count" : 5,
+          "share" : 0.4545
+        }, {
+          "value" : "arcanine:hisui",
+          "count" : 4,
+          "share" : 0.3636
+        }, {
+          "value" : "incineroar",
+          "count" : 4,
+          "share" : 0.3636
+        }, {
+          "value" : "raichu",
+          "count" : 4,
+          "share" : 0.3636
+        }, {
+          "value" : "charizard",
+          "count" : 3,
+          "share" : 0.2727
+        }, {
+          "value" : "farigiraf",
+          "count" : 3,
+          "share" : 0.2727
+        }, {
+          "value" : "gholdengo",
+          "count" : 3,
+          "share" : 0.2727
+        }, {
+          "value" : "kingambit",
+          "count" : 3,
+          "share" : 0.2727
+        }, {
+          "value" : "salamence",
+          "count" : 3,
+          "share" : 0.2727
+        }, {
+          "value" : "sneasler",
+          "count" : 2,
+          "share" : 0.1818
+        }, {
+          "value" : "staraptor",
+          "count" : 2,
+          "share" : 0.1818
+        } ],
+        "sets" : [ {
+          "item" : "Fairy Feather",
+          "ability" : "Pixilate",
+          "nature" : "Modest",
+          "moves" : [ "Detect", "Hyper Beam", "Hyper Voice", "Quick Attack" ],
+          "count" : 3,
+          "share" : 0.2727
+        }, {
+          "item" : "Fairy Feather",
+          "ability" : "Pixilate",
+          "nature" : "Modest",
+          "moves" : [ "Detect", "Hyper Voice", "Quick Attack", "Yawn" ],
+          "count" : 2,
+          "share" : 0.1818
+        }, {
+          "item" : "Fairy Feather",
+          "ability" : "Pixilate",
+          "nature" : "Modest",
+          "moves" : [ "Calm Mind", "Detect", "Hyper Beam", "Hyper Voice" ],
+          "count" : 1,
+          "share" : 0.0909
+        }, {
+          "item" : "Fairy Feather",
+          "ability" : "Pixilate",
+          "nature" : "Modest",
+          "moves" : [ "Detect", "Hyper Beam", "Hyper Voice", "Weather Ball" ],
+          "count" : 1,
+          "share" : 0.0909
+        }, {
+          "item" : "Fairy Feather",
+          "ability" : "Pixilate",
+          "nature" : "Modest",
+          "moves" : [ "Detect", "Hyper Beam", "Hyper Voice", "Yawn" ],
+          "count" : 1,
+          "share" : 0.0909
+        }, {
+          "item" : "Fairy Feather",
+          "ability" : "Pixilate",
+          "nature" : "Modest",
+          "moves" : [ "Hyper Beam", "Hyper Voice", "Protect", "Quick Attack" ],
+          "count" : 1,
+          "share" : 0.0909
+        }, {
+          "item" : "Fairy Feather",
+          "ability" : "Pixilate",
+          "nature" : "Sassy",
+          "moves" : [ "Detect", "Hyper Beam", "Hyper Voice", "Quick Attack" ],
+          "count" : 1,
+          "share" : 0.0909
+        }, {
+          "item" : "Life Orb",
+          "ability" : "Pixilate",
+          "nature" : "Modest",
+          "moves" : [ "Detect", "Hyper Beam", "Hyper Voice", "Yawn" ],
+          "count" : 1,
+          "share" : 0.0909
+        } ]
+      }
+    },
+    "pairs" : [ {
+      "members" : [ "gholdengo", "rillaboom" ],
+      "teams" : 24,
+      "share" : 0.2892,
+      "lift" : 1.6169
+    }, {
+      "members" : [ "raichu", "rillaboom" ],
+      "teams" : 24,
+      "share" : 0.2892,
+      "lift" : 1.6169
+    }, {
+      "members" : [ "incineroar", "rillaboom" ],
+      "teams" : 23,
+      "share" : 0.2771,
+      "lift" : 1.3147
+    }, {
+      "members" : [ "gholdengo", "raichu" ],
+      "teams" : 19,
+      "share" : 0.2289,
+      "lift" : 2.0115
+    }, {
+      "members" : [ "garchomp", "rillaboom" ],
+      "teams" : 16,
+      "share" : 0.1928,
+      "lift" : 1.1608
+    }, {
+      "members" : [ "rillaboom", "sneasler" ],
+      "teams" : 15,
+      "share" : 0.1807,
+      "lift" : 1.179
+    }, {
+      "members" : [ "garchomp", "incineroar" ],
+      "teams" : 14,
+      "share" : 0.1687,
+      "lift" : 1.3543
+    }, {
+      "members" : [ "arcanine:hisui", "rillaboom" ],
+      "teams" : 12,
+      "share" : 0.1446,
+      "lift" : 1.5091
+    }, {
+      "members" : [ "garchomp", "gholdengo" ],
+      "teams" : 12,
+      "share" : 0.1446,
+      "lift" : 1.3681
+    }, {
+      "members" : [ "garchomp", "raichu" ],
+      "teams" : 12,
+      "share" : 0.1446,
+      "lift" : 1.3681
+    }, {
+      "members" : [ "rillaboom", "volcarona" ],
+      "teams" : 12,
+      "share" : 0.1446,
+      "lift" : 1.6169
+    }, {
+      "members" : [ "gholdengo", "incineroar" ],
+      "teams" : 11,
+      "share" : 0.1325,
+      "lift" : 0.9881
+    }, {
+      "members" : [ "incineroar", "raichu" ],
+      "teams" : 11,
+      "share" : 0.1325,
+      "lift" : 0.9881
+    }, {
+      "members" : [ "garchomp", "volcarona" ],
+      "teams" : 10,
+      "share" : 0.1205,
+      "lift" : 2.2802
+    }, {
+      "members" : [ "gholdengo", "volcarona" ],
+      "teams" : 10,
+      "share" : 0.1205,
+      "lift" : 2.1173
+    }, {
+      "members" : [ "incineroar", "sneasler" ],
+      "teams" : 10,
+      "share" : 0.1205,
+      "lift" : 1.048
+    }, {
+      "members" : [ "raichu", "volcarona" ],
+      "teams" : 10,
+      "share" : 0.1205,
+      "lift" : 2.1173
+    }, {
+      "members" : [ "arcanine:hisui", "gholdengo" ],
+      "teams" : 9,
+      "share" : 0.1084,
+      "lift" : 1.7786
+    }, {
+      "members" : [ "arcanine:hisui", "raichu" ],
+      "teams" : 9,
+      "share" : 0.1084,
+      "lift" : 1.7786
+    }, {
+      "members" : [ "archaludon", "pelipper" ],
+      "teams" : 9,
+      "share" : 0.1084,
+      "lift" : 6.9167
+    } ],
+    "trios" : [ {
+      "members" : [ "gholdengo", "raichu", "rillaboom" ],
+      "teams" : 19,
+      "share" : 0.2289,
+      "lift" : 3.7944
+    }, {
+      "members" : [ "garchomp", "gholdengo", "rillaboom" ],
+      "teams" : 11,
+      "share" : 0.1325,
+      "lift" : 2.3657
+    }, {
+      "members" : [ "gholdengo", "incineroar", "rillaboom" ],
+      "teams" : 11,
+      "share" : 0.1325,
+      "lift" : 1.8639
+    }, {
+      "members" : [ "incineroar", "raichu", "rillaboom" ],
+      "teams" : 11,
+      "share" : 0.1325,
+      "lift" : 1.8639
+    }, {
+      "members" : [ "garchomp", "raichu", "rillaboom" ],
+      "teams" : 10,
+      "share" : 0.1205,
+      "lift" : 2.1507
+    }, {
+      "members" : [ "garchomp", "rillaboom", "volcarona" ],
+      "teams" : 10,
+      "share" : 0.1205,
+      "lift" : 4.3013
+    }, {
+      "members" : [ "raichu", "rillaboom", "volcarona" ],
+      "teams" : 10,
+      "share" : 0.1205,
+      "lift" : 3.9941
+    }, {
+      "members" : [ "arcanine:hisui", "gholdengo", "rillaboom" ],
+      "teams" : 9,
+      "share" : 0.1084,
+      "lift" : 3.355
+    }, {
+      "members" : [ "garchomp", "gholdengo", "volcarona" ],
+      "teams" : 9,
+      "share" : 0.1084,
+      "lift" : 6.0833
+    }, {
+      "members" : [ "garchomp", "incineroar", "rillaboom" ],
+      "teams" : 9,
+      "share" : 0.1084,
+      "lift" : 1.6423
+    }, {
+      "members" : [ "garchomp", "raichu", "volcarona" ],
+      "teams" : 9,
+      "share" : 0.1084,
+      "lift" : 6.0833
+    }, {
+      "members" : [ "gholdengo", "rillaboom", "volcarona" ],
+      "teams" : 9,
+      "share" : 0.1084,
+      "lift" : 3.5947
+    }, {
+      "members" : [ "arcanine:hisui", "raichu", "rillaboom" ],
+      "teams" : 8,
+      "share" : 0.0964,
+      "lift" : 2.9823
+    }, {
+      "members" : [ "arcanine:hisui", "raichu", "staraptor" ],
+      "teams" : 8,
+      "share" : 0.0964,
+      "lift" : 14.5799
+    }, {
+      "members" : [ "garchomp", "gholdengo", "raichu" ],
+      "teams" : 8,
+      "share" : 0.0964,
+      "lift" : 2.7037
+    }, {
+      "members" : [ "gholdengo", "incineroar", "raichu" ],
+      "teams" : 8,
+      "share" : 0.0964,
+      "lift" : 2.1302
+    }, {
+      "members" : [ "gholdengo", "raichu", "volcarona" ],
+      "teams" : 8,
+      "share" : 0.0964,
+      "lift" : 5.0211
+    }, {
+      "members" : [ "incineroar", "rillaboom", "sneasler" ],
+      "teams" : 8,
+      "share" : 0.0964,
+      "lift" : 1.5815
+    }, {
+      "members" : [ "incineroar", "rillaboom", "volcarona" ],
+      "teams" : 8,
+      "share" : 0.0964,
+      "lift" : 2.7111
+    }, {
+      "members" : [ "arcanine:hisui", "gholdengo", "raichu" ],
+      "teams" : 7,
+      "share" : 0.0843,
+      "lift" : 4.1006
+    } ],
+    "other" : 59,
+    "archetypes" : [ {
+      "id" : "garchomp+gholdengo+rillaboom+volcarona",
+      "name" : "rillaboom+gholdengo",
+      "core" : [ "rillaboom", "gholdengo", "garchomp", "volcarona" ],
+      "teams" : 9,
+      "usage" : 0.1084
+    }, {
+      "id" : "arcanine:hisui+gholdengo+raichu+staraptor",
+      "name" : "gholdengo+raichu",
+      "core" : [ "gholdengo", "raichu", "arcanine:hisui", "staraptor" ],
+      "teams" : 7,
+      "usage" : 0.0843
+    }, {
+      "id" : "gengar+incineroar+kommoo+rillaboom",
+      "name" : "rillaboom+incineroar",
+      "core" : [ "rillaboom", "incineroar", "gengar", "kommoo" ],
+      "teams" : 4,
+      "usage" : 0.0482
+    }, {
+      "id" : "gholdengo+incineroar+raichu+rillaboom",
+      "name" : "rillaboom+incineroar+gholdengo",
+      "core" : [ "rillaboom", "incineroar", "gholdengo", "raichu" ],
+      "teams" : 3,
+      "usage" : 0.0361
+    }, {
+      "id" : "garchomp+incineroar+raichu+volcarona",
+      "name" : "incineroar+raichu",
+      "core" : [ "incineroar", "raichu", "garchomp", "volcarona" ],
+      "teams" : 1,
+      "usage" : 0.012
+    } ]
+  },
+  "trends" : {
+    "rillaboom" : -0.0199,
+    "incineroar" : -0.0024,
+    "gholdengo" : 0.0206,
+    "garchomp" : -0.02,
+    "raichu" : 0.0373,
+    "sneasler" : -0.0775,
+    "volcarona" : -0.0146,
+    "charizard" : -0.0267,
+    "arcanine:hisui" : 0.0474,
+    "archaludon" : -0.0387,
+    "basculegion" : -8.0E-4,
+    "sylveon" : 0.0158,
+    "kingambit" : 0.0038,
+    "pelipper" : -0.0249,
+    "primarina" : 0.0205,
+    "farigiraf" : -0.0203,
+    "salamence" : 0.0251,
+    "staraptor" : 0.0251,
+    "gengar" : 0.0297,
+    "indeedee" : 0.001,
+    "indeedee:female" : 0.001,
+    "golisopod" : -0.011,
+    "venusaur" : -0.011,
+    "floette" : -0.0231,
+    "kommoo" : 0.0056,
+    "politoed" : -0.0231,
+    "sinistcha" : 0.0343,
+    "swampert" : 0.0056,
+    "annihilape" : -0.0065,
+    "tyranitar" : 0.0223,
+    "corviknight" : 0.0102,
+    "dragonite" : -0.0185,
+    "excadrill" : 0.0102,
+    "gardevoir" : 0.0102,
+    "grimmsnarl" : -0.0185,
+    "milotic" : -0.0185,
+    "froslass" : -0.0018,
+    "lucario" : 0.0556,
+    "whimsicott" : -0.0018,
+    "delphox" : -0.0139,
+    "dragapult" : -0.0139,
+    "metagross" : -0.0139,
+    "sableye" : 0.0028,
+    "baxcalibur" : -0.0092,
+    "espathra" : -0.0092,
+    "kleavor" : -0.0092,
+    "mimikyu" : -0.0092,
+    "absol" : 0.0074,
+    "aerodactyl" : 0.0074,
+    "mamoswine" : 0.0074,
+    "maushold" : 0.0074,
+    "ninetales:alola" : 0.0074,
+    "pawmot" : 0.0074,
+    "torkoal" : 0.0074,
+    "toxapex" : 0.0074,
+    "aegislash" : -0.0047,
+    "armarouge" : -0.0047,
+    "azumarill" : -0.0047,
+    "blastoise" : -0.0047,
+    "camerupt" : -0.0047,
+    "ceruledge" : -0.0047,
+    "chandelure" : -0.0047,
+    "chesnaught" : -0.0047,
+    "clefable" : -0.0047,
+    "decidueye:hisui" : -0.0047,
+    "glalie" : -0.0047,
+    "glimmora" : -0.0047,
+    "hawlucha" : -0.0047,
+    "medicham" : -0.0047,
+    "meowstic" : -0.0047,
+    "mrrime" : -0.0047,
+    "noivern" : -0.0047,
+    "pyroar" : -0.0047,
+    "rotom" : 0.0241,
+    "sceptile" : -0.0047,
+    "skarmory" : -0.0047,
+    "slowbro" : -0.0047,
+    "snorlax" : -0.0047,
+    "vivillon" : -0.0047,
+    "weavile" : 0.0241,
+    "conkeldurr" : 0.012,
+    "hatterene" : 0.012,
+    "infernape" : 0.012,
+    "lopunny" : 0.012,
+    "pikachu" : 0.012,
+    "serperior" : 0.012
+  }
+}

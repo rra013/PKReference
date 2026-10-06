@@ -289,12 +289,13 @@ ago": when the server last fetched an event), not when the app last asked.
 
 ## 5. Backend additions
 
-Small, in one PR (§9, 4b), with tests on the fixture event on H2 and
-Postgres and Swagger annotations:
+Built in 4b, with tests on the fixture event on H2 and Postgres, and
+Swagger annotations:
 
 1. **`GET /v1/formats/{f}/events?limit=`**: the newest stored events, each
    with its name, date, players, whether its standings are final, and its
-   top-cut size, and the winner's name, record and six species keys. For the
+   top-cut size (`topCutPlayers`), and the winner's name, record and six
+   species keys. For the
    Recent events card; `/v1/formats/{f}/tournaments` has Limitless's shape,
    which has no winner.
 2. **Unique archetype names.** The name is the core's two most-used members,
@@ -303,7 +304,13 @@ Postgres and Swagger annotations:
    names differ. `id` doesn't change.
 3. **`GET /v1/formats/{f}/archetypes/{id}?window=`**: one archetype, as in
    the list, with its five best-placed teams (event, placing, record and the
-   six members' sets) for the archetype page.
+   six members' sets) for the archetype page. Best-placed means the lowest
+   placing, then the bigger event, then the newer one.
+4. **`golden/meta-fixture.json`**, for §10's check that the device and the
+   server agree: the fixture event's usage, trends, the 12 most-used
+   Pokémon's pages, cores and archetypes, recorded from `MetaService` and
+   checked by `MetaGoldenFileTest` (`-Dgolden.record=true` records it
+   again).
 
 Nothing else is needed: the home, Pokémon page and Mon Index card use the
 existing endpoints.

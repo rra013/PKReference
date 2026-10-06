@@ -1,11 +1,20 @@
 package com.pkreference.backend.insight;
 
+import com.pkreference.backend.insight.MetaRepository.EventRow;
 import com.pkreference.backend.insight.MetaRepository.MemberRow;
 import com.pkreference.backend.insight.MetaRepository.PairingRow;
+import com.pkreference.backend.insight.MetaRepository.PlacingRow;
+import com.pkreference.backend.insight.MetaRepository.TeamMemberRow;
 import com.pkreference.backend.insight.MetaResponses.Archetype;
+import com.pkreference.backend.insight.MetaResponses.ArchetypeDetail;
 import com.pkreference.backend.insight.MetaResponses.Archetypes;
 import com.pkreference.backend.insight.MetaResponses.Core;
 import com.pkreference.backend.insight.MetaResponses.Cores;
+import com.pkreference.backend.insight.MetaResponses.EventSummary;
+import com.pkreference.backend.insight.MetaResponses.EventWinner;
+import com.pkreference.backend.insight.MetaResponses.Events;
+import com.pkreference.backend.insight.MetaResponses.ExampleMember;
+import com.pkreference.backend.insight.MetaResponses.ExampleTeam;
 import com.pkreference.backend.insight.MetaResponses.Matchup;
 import com.pkreference.backend.insight.MetaResponses.Format;
 import com.pkreference.backend.insight.MetaResponses.Formats;
@@ -63,6 +72,8 @@ public class MetaService {
     /** A core or archetype needs at least this many teams, and at least ARCHETYPE_SHARE of them. */
     static final int MIN_CORE_TEAMS = 4;
     static final double ARCHETYPE_SHARE = 0.02;
+    /** An archetype page's example teams. */
+    static final int EXAMPLE_TEAMS = 5;
 
     private final MetaRepository repository;
     private final NameStandardizer names;
@@ -200,11 +211,138 @@ public class MetaService {
     /**
      * Archetypes: cores of four, the most common first, each differing from every more common core
      * by at least two Pokémon (sharing at most two), with at least MIN_CORE_TEAMS teams and
-     * ARCHETYPE_SHARE of them. Each team belongs to the first core it contains.
+     * ARCHETYPE_SHARE of them. Each team belongs to the first core it contains. Each is named by its
+     * two most-used members, and by more of its core when an archetype with more teams has that name.
      */
     public Archetypes archetypes(String format, MetaWindow window) {
         Instant now = clock.instant();
         return memoize("archetypes|" + format + "|" + window.id(), now, () -> {
+            Grouping g = grouping(format, window, now);
+            Teams teams = g.teams();
+            int n = teams.count();
+
+            // Records: overall, and against each other archetype.
+            Map<String, int[]> overall = new HashMap<>();
+            Map<String, Map<String, int[]>> against = new HashMap<>();
+            for (PairingRow p : repository.pairings(format, g.from(), now)) {
+                String a = g.archetypeOf().get(p.team1());
+                String b = g.archetypeOf().get(p.team2());
+                if (!teams.keysByTeam.containsKey(p.team1()) || !teams.keysByTeam.containsKey(p.team2())) continue;
+                if (a != null && !a.equals(b)) {
+                    int o = outcome(p.result(), true);
+                    overall.computeIfAbsent(a, k -> new int[3])[o]++;
+                    if (b != null) against.computeIfAbsent(a, k -> new HashMap<>()).computeIfAbsent(b, k -> new int[3])[o]++;
+                }
+                if (b != null && !b.equals(a)) {
+                    int o = outcome(p.result(), false);
+                    overall.computeIfAbsent(b, k -> new int[3])[o]++;
+                    if (a != null) against.computeIfAbsent(b, k -> new HashMap<>()).computeIfAbsent(a, k -> new int[3])[o]++;
+                }
+            }
+
+            List<Archetype> archetypes = new ArrayList<>();
+            for (List<String> core : g.cores()) {
+                String id = String.join("+", core);
+                Set<String> inIt = g.members().getOrDefault(id, Set.of());
+                if (inIt.isEmpty()) continue;
+                List<String> byUsage = core.stream()
+                        .sorted(Comparator.comparingInt((String k) -> -teams.teamsByKey.get(k).size()).thenComparing(k -> k))
+                        .toList();
+                int inTopCut = (int) inIt.stream().filter(g.topCutTeams()::contains).count();
+                List<Matchup> matchups = against.getOrDefault(id, Map.of()).entrySet().stream()
+                        .map(e -> new Matchup(e.getKey(), winRecord(e.getValue())))
+                        .sorted(Comparator.comparingInt((Matchup m) -> -m.record().matches()).thenComparing(Matchup::against))
+                        .toList();
+                archetypes.add(new Archetype(id, null, byUsage, inIt.size(),
+                        ratio(inIt.size(), n), inTopCut,
+                        g.topCutTeams().isEmpty() ? null : ratio(inTopCut, g.topCutTeams().size()),
+                        winRecord(overall.get(id)), matchups));
+            }
+            archetypes.sort(Comparator.comparingInt((Archetype a) -> -a.teams()).thenComparing(Archetype::id));
+            return new Archetypes(format, window.id(), g.from(), now, now,
+                    new Sample(teams.events(), n, g.topCutTeams().size()), n - g.archetypeOf().size(),
+                    named(archetypes));
+        });
+    }
+
+    /**
+     * Names in order (most teams first): the two most-used members, or as many more as it takes to
+     * differ from every name before it.
+     */
+    static List<Archetype> named(List<Archetype> archetypes) {
+        Set<String> used = new HashSet<>();
+        List<Archetype> out = new ArrayList<>();
+        for (Archetype a : archetypes) {
+            int size = 2;
+            String name = String.join("+", a.core().subList(0, size));
+            while (used.contains(name) && size < a.core().size()) name = String.join("+", a.core().subList(0, ++size));
+            used.add(name);
+            out.add(new Archetype(a.id(), name, a.core(), a.teams(), a.usage(), a.topCutTeams(), a.topCutUsage(),
+                    a.record(), a.matchups()));
+        }
+        return out;
+    }
+
+    /** One archetype, with its best-placed teams. Throws NoSuchElementException for an id not in the window. */
+    public ArchetypeDetail archetype(String format, String id, MetaWindow window) {
+        Instant now = clock.instant();
+        return memoize("archetype|" + format + "|" + id + "|" + window.id(), now, () -> {
+            Archetypes all = archetypes(format, window);
+            Archetype archetype = all.archetypes().stream().filter(a -> a.id().equals(id)).findFirst()
+                    .orElseThrow(() -> new NoSuchElementException("No archetype " + id + " in the window"));
+            Set<String> inIt = grouping(format, window, now).members().getOrDefault(id, Set.of());
+            List<PlacingRow> best = repository.placings(format, all.from(), now).stream()
+                    .filter(p -> p.placing() != null && inIt.contains(p.team()))
+                    .sorted(Comparator.comparingInt(PlacingRow::placing)
+                            .thenComparing(Comparator.comparingInt(PlacingRow::players).reversed())
+                            .thenComparing(PlacingRow::eventDate, Comparator.nullsLast(Comparator.reverseOrder()))
+                            .thenComparing(PlacingRow::team))
+                    .limit(EXAMPLE_TEAMS)
+                    .toList();
+            Map<String, List<ExampleMember>> members = new HashMap<>();
+            for (TeamMemberRow m : repository.teamMembers(best.stream().map(PlacingRow::team).collect(Collectors.toSet()))) {
+                List<String> moves = m.moves().stream().map(mv -> names.move(format, mv)).filter(Objects::nonNull).toList();
+                members.computeIfAbsent(m.team(), k -> new ArrayList<>()).add(new ExampleMember(m.speciesKey(), m.name(),
+                        names.item(format, m.item()), names.ability(format, m.ability()), names.nature(m.nature()), moves));
+            }
+            List<ExampleTeam> examples = best.stream()
+                    .map(p -> new ExampleTeam(p.eventId(), p.eventName(), p.eventDate(), p.players(), p.name(), p.placing(),
+                            p.wins(), p.losses(), p.ties(), members.getOrDefault(p.team(), List.of())))
+                    .toList();
+            return new ArchetypeDetail(format, window.id(), all.from(), now, now, all.sample(), archetype, examples);
+        });
+    }
+
+    /** The format's newest stored events, with their top cuts and winners. */
+    public Events events(String format, int limit) {
+        Instant now = clock.instant();
+        return memoize("events|" + format + "|" + limit, now, () -> {
+            List<EventRow> rows = repository.events(format, limit);
+            List<String> ids = rows.stream().map(EventRow::id).toList();
+            Map<String, Integer> topCuts = repository.topCutPlayers(ids);
+            Map<String, PlacingRow> winners = new HashMap<>();
+            for (PlacingRow w : repository.winners(ids)) winners.putIfAbsent(w.eventId(), w);
+            Map<String, List<String>> teams = new HashMap<>();
+            for (TeamMemberRow m : repository.teamMembers(winners.values().stream().map(PlacingRow::team)
+                    .collect(Collectors.toSet()))) {
+                if (m.speciesKey() != null) teams.computeIfAbsent(m.team(), k -> new ArrayList<>()).add(m.speciesKey());
+            }
+            return new Events(format, now, rows.stream().map(e -> {
+                PlacingRow w = winners.get(e.id());
+                EventWinner winner = w == null ? null : new EventWinner(w.name(), w.wins(), w.losses(), w.ties(),
+                        teams.getOrDefault(w.team(), List.of()));
+                return new EventSummary(e.id(), e.name(), e.date(), e.players(), e.standingsFinal(),
+                        topCuts.get(e.id()), winner);
+            }).toList());
+        });
+    }
+
+    /** Teams grouped into archetypes, before anything is counted: what the list and each page share. */
+    private record Grouping(Instant from, Teams teams, Set<String> topCutTeams, List<List<String>> cores,
+                            Map<String, String> archetypeOf, Map<String, Set<String>> members) {}
+
+    private Grouping grouping(String format, MetaWindow window, Instant now) {
+        return memoize("grouping|" + format + "|" + window.id(), now, () -> {
             Instant from = window.from(now);
             Teams teams = Teams.of(repository.members(format, from, now));
             var topCut = repository.topCut(format, from, now);
@@ -238,46 +376,7 @@ public class MetaService {
                     }
                 }
             }
-
-            // Records: overall, and against each other archetype.
-            Map<String, int[]> overall = new HashMap<>();
-            Map<String, Map<String, int[]>> against = new HashMap<>();
-            for (PairingRow p : repository.pairings(format, from, now)) {
-                String a = archetypeOf.get(p.team1());
-                String b = archetypeOf.get(p.team2());
-                if (!teams.keysByTeam.containsKey(p.team1()) || !teams.keysByTeam.containsKey(p.team2())) continue;
-                if (a != null && !a.equals(b)) {
-                    int o = outcome(p.result(), true);
-                    overall.computeIfAbsent(a, k -> new int[3])[o]++;
-                    if (b != null) against.computeIfAbsent(a, k -> new HashMap<>()).computeIfAbsent(b, k -> new int[3])[o]++;
-                }
-                if (b != null && !b.equals(a)) {
-                    int o = outcome(p.result(), false);
-                    overall.computeIfAbsent(b, k -> new int[3])[o]++;
-                    if (a != null) against.computeIfAbsent(b, k -> new HashMap<>()).computeIfAbsent(a, k -> new int[3])[o]++;
-                }
-            }
-
-            List<Archetype> archetypes = new ArrayList<>();
-            for (List<String> core : cores) {
-                String id = String.join("+", core);
-                Set<String> inIt = members.getOrDefault(id, Set.of());
-                if (inIt.isEmpty()) continue;
-                List<String> byUsage = core.stream()
-                        .sorted(Comparator.comparingInt((String k) -> -teams.teamsByKey.get(k).size()).thenComparing(k -> k))
-                        .toList();
-                int inTopCut = (int) inIt.stream().filter(topCutTeams::contains).count();
-                List<Matchup> matchups = against.getOrDefault(id, Map.of()).entrySet().stream()
-                        .map(e -> new Matchup(e.getKey(), winRecord(e.getValue())))
-                        .sorted(Comparator.comparingInt((Matchup m) -> -m.record().matches()).thenComparing(Matchup::against))
-                        .toList();
-                archetypes.add(new Archetype(id, byUsage.get(0) + "+" + byUsage.get(1), byUsage, inIt.size(),
-                        ratio(inIt.size(), n), inTopCut, topCutTeams.isEmpty() ? null : ratio(inTopCut, topCutTeams.size()),
-                        winRecord(overall.get(id)), matchups));
-            }
-            archetypes.sort(Comparator.comparingInt((Archetype a) -> -a.teams()).thenComparing(Archetype::id));
-            return new Archetypes(format, window.id(), from, now, now,
-                    new Sample(teams.events(), n, topCutTeams.size()), n - archetypeOf.size(), archetypes);
+            return new Grouping(from, teams, topCutTeams, cores, archetypeOf, members);
         });
     }
 
@@ -407,11 +506,20 @@ public class MetaService {
         memo.clear();
     }
 
+    /**
+     * Not computeIfAbsent: one result can be worked out from another (an archetype page from the
+     * grouping), and a ConcurrentHashMap can't be changed from inside its own computeIfAbsent. Two
+     * requests at once may both compute a result; the answers are the same.
+     */
     @SuppressWarnings("unchecked")
     private <T> T memoize(String key, Instant now, Supplier<T> compute) {
         String full = key + "|" + repository.version() + "|" + now.truncatedTo(ChronoUnit.HOURS);
+        Object known = memo.get(full);
+        if (known != null) return (T) known;
+        T value = compute.get();
         if (memo.size() > 500) memo.clear();
-        return (T) memo.computeIfAbsent(full, k -> compute.get());
+        memo.put(full, value);
+        return value;
     }
 
     private static Set<String> intersect(Set<String> a, Set<String> b) {

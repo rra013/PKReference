@@ -1,7 +1,9 @@
 package com.pkreference.backend.insight;
 
+import com.pkreference.backend.insight.MetaResponses.ArchetypeDetail;
 import com.pkreference.backend.insight.MetaResponses.Archetypes;
 import com.pkreference.backend.insight.MetaResponses.Cores;
+import com.pkreference.backend.insight.MetaResponses.Events;
 import com.pkreference.backend.insight.MetaResponses.Formats;
 import com.pkreference.backend.insight.MetaResponses.PokemonDetail;
 import com.pkreference.backend.insight.MetaResponses.PokemonList;
@@ -31,9 +33,10 @@ import java.util.NoSuchElementException;
 @RequestMapping("/v1")
 @Tag(name = "Meta", description = """
         Tournament insights from Limitless events: usage, top-cut rate, trends, win rates, sets, cores and \
-        archetypes. Read-only and cached (15 minutes, with ETags). Shares are 0 to 1.""")
+        archetypes, and the newest events. Read-only and cached (15 minutes, with ETags). Shares are 0 to 1.""")
 public class MetaController {
     static final CacheControl CACHE = CacheControl.maxAge(Duration.ofMinutes(15)).cachePublic();
+    static final int MAX_EVENTS = 50;
     private static final String WINDOW = "14d, 30d (the default) or regulation (every stored event of the format).";
 
     private final MetaService meta;
@@ -86,6 +89,29 @@ public class MetaController {
             @Parameter(description = "Limitless format id.", example = "M-C") @PathVariable String format,
             @Parameter(description = WINDOW) @RequestParam(required = false) String window) {
         return ResponseEntity.ok().cacheControl(CACHE).body(meta.archetypes(format, MetaWindow.parse(window)));
+    }
+
+    @GetMapping("/formats/{format}/archetypes/{id}")
+    @Operation(summary = "One archetype, with example teams",
+            description = "The archetype as the list has it, and its best-placed teams with their sets. 404 when "
+                    + "the window has no archetype with that id.")
+    public ResponseEntity<ArchetypeDetail> archetype(
+            @Parameter(description = "Limitless format id.", example = "M-C") @PathVariable String format,
+            @Parameter(description = "The archetype's id: its core's species keys, sorted, joined with +.",
+                    example = "garchomp+gholdengo+incineroar+rillaboom") @PathVariable String id,
+            @Parameter(description = WINDOW) @RequestParam(required = false) String window) {
+        return ResponseEntity.ok().cacheControl(CACHE).body(meta.archetype(format, id, MetaWindow.parse(window)));
+    }
+
+    @GetMapping("/formats/{format}/events")
+    @Operation(summary = "The newest stored events",
+            description = "Newest first, each with its size, whether its standings are final, its top cut's size "
+                    + "and its winner's team.")
+    public ResponseEntity<Events> events(
+            @Parameter(description = "Limitless format id.", example = "M-C") @PathVariable String format,
+            @Parameter(description = "How many, from 1 to " + MAX_EVENTS + ".") @RequestParam(defaultValue = "10") int limit) {
+        if (limit < 1 || limit > MAX_EVENTS) throw new IllegalArgumentException("limit must be 1 to " + MAX_EVENTS);
+        return ResponseEntity.ok().cacheControl(CACHE).body(meta.events(format, limit));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
