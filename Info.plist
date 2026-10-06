@@ -4,6 +4,14 @@
 <dict>
 	<key>CFBundleSpokenName</key>
 	<string>P K Reference</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- The PK Reference server runs on the owner's machine over plain HTTP while the app isn't deployed. -->
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>PK Reference connects to your PK Reference server on this network for tournament data, when it's turned on in Settings.</string>
 	<key>INAlternativeAppNames</key>
 	<array>
 		<dict>

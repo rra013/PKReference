@@ -24,7 +24,8 @@ struct AppSettingsTests {
          AppSettings.typeBadgeStyle.name, AppSettings.density.name,
          AppSettings.typeBackgrounds.name,
          AppSettings.championsRegulation.name, AppSettings.instantSetDelete.name,
-         AppSettings.warnBeforeLeavingTab.name, AppSettings.matchupColors.name]
+         AppSettings.warnBeforeLeavingTab.name, AppSettings.matchupColors.name,
+         AppSettings.metaServerEnabled.name, AppSettings.metaServerAddress.name]
     }
 
     @Test("Key names match what earlier versions stored")
@@ -35,7 +36,8 @@ struct AppSettingsTests {
                           "typeBadgeStyle", "density",
                           "typeBackgrounds",
                           "championsRegulationRaw", "instantSetDelete",
-                          "warnBeforeLeavingTab", "matchupColors"])
+                          "warnBeforeLeavingTab", "matchupColors",
+                          "metaServerEnabled", "metaServerAddress"])
     }
 
     @Test("No two settings share a key")
@@ -55,6 +57,8 @@ struct AppSettingsTests {
         #expect(AppSettings.typeBackgrounds.defaultValue == false)
         #expect(AppSettings.instantSetDelete.defaultValue == false)
         #expect(AppSettings.warnBeforeLeavingTab.defaultValue == true)
+        #expect(AppSettings.metaServerEnabled.defaultValue == false)
+        #expect(AppSettings.metaServerAddress.defaultValue == "http://localhost:8080")
     }
 
     /// A throwaway defaults suite, removed when `body` returns.

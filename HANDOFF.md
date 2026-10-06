@@ -36,7 +36,7 @@ says what changed and what was checked.
 Before that, #23–#56 were the UI pass, game data into JSON, iPad fixes, the
 Mac app, Siri Phase 1 and the rename to PK Reference.
 
-Full suite on 2026-10-06, with the backend's species golden test: 1,281 tests, all passing
+Full suite on 2026-10-06, with the PK Reference server option: 1,285 tests, all passing
 on the iPhone 17 Pro Max simulator. The iOS and Mac builds had no warnings.
 
 ---
@@ -612,11 +612,13 @@ is in [Recent work](#recent-work) and the README.
      but saving a team reports them; a log of them would show the gaps.
 6. **Use the backend in the app.** Started 2026-10-06 on the
    `backend-integration` branch: see
-   [`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md). Today each
-   device downloads Limitless's teams itself, for Team Search and the
-   Problem Solver's usage ranking. The backend runs on the owner's Mac
-   against Docker's Kafka and live Limitless. Item 5's rate limits and terms
-   apply to it too.
+   [`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md). The backend
+   runs on the owner's Mac against Docker's Kafka and live Limitless; item
+   5's rate limits and terms apply to it too. Settings → PK Reference Server
+   (Beta), off by default, has Team Search and the Problem Solver build their
+   corpus from it (`MetaServer.swift`: the same two calls, which the server
+   answers in Limitless's shapes), falling back to Limitless whenever it
+   can't answer. Next is the plan's Phase 4, the Meta tab.
 7. **FireRed and LeafGreen's open items.** Wild calibration (Ten Lines'
    `check_seeds_wild`); Teachy TV on Switch, which Ten Lines hasn't worked
    out either; and the Switch lists' settings nobody has farmed yet (Ten

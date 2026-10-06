@@ -342,12 +342,17 @@ Each phase is one PR into `backend-integration`, or two where it's large.
      none under 30 matches), cores (pairs and trios with their lift), and a
      first version of archetypes (cores of four, with their records and
      matchups). Swagger UI describes every endpoint and field.
-3. **The app's client, behind the setting.**
-   - Client, disk cache, the setting and freshness labels.
-   - Team Search's corpus and the Problem Solver's usage from the server,
-     with fallback.
-   - The server is the owner's local Docker setup, through the setting's
-     server address.
+3. **The app's client, behind the setting.** Two PRs:
+   - **3a, backend:** `GET /v1/formats/{f}/tournaments` and
+     `GET /v1/tournaments/{id}/standings`, the stored events in Limitless's
+     own shapes; the standings come back as Limitless sent them.
+   - **3b, app:** Settings → PK Reference Server (Beta), off by default, with
+     the server's address (`http://localhost:8080`) and a connection test.
+     With it on, Team Search's corpus (and so the Problem Solver's usage)
+     comes from the server through the app's existing corpus code
+     (`PreferredCorpusFetcher`), and from Limitless whenever the server
+     can't answer. Freshness labels and the app's use of `/v1`'s insights
+     come with the Meta tab (Phase 4), which reads them.
 4. **Meta tab (first version).**
    - Home, the Pokémon page and the info sheets.
    - Mon Index's "In the meta" card.
