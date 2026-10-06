@@ -28,7 +28,7 @@ says what changed and what was checked.
 | [#57](https://github.com/rra013/PKReference/pull/57)–[#59](https://github.com/rra013/PKReference/pull/59) | Siri, Spotlight and Shortcuts, Phase 2: Compare Speed, Check Legality, saved sets and teams (in Spotlight too), the system's in-app search, and search sentences read into a damage calc. See [Feature notes](#siri-spotlight-and-shortcuts). |
 | [#60](https://github.com/rra013/PKReference/pull/60)–[#67](https://github.com/rra013/PKReference/pull/67), [#69](https://github.com/rra013/PKReference/pull/69) | The Problem Solver: the solver and its tab, field options, grouping by Pokémon, two hits, an ability filter, usage ranking, Siri's Find Counters, and Sturdy, Focus Sash and Disguise taking a hit in the calc. See [Feature notes](#problem-solver). |
 | [#68](https://github.com/rra013/PKReference/pull/68), [#85](https://github.com/rra013/PKReference/pull/85) | Champions data: Dragoninite in every regulation; the 15 items M-B added, which M-B and M-C lacked; and the game's names for Golisopite and Baxcalibrite. Sets saved with the old names still load (`HeldItem.renamed`). |
-| [#70](https://github.com/rra013/PKReference/pull/70)–[#83](https://github.com/rra013/PKReference/pull/83) | RNG tools: FireRed/LeafGreen initial seeds and calibration from Ten Lines (#70–#72), a Mac crash opening Calibrate (#73), then the RNG fixes' PRs 1–8, 11 and 11b from the 2026-10-03 audit (#74–#83), and PRs 9, 10 and 12: wild areas from PokéFinder's tables, the Gen 4 tools' year, and Gen 5 profiles. See [`RNGFixes-PLAN.md`](RNGFixes-PLAN.md). |
+| [#70](https://github.com/rra013/PKReference/pull/70)–[#83](https://github.com/rra013/PKReference/pull/83), [#87](https://github.com/rra013/PKReference/pull/87)–[#89](https://github.com/rra013/PKReference/pull/89) | RNG tools: FireRed/LeafGreen initial seeds and calibration from Ten Lines (#70–#72), a Mac crash opening Calibrate (#73), then the fixes from the 2026-10-03 audit (#74–#83, #87–#89), last of all wild areas from PokéFinder's tables, the Gen 4 tools' year, and Gen 5 profiles. See [Feature notes](#rng-tools). |
 | [#84](https://github.com/rra013/PKReference/pull/84), [#85](https://github.com/rra013/PKReference/pull/85) | An optional backend in `backend/`: Limitless tournaments through Kafka into usage counts served over REST, with hand-typed names standardized. The app doesn't use it yet. |
 
 Before that, #23–#56 were the UI pass, game data into JSON, iPad fixes, the
@@ -101,9 +101,9 @@ call it yet (see [What's next](#whats-next)).
 **RNG tools** (`RNGToolsView.swift` and the files beside it): PokéFinder's
 C++ core is called through `PFBridge.h`/`.mm`, with `PFBridgeSwift.swift` as
 the Swift side. Fixes go in the bridge or the app, not in `PKReference/Core`,
-whose changes `MODIFICATIONS.md` lists. [`RNGFixes-PLAN.md`](RNGFixes-PLAN.md)
-§2 lists the patterns new RNG code follows: streaming searches, chunked
-generators, the result limit, live number fields. FireRed and LeafGreen's
+whose changes `MODIFICATIONS.md` lists. [Feature notes](#rng-tools) lists
+the patterns new RNG code follows: streaming searches, chunked generators,
+the result limit, live number fields. FireRed and LeafGreen's
 initial seeds, ported from [Ten Lines](https://github.com/Lincoln-LM/ten-lines)
 (GPL-3.0, no "or later"), are `FRLGSeeds.swift` (the engine) and
 `FRLGSeedsView.swift` (the screens), with the community's farmed lists
@@ -258,9 +258,9 @@ wasn't checked.
 
 ## Feature notes
 
-How two finished features were designed, and the owner's decisions that
-still hold for changes to them. Their plans were removed on 2026-10-05; git
-history has them.
+How three finished pieces of work were designed, and the owner's decisions
+that still hold for changes to them. Their plans were removed on 2026-10-05
+and 2026-10-06; git history has them.
 
 ### Siri, Spotlight and Shortcuts
 
@@ -345,6 +345,61 @@ iPad and the Mac), with `ProblemSolverTests`.
     pastes and saves as a calc side does.
 - **Checking it:** `-debugNavigate problem:Incineroar,intimidate,bulky`
   opens the tab on a set.
+
+### RNG tools
+
+The 2026-10-03 audit checked the RNG tools against independent maths,
+round-tripped every Searcher through its Generator, diffed the encounter
+data against PokéFinder's tables, and walked every tool on the iPhone and
+the Mac. PokéFinder's maths held wherever it was checked; almost every
+problem was in the app's glue: the bridge's filters, the values it passed,
+and the data and screens around it. Fourteen PRs (#74–#83, #87–#89) fixed
+its 45 findings and 13 found since. Each PR's description says which, and
+what was checked.
+
+- **Rules that still hold:**
+  - Don't edit PokéFinder's code (`PKReference/Core`): fixes go in the
+    bridge (`PFBridge.mm`/`.h`, `PFBridgeSwift.swift`) or the app.
+  - Offer what PokéFinder's screens offer for each game. Its generators read
+    only their own leads, methods, modes and encounter settings, and
+    ignore or misread any other: Gen 4 wild has Method J or K by game, Gen 5
+    one method, Sword and Shield only raids.
+- **Patterns new RNG code follows:**
+  - A long search gets a streaming handle, as `pf_staticSearch3_start` and
+    the rest have: the bridge sets the progress total before it starts and
+    a `done` flag when its thread returns, and Swift frees the handle off
+    the main actor.
+  - A generator runs through `generateInChunks`, 10,000 advances at a time,
+    and every search and generate stops at `searchResultLimit` (100,000)
+    and says so.
+  - A number field is a `LiveIntField` (or `RNGIntField`, `RNGOptIntField`,
+    `IVField`) with an `RNGFieldRange` or `.clamping`; hex values, such as
+    Gen 5's parameters, use `HexField`.
+  - Leads are `PFLead`; Shiny Only is `pfShinyFilter` (star or square).
+  - Encounters are references into PokéFinder's tables: statics by type and
+    index (`StaticEncounterData`), wild areas by location ID with the
+    settings that change their slots (`WildAreaData`).
+  - Results clear when what they were found for changes, and a run that
+    finds nothing says why (`noResultsText`).
+  - Handoffs to the Timer go through `FinderTimerBridge` to
+    `RNGTimerEngine.shared`: Gen 3 targets with `Gen3TargetStart`, Gen 4
+    with the whole clock time and year that Check Your Seed reads, Gen 5
+    with the second to press Continue.
+- **The owner's decisions (2026-10-03 and 04):**
+  - FireRed and LeafGreen's Mew is the one app-only static, generated from
+    Emerald's Mew template.
+  - Shiny Only means star or square.
+  - Gen 3 static offers Methods 1 and 4, which PokéFinder has in both
+    modes.
+  - The Eggs tool and TID/SID have no Gen 8 tab: the Finder's Egg and
+    TID/SID modes are BDSP's.
+  - Gen 5 parameters come from the calibrator, with no table of per-console
+    values unless one with a source turns up.
+  - IV Calc offers each game's PokéFinder checker and base stats, or
+    today's stats with EVs.
+- **Checking it:** the audit's probes became unit tests (`RNGToolsTests`).
+  Recorded simulator runs and Mac snapshots (`-debugOpenSheet finder`,
+  `routes`, `frlgCalibration`, `gameCubeSearch`) checked the screens.
 
 ---
 
@@ -473,11 +528,19 @@ From the recent PRs, each also noted in its description:
 Roughly in order of value for effort. Only open work is listed; what's done
 is in [Recent work](#recent-work) and the README.
 
-1. **Retire [`RNGFixes-PLAN.md`](RNGFixes-PLAN.md)** once PR 12 (Gen 5
-   profiles, the calibrator, Gen 5 IDs and Send to Timer) merges: every PR
-   is built. What's still true (the patterns in its §2, the owner's choices
-   in §9 and §10, and what was left out: needle calibration, C-Gear and
-   Entralink timings) comes here first.
+1. **RNG tools: what the fixes left out.** See [Feature notes](#rng-tools).
+   - Gen 5 eggs. The Eggs tool's Gen 5 tab, which ran Gen 4's generator,
+     was removed to come back with Gen 5 profiles, which now exist
+     (`Gen5DSParametersCard`).
+   - Gen 5 needle calibration. PokéFinder's calibrator also works from the
+     Unova Link's needle (`ProfileNeedleSearcher5`); the app's has IVs and
+     a seed.
+   - The Gen 5 Timer's C-Gear and Entralink modes aren't set from a result:
+     PokéFinder's Gen 5 results carry no delay.
+   - Honey trees, Headbutt and the Bug-Catching Contest. PokéFinder's Gen 4
+     wild screens search them (honey trees and the Poké Radar by one slot);
+     the Finder doesn't offer them, though the Routes browser lists
+     Headbutt.
 2. **The items M-B added that sets can't hold.** #85 made M-B's 15 items
    legal, but 11 have no `HeldItem`: Wide Lens, Muscle Band, Wise Glasses,
    Zoom Lens, Iron Ball, Shed Shell, Big Root and the four weather rocks.
@@ -569,10 +632,14 @@ is in [Recent work](#recent-work) and the README.
 | [`PKReference/Core/MODIFICATIONS.md`](PKReference/Core/MODIFICATIONS.md) | Changes made to PokéFinder's code (required by its GPL) |
 | [`PKReference/ShowdownPort-NOTES.md`](PKReference/ShowdownPort-NOTES.md) | Scope and wiring of the `@smogon/calc` port |
 | [`PKReference/AbilityReference.md`](PKReference/AbilityReference.md) | Which abilities the legacy damage engine models (matchups the port can't take) |
-| [`RNGFixes-PLAN.md`](RNGFixes-PLAN.md) | Fixes from the 2026-10-03 RNG tools audit: every PR built (1–12, 11b); retires into this file |
 | [`RNGRewrite-PLAN.md`](RNGRewrite-PLAN.md) | Plan for an independent RNG core (on hold) |
 | [`tools/README.md`](tools/README.md) | Adding a Champions regulation, and the scripts that regenerate the bundled data |
 | [`backend/README.md`](backend/README.md) | Running and testing the optional backend |
+
+Removed on 2026-10-06, in git history: `RNGFixes-PLAN.md` (every PR built;
+its rules, patterns and the owner's decisions are in
+[Feature notes](#rng-tools), what it left out is item 1 above, and its
+findings, numbered 1–58, are in its history and each PR's description).
 
 Removed on 2026-10-05, all in git history: `AppIntents-PLAN.md` and
 `ProblemSolver-PLAN.md` (finished; their decisions are in
