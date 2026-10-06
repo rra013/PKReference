@@ -3251,6 +3251,12 @@ extern "C" PFEggGeneratorState8 *pf_eggGenerate8(uint64_t seed0, uint64_t seed1,
 
     Daycare daycare(parentIVs, abilities, genders, items, dcNatures, eggSpecie, masuda);
 
+    // The Oval Charm raises the daycare's odds, as PokéFinder's Eggs8
+    // screen does before it makes the generator (which doesn't read it).
+    if (ovalCharm) {
+        compatibility = compatibility == 20 ? 40 : compatibility == 50 ? 80 : 88;
+    }
+
     EggGenerator8 generator(initialAdvances, maxAdvances, offset, compatibility, daycare, profile, filter);
 
     auto results = generator.generate(seed0, seed1);

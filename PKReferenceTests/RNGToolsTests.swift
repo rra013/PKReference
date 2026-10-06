@@ -3128,3 +3128,176 @@ struct Gen5EggTests {
         #expect(chatotPitchText(5) == "L 5" && chatotPitchText(99) == "H 99")
     }
 }
+
+// MARK: - BDSP Egg Tests
+
+/// The Finder's BDSP Egg mode: PokéFinder's EggGenerator8 with its Eggs8
+/// screen's species, parent checks and parent order.
+struct BDSPEggTests {
+    /// A male with every IV 31 and a female with every IV 0, so each IV
+    /// shows which parent gave it.
+    private let male = EggParent(ivs: Array(repeating: 31, count: 6), gender: 0)
+    private let female = EggParent(ivs: Array(repeating: 0, count: 6), gender: 1)
+
+    private func generate(_ daycare: BDSPDaycare, compatibility: UInt8 = 70, maxAdvances: UInt32 = 300,
+                          ovalCharm: Bool = false, filterAbility: UInt8 = 255) -> [StaticSearchResult] {
+        var eggs: [StaticSearchResult] = []
+        eggGenerateGen8Streaming(seed0: 0x0123_4567_89AB_CDEF, seed1: 0xFEDC_BA98_7654_3210,
+                                 initialAdvance: 0, maxAdvance: maxAdvances, compatibility: compatibility,
+                                 daycare: daycare, natures: [], tid: 0, sid: 0, shinyOnly: false,
+                                 game: .bd,
+                                 shinyCharm: false, ovalCharm: ovalCharm, filterAbility: filterAbility) {
+            eggs.append($0)
+        }
+        return eggs
+    }
+
+    private func daycare(_ a: EggParent, _ b: EggParent, specie: UInt16 = 1) -> BDSPDaycare {
+        BDSPDaycare(parentA: a, parentB: b, specie: specie, masuda: false)
+    }
+
+    private func ivs(_ egg: StaticSearchResult) -> [UInt8] {
+        [egg.ivHP, egg.ivAtk, egg.ivDef, egg.ivSpA, egg.ivSpD, egg.ivSpe]
+    }
+
+    /// The egg's gender comes from the species picked, not species 1's
+    /// ratio: Nidoran and Volbeat's families are half each.
+    @MainActor
+    @Test func speciesSetsGender() throws {
+        func genders(_ specie: UInt16) -> Set<UInt8> {
+            Set(generate(daycare(male, female, specie: specie)).map(\.gender))
+        }
+        #expect(genders(236) == [0])     // Tyrogue: male only
+        #expect(genders(440) == [1])     // Happiny: female only
+        #expect(genders(81) == [2])      // Magnemite: genderless
+        #expect(genders(1) == [0, 1])
+        for specie: UInt16 in [29, 313] {
+            let eggs = generate(daycare(male, female, specie: specie))
+            let females = eggs.filter { $0.gender == 1 }.count
+            #expect(eggs.count > 100 && abs(females * 2 - eggs.count) < eggs.count / 4, "\(specie)")
+        }
+        let list = EggSpecies.list(for: .gen8)
+        #expect(list.last == 489 && [29, 32, 313, 314, 440].allSatisfy(list.contains))
+    }
+
+    /// Parents entered female first go to PokéFinder male first, as its
+    /// reorderParents swaps them: the eggs are the same, the inheritance
+    /// names the parents as entered, and the female's hidden ability
+    /// passes down. In the order entered, the generator would read the
+    /// male's ability.
+    @Test func reordersParents() throws {
+        var haFemale = female
+        haFemale.ability = 2
+        let maleFirst = generate(daycare(male, haFemale))
+        let femaleFirst = generate(daycare(haFemale, male))
+        #expect(!maleFirst.isEmpty)
+        #expect(maleFirst.map(\.pid) == femaleFirst.map(\.pid) && maleFirst.map(ivs) == femaleFirst.map(ivs))
+        let swapped = maleFirst.map { $0.inheritance?.map { $0 == 1 ? UInt8(2) : $0 == 2 ? 1 : 0 } }
+        #expect(femaleFirst.map(\.inheritance) == swapped)
+        for egg in femaleFirst {
+            let inheritance = try #require(egg.inheritance)
+            #expect(inheritance.filter { $0 != 0 }.count == 3)
+            for (iv, parent) in zip(ivs(egg), inheritance) where parent != 0 {
+                #expect(iv == (parent == 1 ? 0 : 31), "Parent A is the female")
+            }
+        }
+        #expect(femaleFirst.contains { $0.ability == 2 })
+        let unordered = PFBridge.eggGenerate8(seed0: 0x0123_4567_89AB_CDEF, seed1: 0xFEDC_BA98_7654_3210,
+                                              initialAdvances: 0, maxAdvances: 300, compatibility: 70,
+                                              parentAIVs: haFemale.ivs, parentBIVs: male.ivs,
+                                              parentAAbility: 2, parentBAbility: 0,
+                                              parentAGender: 1, parentBGender: 0,
+                                              parentAItem: 0, parentBItem: 0, parentANature: 0, parentBNature: 0,
+                                              eggSpecie: 1, masuda: false, tid: 0, sid: 0,
+                                              game: .bd)
+        #expect(!unordered.isEmpty && !unordered.contains { $0.ability == 2 })
+
+        // Ditto goes second, after the male or genderless parent, whose
+        // hidden ability then passes down.
+        var haMale = male
+        haMale.ability = 2
+        let ditto = EggParent(gender: 3)
+        #expect(daycare(ditto, haMale).isReversed && daycare(ditto, haMale).abilityParent == haMale)
+        #expect(generate(daycare(ditto, haMale)).contains { $0.ability == 2 })
+        var haGenderless = EggParent(gender: 2)
+        haGenderless.ability = 2
+        #expect(daycare(ditto, haGenderless, specie: 81).isReversed)
+        #expect(generate(daycare(ditto, haGenderless, specie: 81)).contains { $0.ability == 2 })
+        #expect(daycare(haFemale, ditto).isReversed && daycare(haFemale, ditto).abilityParent == haFemale)
+        #expect(!daycare(ditto, haFemale).isReversed && !daycare(male, ditto).isReversed)
+    }
+
+    /// The pairs PokéFinder's `EggSettings::isValid` lets through, and for
+    /// a hidden ability its BDSP rule: the female's, or with Ditto the
+    /// other parent's.
+    @Test func parentChecks() {
+        for genderA: UInt8 in 0...3 {
+            for genderB: UInt8 in 0...3 {
+                for abilityA: UInt8 in 0...2 {
+                    for abilityB: UInt8 in 0...2 {
+                        var a = EggParent(gender: genderA)
+                        a.ability = abilityA
+                        var b = EggParent(gender: genderB)
+                        b.ability = abilityB
+                        let parents = daycare(a, b)
+                        let label = "\(genderA)/\(genderB) \(abilityA)/\(abilityB)"
+                        let canBreed = EggParent.canBreed(genderA, genderB)
+                        #expect((parents.blockedReason(hiddenAbility: false) == nil) == canBreed, "\(label)")
+                        // PokéFinder's check, as it's written.
+                        let hiddenAbility = (genderA == 0 && genderB == 1 && abilityB == 2)
+                            || (genderA == 1 && abilityA == 2 && genderB == 0)
+                            || (genderA == 3 && abilityB == 2) || (abilityA == 2 && genderB == 3)
+                        #expect((parents.blockedReason(hiddenAbility: true) == nil) == (canBreed && hiddenAbility),
+                                "\(label)")
+                    }
+                }
+            }
+        }
+        #expect(daycare(male, male).blockedReason(hiddenAbility: false) == EggParent.cannotBreedText)
+        // Gen 5 doesn't pass a hidden ability down with Ditto; BDSP does.
+        var haFemale = female
+        haFemale.ability = 2
+        let ditto = EggParent(gender: 3)
+        #expect(daycare(ditto, haFemale).blockedReason(hiddenAbility: true) == nil)
+        #expect(Gen5Daycare(parentA: ditto, parentB: haFemale, specie: 1, masuda: false)
+            .blockedReason(hiddenAbility: true) != nil)
+        // The hidden-ability filter finds only hidden abilities.
+        let eggs = generate(daycare(haFemale, male), filterAbility: 2)
+        #expect(!eggs.isEmpty && eggs.allSatisfy { $0.ability == 2 })
+    }
+
+    /// BDSP's parents hold an Everstone or the Destiny Knot (PokéFinder's
+    /// item 8, which passes five IVs); its generator ignores power items.
+    @MainActor
+    @Test func heldItems() throws {
+        let fields = EggParentFields(game: .brilliantDiamond)
+        #expect(fields.abilities == [0, 1, 2] && fields.items == [0, 1, 8])
+        #expect(EggParentFields(game: .shiningPearl) == fields)
+        #expect(EggParent.itemNames[8] == "Destiny Knot")
+        var powerItem = male
+        powerItem.item = 7
+        #expect(fields.fitting(powerItem).item == 0)
+
+        var knot = female
+        knot.item = 8
+        for egg in generate(daycare(male, knot)) {
+            #expect(egg.inheritance?.filter { $0 != 0 }.count == 5)
+        }
+        var everstone = female
+        everstone.item = 1
+        everstone.nature = 15 // Modest
+        #expect(generate(daycare(everstone, male)).allSatisfy { $0.nature == 15 })
+    }
+
+    /// The Oval Charm raises the odds as PokéFinder's Eggs8 does: 20% to
+    /// 40%, 50% to 80% and 70% to 88%.
+    @Test func ovalCharm() {
+        let parents = daycare(male, female)
+        for (compatibility, withCharm) in [(UInt8(20), UInt8(40)), (50, 80), (70, 88)] {
+            let charmed = generate(parents, compatibility: compatibility, ovalCharm: true)
+            let raised = generate(parents, compatibility: withCharm)
+            #expect(charmed.map(\.advances) == raised.map(\.advances) && charmed.map(\.pid) == raised.map(\.pid))
+            #expect(charmed.count > generate(parents, compatibility: compatibility).count)
+        }
+    }
+}

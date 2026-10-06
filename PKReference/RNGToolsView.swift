@@ -1747,16 +1747,13 @@ nonisolated func wildGenerateGen8Streaming(
 // MARK: - Gen 8 Egg Generator Streaming
 // ============================================================================
 
+/// The parents go to PokéFinder in the game's order, and each egg's
+/// inheritance names them as you entered them.
 nonisolated func eggGenerateGen8Streaming(
     seed0: UInt64, seed1: UInt64,
     initialAdvance: UInt32, maxAdvance: UInt32,
     compatibility: UInt8,
-    parentAIVs: [UInt8], parentBIVs: [UInt8],
-    parentAAbility: UInt8, parentBAbility: UInt8,
-    parentAGender: UInt8, parentBGender: UInt8,
-    parentAItem: UInt8, parentBItem: UInt8,
-    parentANature: UInt8, parentBNature: UInt8,
-    eggSpecie: UInt16, masuda: Bool,
+    daycare: BDSPDaycare,
     natures: Set<UInt8>,
     tid: UInt16, sid: UInt16,
     shinyOnly: Bool,
@@ -1770,18 +1767,19 @@ nonisolated func eggGenerateGen8Streaming(
     var natArr = [Bool](repeating: natures.isEmpty, count: 25)
     for n in natures { natArr[Int(n)] = true }
     let shinyFilter: UInt8 = pfShinyFilter(shinyOnly)
+    let (first, second) = daycare.gameOrder
 
     generateInChunks(initialAdvance: initialAdvance, maxAdvance: maxAdvance, onProgress: onProgress) { start, count in
         let results = PFBridge.eggGenerate8(
             seed0: seed0, seed1: seed1,
             initialAdvances: start, maxAdvances: count,
             compatibility: compatibility,
-            parentAIVs: parentAIVs, parentBIVs: parentBIVs,
-            parentAAbility: parentAAbility, parentBAbility: parentBAbility,
-            parentAGender: parentAGender, parentBGender: parentBGender,
-            parentAItem: parentAItem, parentBItem: parentBItem,
-            parentANature: parentANature, parentBNature: parentBNature,
-            eggSpecie: eggSpecie, masuda: masuda,
+            parentAIVs: first.ivs, parentBIVs: second.ivs,
+            parentAAbility: first.ability, parentBAbility: second.ability,
+            parentAGender: first.gender, parentBGender: second.gender,
+            parentAItem: first.item, parentBItem: second.item,
+            parentANature: first.nature, parentBNature: second.nature,
+            eggSpecie: daycare.specie, masuda: daycare.masuda,
             tid: tid, sid: sid, game: game,
             shinyCharm: shinyCharm, ovalCharm: ovalCharm,
             filterGender: filterGender, filterAbility: filterAbility,
@@ -1794,7 +1792,7 @@ nonisolated func eggGenerateGen8Streaming(
                 nature: r.nature, ability: r.ability,
                 gender: r.gender, shiny: r.shiny > 0,
                 advances: r.advances, method: .method1,
-                inheritance: r.inheritance, eggSeed: r.seed
+                inheritance: daycare.yourParents(r.inheritance), eggSeed: r.seed
             ))
         }
         return results.count
@@ -3990,6 +3988,11 @@ struct FinderRootView: View {
                     }
                 }
 
+                if encounterMode == .egg {
+                    EggParentCard(label: "Parent A", parent: gen8EggParentA, fields: gen8EggParentFields)
+                    EggParentCard(label: "Parent B", parent: gen8EggParentB, fields: gen8EggParentFields)
+                }
+
                 // Profile
                 SectionCard(title: "Trainer", icon: "person") {
                     if !savedProfiles.isEmpty {
@@ -4142,6 +4145,14 @@ struct FinderRootView: View {
                             Text("Any").tag(UInt8(255))
                             Text("Ability 0").tag(UInt8(0))
                             Text("Ability 1").tag(UInt8(1))
+                            // BDSP's eggs can have it, as PokéFinder's Eggs8
+                            // filter offers.
+                            if encounterMode == .egg {
+                                Text("Hidden Ability").tag(UInt8(2))
+                            }
+                        }
+                        .onChange(of: encounterMode, initial: true) {
+                            if encounterMode != .egg && filterAbility == 2 { filterAbility = 255 }
                         }
 
                         FinderHiddenPowerGrid(selected: $selectedHiddenPowers)
@@ -4408,6 +4419,9 @@ struct FinderRootView: View {
         }
         if encounterMode == .underground && undergroundArea == nil {
             return "Choose an area under Encounter."
+        }
+        if encounterMode == .egg, let reason = bdspDaycare.blockedReason(hiddenAbility: filterAbility == 2) {
+            return reason
         }
         // The Safari Zone rerolls a Pokémon until an IV is 31, which
         // PokéFinder's searcher works back from.
@@ -4893,60 +4907,11 @@ struct FinderRootView: View {
 
     // MARK: Gen 8 Encounter Mode Views
 
+    /// The daycare, in the Encounter card. The parents have cards of
+    /// their own below it.
     private var gen8EggParametersView: some View {
         VStack(spacing: 8) {
-            Text("Parent A").font(.subheadline).bold().frame(maxWidth: .infinity, alignment: .leading)
-            ForEach(0..<6) { i in
-                let statNames = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"]
-                IVField(label: statNames[i], value: Binding(
-                    get: { gen8EggParentAIVs[i] },
-                    set: { gen8EggParentAIVs[i] = $0 }
-                ))
-            }
-            Picker("Ability", selection: $gen8ParentAAbility) {
-                Text("1").tag(UInt8(0)); Text("2").tag(UInt8(1)); Text("H").tag(UInt8(2))
-            }.pickerStyle(.segmented).labelsHidden()
-            Picker("Gender", selection: $gen8ParentAGender) {
-                Text("Male").tag(UInt8(0)); Text("Female").tag(UInt8(1))
-            }.pickerStyle(.segmented).labelsHidden()
-            Picker("Item", selection: $gen8ParentAItem) {
-                Text("None").tag(UInt8(0)); Text("Everstone").tag(UInt8(1))
-                Text("Destiny Knot").tag(UInt8(2)); Text("Power Weight").tag(UInt8(3))
-                Text("Power Bracer").tag(UInt8(4)); Text("Power Belt").tag(UInt8(5))
-                Text("Power Lens").tag(UInt8(6)); Text("Power Band").tag(UInt8(7))
-                Text("Power Anklet").tag(UInt8(8))
-            }
-            Picker("Nature", selection: $gen8ParentANature) {
-                ForEach(0..<25, id: \.self) { i in Text(pfNatureNames[i]).tag(UInt8(i)) }
-            }
-
-            Divider().padding(.vertical, 4)
-            Text("Parent B").font(.subheadline).bold().frame(maxWidth: .infinity, alignment: .leading)
-            ForEach(0..<6) { i in
-                let statNames = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"]
-                IVField(label: statNames[i], value: Binding(
-                    get: { gen8EggParentBIVs[i] },
-                    set: { gen8EggParentBIVs[i] = $0 }
-                ))
-            }
-            Picker("Ability", selection: $gen8ParentBAbility) {
-                Text("1").tag(UInt8(0)); Text("2").tag(UInt8(1)); Text("H").tag(UInt8(2))
-            }.pickerStyle(.segmented).labelsHidden()
-            Picker("Gender", selection: $gen8ParentBGender) {
-                Text("Male").tag(UInt8(0)); Text("Female").tag(UInt8(1))
-            }.pickerStyle(.segmented).labelsHidden()
-            Picker("Item", selection: $gen8ParentBItem) {
-                Text("None").tag(UInt8(0)); Text("Everstone").tag(UInt8(1))
-                Text("Destiny Knot").tag(UInt8(2)); Text("Power Weight").tag(UInt8(3))
-                Text("Power Bracer").tag(UInt8(4)); Text("Power Belt").tag(UInt8(5))
-                Text("Power Lens").tag(UInt8(6)); Text("Power Band").tag(UInt8(7))
-                Text("Power Anklet").tag(UInt8(8))
-            }
-            Picker("Nature", selection: $gen8ParentBNature) {
-                ForEach(0..<25, id: \.self) { i in Text(pfNatureNames[i]).tag(UInt8(i)) }
-            }
-
-            Divider().padding(.vertical, 4)
+            EggSpeciesPicker(generation: .gen8, specie: $gen8EggSpecie)
             Picker("Compatibility", selection: $gen8Compatibility) {
                 Text("The two don't like each other (20%)").tag(UInt8(20))
                 Text("The two seem to get along (50%)").tag(UInt8(50))
@@ -4954,6 +4919,43 @@ struct FinderRootView: View {
             }
             Toggle("Masuda Method", isOn: $gen8Masuda)
         }
+    }
+
+    private var gen8EggParentFields: EggParentFields { EggParentFields(game: selectedGame) }
+
+    /// Parent A as entered, kept in the Egg mode's settings, with what BDSP
+    /// doesn't read put back.
+    private var gen8EggParentA: Binding<EggParent> {
+        Binding {
+            gen8EggParentFields.fitting(EggParent(ivs: gen8EggParentAIVs, ability: gen8ParentAAbility,
+                                                  gender: gen8ParentAGender, item: gen8ParentAItem,
+                                                  nature: gen8ParentANature))
+        } set: {
+            gen8EggParentAIVs = $0.ivs
+            gen8ParentAAbility = $0.ability
+            gen8ParentAGender = $0.gender
+            gen8ParentAItem = $0.item
+            gen8ParentANature = $0.nature
+        }
+    }
+
+    private var gen8EggParentB: Binding<EggParent> {
+        Binding {
+            gen8EggParentFields.fitting(EggParent(ivs: gen8EggParentBIVs, ability: gen8ParentBAbility,
+                                                  gender: gen8ParentBGender, item: gen8ParentBItem,
+                                                  nature: gen8ParentBNature))
+        } set: {
+            gen8EggParentBIVs = $0.ivs
+            gen8ParentBAbility = $0.ability
+            gen8ParentBGender = $0.gender
+            gen8ParentBItem = $0.item
+            gen8ParentBNature = $0.nature
+        }
+    }
+
+    private var bdspDaycare: BDSPDaycare {
+        BDSPDaycare(parentA: gen8EggParentA.wrappedValue, parentB: gen8EggParentB.wrappedValue,
+                    specie: gen8EggSpecie, masuda: gen8Masuda)
     }
 
     private var gen8RaidParametersView: some View {
@@ -5281,7 +5283,7 @@ struct FinderRootView: View {
     /// What the results were found for.
     private var resultsKey: [String] {
         [generation, selectedGame, encounterMode, encounterCategory, selectedEncounter?.id as Any,
-         selectedLocation, selectedEncounterType, method, wildSettings, undergroundLocation]
+         selectedLocation, selectedEncounterType, method, wildSettings, undergroundLocation, gen8EggSpecie]
             .map { String(describing: $0) }
     }
 
@@ -5352,19 +5354,8 @@ struct FinderRootView: View {
         let g8OvalCharm = gen8OvalCharm
 
         // Gen 8 Egg params
-        let g8ParentAIVs = gen8EggParentAIVs
-        let g8ParentBIVs = gen8EggParentBIVs
-        let g8ParentAAbility = gen8ParentAAbility
-        let g8ParentBAbility = gen8ParentBAbility
-        let g8ParentAGender = gen8ParentAGender
-        let g8ParentBGender = gen8ParentBGender
-        let g8ParentAItem = gen8ParentAItem
-        let g8ParentBItem = gen8ParentBItem
-        let g8ParentANature = gen8ParentANature
-        let g8ParentBNature = gen8ParentBNature
+        let g8Daycare = bdspDaycare
         let g8Compatibility = gen8Compatibility
-        let g8Masuda = gen8Masuda
-        let g8EggSpecie = gen8EggSpecie
 
         // Gen 8 Raid params
         let g8RaidDen = gen8RaidDen
@@ -5434,13 +5425,7 @@ struct FinderRootView: View {
                 eggGenerateGen8Streaming(
                     seed0: g8Seed0, seed1: g8Seed1,
                     initialAdvance: initAdv, maxAdvance: maxAdv,
-                    compatibility: g8Compatibility,
-                    parentAIVs: g8ParentAIVs, parentBIVs: g8ParentBIVs,
-                    parentAAbility: g8ParentAAbility, parentBAbility: g8ParentBAbility,
-                    parentAGender: g8ParentAGender, parentBGender: g8ParentBGender,
-                    parentAItem: g8ParentAItem, parentBItem: g8ParentBItem,
-                    parentANature: g8ParentANature, parentBNature: g8ParentBNature,
-                    eggSpecie: g8EggSpecie, masuda: g8Masuda,
+                    compatibility: g8Compatibility, daycare: g8Daycare,
                     natures: natFilter, tid: tID, sid: sID,
                     shinyOnly: shiny, game: pfGameVal,
                     shinyCharm: g8ShinyCharm, ovalCharm: g8OvalCharm,
