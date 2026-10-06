@@ -595,16 +595,13 @@ is in [Recent work](#recent-work) and the README.
      but not built.
    - Names Limitless writes that the alias table doesn't know still search,
      but saving a team reports them; a log of them would show the gaps.
-6. **Use the backend in the app.** The owner wants this, later (2026-10-05).
-   Today each device downloads Limitless's teams itself, for Team Search and
-   the Problem Solver's usage ranking; `backend/` could serve those counts.
-   Before relying on it:
-   - It has only run under `mvn verify`'s embedded Kafka, never against a
-     real broker or the live Limitless API.
-   - Its default Limitless game, `VGC`, is the one the app uses
-     (`TeamCorpus.swift`), so that's right.
-   - It polls Limitless every 30 minutes, so item 5's rate limits and terms
-     apply to it too.
+6. **Use the backend in the app.** Started 2026-10-06 on the
+   `backend-integration` branch: see
+   [`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md). Today each
+   device downloads Limitless's teams itself, for Team Search and the
+   Problem Solver's usage ranking. The backend runs on the owner's Mac
+   against Docker's Kafka and live Limitless. Item 5's rate limits and terms
+   apply to it too.
 7. **FireRed and LeafGreen's open items.** Wild calibration (Ten Lines'
    `check_seeds_wild`); Teachy TV on Switch, which Ten Lines hasn't worked
    out either; and the Switch lists' settings nobody has farmed yet (Ten
@@ -640,6 +637,7 @@ is in [Recent work](#recent-work) and the README.
 | [`PKReference/ShowdownPort-NOTES.md`](PKReference/ShowdownPort-NOTES.md) | Scope and wiring of the `@smogon/calc` port |
 | [`PKReference/AbilityReference.md`](PKReference/AbilityReference.md) | Which abilities the legacy damage engine models (matchups the port can't take) |
 | [`RNGRewrite-PLAN.md`](RNGRewrite-PLAN.md) | Plan for an independent RNG core (on hold) |
+| [`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md) | Plan for wiring the backend into the app: data sources, design, UI and phases |
 | [`tools/README.md`](tools/README.md) | Adding a Champions regulation, and the scripts that regenerate the bundled data |
 | [`backend/README.md`](backend/README.md) | Running and testing the optional backend |
 
