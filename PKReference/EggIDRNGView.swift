@@ -1,5 +1,186 @@
 import SwiftUI
 
+// MARK: - Parents
+
+/// A parent in the daycare, as PokéFinder's Daycare takes it.
+nonisolated struct EggParent: Hashable, Sendable {
+    var ivs: [UInt8] = Array(repeating: 31, count: 6)
+    /// 0, 1, or 2 for a hidden ability.
+    var ability: UInt8 = 0
+    /// 0 male, 1 female, 2 genderless, 3 Ditto.
+    var gender: UInt8
+    /// 0 none, 1 Everstone, 2 to 7 the power items (HP to Speed).
+    var item: UInt8 = 0
+    /// Passed down with an Everstone.
+    var nature: UInt8 = 0
+
+    static let genderNames = ["Male", "Female", "Genderless", "Ditto"]
+    static let abilityNames = ["Ability 0", "Ability 1", "Hidden Ability"]
+    static let itemNames = ["None", "Everstone", "Power Weight (HP)", "Power Bracer (Atk)", "Power Belt (Def)",
+                            "Power Lens (SpA)", "Power Band (SpD)", "Power Anklet (Spe)"]
+
+    /// PokéFinder's check (`EggSettings::isValid`): a male and a female, or
+    /// Ditto with a male, a female or a genderless Pokémon.
+    static func canBreed(_ a: UInt8, _ b: UInt8) -> Bool {
+        switch (min(a, b), max(a, b)) {
+        case (0, 1), (0, 3), (1, 3), (2, 3): return true
+        default: return false
+        }
+    }
+
+    static let cannotBreedText = "These two can't breed: pair a male with a female, or Ditto with anything but Ditto."
+
+    /// Which parent gave each IV: "HP:A Atk:R …", A and B for the parents,
+    /// R for random.
+    static func inheritanceText(_ inheritance: [UInt8]) -> String {
+        let labels = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"]
+        return zip(labels, inheritance).map { label, parent in
+            switch parent {
+            case 1: return "\(label):A"
+            case 2: return "\(label):B"
+            default: return "\(label):R"
+            }
+        }.joined(separator: " ")
+    }
+}
+
+/// What a game's egg generator reads from the parents besides their IVs and
+/// gender, so their cards show only that (as PokéFinder's EggSettings
+/// does). A parent's nature counts only with an Everstone.
+struct EggParentFields: Equatable {
+    var abilities: [UInt8] = []
+    var items: [UInt8] = []
+
+    init(game: FinderGameVersion) {
+        switch game.generation {
+        case .gen5:
+            abilities = [0, 1, 2]
+            items = Array(0...7)
+        case .gen3 where game == .emerald:
+            items = [0, 1]
+        default:
+            break
+        }
+    }
+
+    /// `parent` with what this game doesn't read put back, so it can't
+    /// change the eggs unseen.
+    func fitting(_ parent: EggParent) -> EggParent {
+        var p = parent
+        if !abilities.contains(p.ability) { p.ability = 0 }
+        if !items.contains(p.item) { p.item = 0 }
+        return p
+    }
+}
+
+/// A parent's IVs and gender and, where the game reads them, its ability,
+/// held item and (with an Everstone) nature.
+struct EggParentCard: View {
+    let label: String
+    @Binding var parent: EggParent
+    let fields: EggParentFields
+
+    private static let ivNames = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"]
+
+    var body: some View {
+        SectionCard(title: label, icon: "figure.stand") {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(0..<6, id: \.self) { i in
+                    IVField(label: Self.ivNames[i], value: $parent.ivs[i])
+                }
+            }
+
+            LabeledContent("Gender") {
+                Picker("Gender", selection: $parent.gender) {
+                    ForEach(EggParent.genderNames.indices, id: \.self) { Text(EggParent.genderNames[$0]).tag(UInt8($0)) }
+                }
+                .labelsHidden()
+            }
+
+            if !fields.abilities.isEmpty {
+                LabeledContent("Ability") {
+                    Picker("Ability", selection: $parent.ability) {
+                        ForEach(fields.abilities, id: \.self) { Text(EggParent.abilityNames[Int($0)]).tag($0) }
+                    }
+                    .labelsHidden()
+                }
+            }
+
+            if !fields.items.isEmpty {
+                LabeledContent("Held Item") {
+                    Picker("Held Item", selection: $parent.item) {
+                        ForEach(fields.items, id: \.self) { Text(EggParent.itemNames[Int($0)]).tag($0) }
+                    }
+                    .labelsHidden()
+                }
+                if parent.item == 1 {
+                    LabeledContent("Nature") {
+                        Picker("Nature", selection: $parent.nature) {
+                            ForEach(0..<25, id: \.self) { Text(pfNatureNames[$0]).tag(UInt8($0)) }
+                        }
+                        .labelsHidden()
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Egg species
+
+/// The species an egg can be, as PokéFinder lists them (`EggSettings`):
+/// each family's first.
+enum EggSpecies {
+    static let all: [UInt16] = [
+        1, 4, 7, 10, 13, 16, 19, 21, 23, 27, 29, 32, 37, 41, 43, 46, 48, 50, 52, 54, 56, 58, 60, 63, 66, 69,
+        72, 74, 77, 79, 81, 83, 84, 86, 88, 90, 92, 95, 96, 98, 100, 102, 104, 108, 109, 111, 113, 114, 115, 116, 118, 120,
+        122, 123, 127, 128, 129, 131, 133, 137, 138, 140, 142, 143, 147, 152, 155, 158, 161, 163, 165, 167, 170, 172, 173, 174, 175, 177,
+        179, 183, 185, 187, 190, 191, 193, 194, 198, 200, 202, 203, 204, 206, 207, 209, 211, 213, 214, 215, 216, 218, 220, 222, 223, 225,
+        226, 227, 228, 231, 234, 235, 236, 238, 239, 240, 241, 246, 252, 255, 258, 261, 263, 265, 270, 273, 276, 278, 280, 283, 285, 287,
+        290, 292, 293, 296, 298, 299, 300, 302, 303, 304, 307, 309, 311, 312, 313, 314, 315, 316, 318, 320, 322, 324, 325, 327, 328, 331,
+        333, 335, 336, 337, 338, 339, 341, 343, 345, 347, 349, 351, 352, 353, 355, 357, 358, 359, 360, 361, 363, 366, 369, 370, 371, 374,
+        387, 390, 393, 396, 399, 401, 403, 406, 408, 410, 412, 415, 417, 418, 420, 422, 425, 427, 431, 433, 434, 436, 438, 439, 440, 441,
+        442, 443, 446, 447, 449, 451, 453, 455, 456, 458, 459, 479, 489, 495, 498, 501, 504, 506, 509, 511, 513, 515, 517, 519, 522, 524,
+        527, 529, 531, 532, 535, 538, 539, 540, 543, 546, 548, 550, 551, 554, 556, 557, 559, 561, 562, 564, 566, 568, 570, 572, 574, 577,
+        580, 582, 585, 587, 588, 590, 592, 594, 595, 597, 599, 602, 605, 607, 610, 613, 615, 616, 618, 619, 621, 622, 624, 626, 627, 629,
+        631, 632, 633, 636, 650, 653, 656, 659, 661, 664, 667, 669, 672, 674, 676, 677, 679, 682, 684, 686, 688, 690, 692, 694, 696, 698,
+        701, 702, 703, 704, 707, 708, 710, 712, 714, 722, 725, 728, 731, 734, 736, 739, 741, 742, 744, 746, 747, 749, 751, 753, 755, 757,
+        759, 761, 764, 765, 766, 767, 769, 771, 774, 775, 776, 777, 778, 779, 780, 781, 782,
+    ]
+
+    /// The last species in a generation's games: the generators read the
+    /// species' gender ratio from a table that ends there.
+    static func last(in generation: FinderGeneration) -> UInt16 {
+        switch generation {
+        case .gen3: return 386
+        case .gen4, .gen8: return 493
+        case .gen5: return 649
+        }
+    }
+
+    static func list(for generation: FinderGeneration) -> [UInt16] {
+        all.filter { $0 <= last(in: generation) }
+    }
+}
+
+/// The egg's species, by name.
+struct EggSpeciesPicker: View {
+    let generation: FinderGeneration
+    @Binding var specie: UInt16
+
+    var body: some View {
+        LabeledContent("Egg Species") {
+            Picker("Egg Species", selection: $specie) {
+                ForEach(EggSpecies.list(for: generation), id: \.self) { Text(PFBridge.specieName($0)).tag($0) }
+            }
+            .labelsHidden()
+        }
+        .onChange(of: generation, initial: true) {
+            if !EggSpecies.list(for: generation).contains(specie) { specie = 1 }
+        }
+    }
+}
+
 // MARK: - Egg RNG View
 
 struct EggRNGView: View {
@@ -27,32 +208,10 @@ struct EggRNGView: View {
     @State private var minRedraw: Int = 0
     @State private var maxRedraw: Int = 0
 
-    // Parent A
-    @State private var parentAHP: UInt8 = 31
-    @State private var parentAAtk: UInt8 = 31
-    @State private var parentADef: UInt8 = 31
-    @State private var parentASpA: UInt8 = 31
-    @State private var parentASpD: UInt8 = 31
-    @State private var parentASpe: UInt8 = 31
-    @State private var parentAAbility: UInt8 = 0
-    @State private var parentAGender: UInt8 = 0
-    @State private var parentAItem: UInt8 = 0
-    @State private var parentANature: UInt8 = 0
-
-    // Parent B
-    @State private var parentBHP: UInt8 = 31
-    @State private var parentBAtk: UInt8 = 31
-    @State private var parentBDef: UInt8 = 31
-    @State private var parentBSpA: UInt8 = 31
-    @State private var parentBSpD: UInt8 = 31
-    @State private var parentBSpe: UInt8 = 31
-    @State private var parentBAbility: UInt8 = 0
-    @State private var parentBGender: UInt8 = 1
-    @State private var parentBItem: UInt8 = 0
-    @State private var parentBNature: UInt8 = 0
-
-    // Egg species
-    @State private var eggSpecie: Int = 1
+    // Daycare
+    @State private var parentA = EggParent(gender: 0)
+    @State private var parentB = EggParent(gender: 1)
+    @State private var eggSpecie: UInt16 = 1
     @State private var masuda: Bool = false
     @State private var compatibility: Int = 20
 
@@ -67,7 +226,10 @@ struct EggRNGView: View {
     /// The last generate ran to the end, for saying it found nothing.
     @State private var finished = false
 
-    static let generations: [FinderGeneration] = [.gen3, .gen4]
+    /// Gen 8 eggs are the Finder's Egg mode.
+    static let generations: [FinderGeneration] = [.gen3, .gen4, .gen5]
+
+    private var parentFields: EggParentFields { EggParentFields(game: selectedGame) }
 
     /// The filters that are set, for when nothing's found.
     private var setFilterNames: [String] {
@@ -104,11 +266,11 @@ struct EggRNGView: View {
 
     private var tooManyResults: Bool { estimatedResults > Double(Self.resultLimit) }
 
+    private var canBreed: Bool { EggParent.canBreed(parentA.gender, parentB.gender) }
+
     var body: some View {
         ScrollView {
             CardStack {
-                // Gen 3 and 4 only: Gen 8 eggs are the Finder's Egg mode, and
-                // Gen 5's need the DS profile.
                 Picker("Generation", selection: $generation) {
                     ForEach(Self.generations) { g in Text(g.rawValue).tag(g) }
                 }
@@ -146,102 +308,18 @@ struct EggRNGView: View {
                     FinderUInt16Field(label: "SID", value: $sid)
                 }
 
-                // Seeds
-                SectionCard(title: "Seeds", icon: "number") {
-                    HStack {
-                        Text("Held Seed")
-                        Spacer()
-                        TextField("Hex", text: $seedHeldText)
-                            .textFieldStyle(.roundedBorder).scaledWidth(120)
-                            .multilineTextAlignment(.trailing)
-                            .autocorrectionDisabled()
-                    }
-                    HStack {
-                        Text("Pickup Seed")
-                        Spacer()
-                        TextField("Hex", text: $seedPickupText)
-                            .textFieldStyle(.roundedBorder).scaledWidth(120)
-                            .multilineTextAlignment(.trailing)
-                            .autocorrectionDisabled()
-                    }
-                    RNGIntField(label: "Initial Advance", value: $initialAdvances, range: RNGFieldRange.advances)
-                    RNGIntField(label: "Max Advance", value: $maxAdvances, range: RNGFieldRange.advances)
-                    RNGIntField(label: "Pickup Init Adv", value: $initialAdvancesPickup, range: RNGFieldRange.advances)
-                    RNGIntField(label: "Pickup Max Adv", value: $maxAdvancesPickup, range: RNGFieldRange.advances)
-
-                    if generation == .gen3 && selectedGame == .emerald {
-                        RNGIntField(label: "Calibration", value: $calibration, range: RNGFieldRange.byte)
-                        RNGIntField(label: "Min Redraw", value: $minRedraw, range: RNGFieldRange.byte)
-                        RNGIntField(label: "Max Redraw", value: $maxRedraw, range: RNGFieldRange.byte)
-                    }
-                }
-
-                // Daycare
-                SectionCard(title: "Daycare", icon: "house") {
-                    Picker("Compatibility", selection: $compatibility) {
-                        Text("The two seem to get along (20%)").tag(20)
-                        Text("The two seem to get along very well (50%)").tag(50)
-                        Text("The two don't seem to like each other (70%)").tag(70)
-                    }
-
-                    Toggle("Masuda Method", isOn: $masuda)
-
-                    HStack {
-                        Text("Egg Species #")
-                        Spacer()
-                        LiveIntField(value: $eggSpecie, range: 1...Int(UInt16.max), grouping: false)
-                            .clamping($eggSpecie, to: 1...Int(UInt16.max))
-                            .textFieldStyle(.roundedBorder).scaledWidth(80)
-                            .multilineTextAlignment(.trailing)
-                    }
-                }
-
-                parentSection(label: "Parent A",
-                              hp: $parentAHP, atk: $parentAAtk, def: $parentADef,
-                              spa: $parentASpA, spd: $parentASpD, spe: $parentASpe,
-                              ability: $parentAAbility, gender: $parentAGender,
-                              item: $parentAItem, nature: $parentANature)
-
-                parentSection(label: "Parent B",
-                              hp: $parentBHP, atk: $parentBAtk, def: $parentBDef,
-                              spa: $parentBSpA, spd: $parentBSpD, spe: $parentBSpe,
-                              ability: $parentBAbility, gender: $parentBGender,
-                              item: $parentBItem, nature: $parentBNature)
-
-                FinderNatureGrid(selected: $selectedNatures)
-
-                Toggle("Shiny Only", isOn: $shinyOnly)
-                    .padding(.horizontal)
-
-                Button {
-                    generateEggs()
-                } label: {
-                    Label("Generate", systemImage: "sparkles")
-                }
-                .buttonStyle(.primaryAction)
-                .disabled(tooManyResults)
-                if tooManyResults {
-                    Text("These ranges would list about \(Int(estimatedResults).formatted()) eggs, more than \(Self.resultLimit.formatted()). Narrow the held or pickup advances, or filter by nature or shininess.")
-                        .font(.caption).foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                if finished && (generation == .gen3 ? results3.isEmpty : results4.isEmpty) {
-                    Text(noResultsText(filters: setFilterNames, widen: "the held or pickup advances"))
-                        .font(.caption).foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                if generation == .gen3 && !results3.isEmpty {
-                    eggResults3Section
-                }
-                if generation == .gen4 && !results4.isEmpty {
-                    eggResults4Section
+                if generation == .gen5 {
+                    Gen5EggView(game: selectedGame, tid: tid, sid: sid)
+                } else {
+                    gen3And4Inputs
                 }
             }
             .padding()
         }
         .dismissesKeyboard()
+        #if DEBUG && os(macOS)
+        .task { await DebugSnapshot.openSheet("eggs5") { generation = .gen5 } }
+        #endif
         // Eggs from another game would read as this one's.
         .onChange(of: ["\(generation)", selectedGame.rawValue]) {
             searchTask?.cancel()
@@ -249,51 +327,94 @@ struct EggRNGView: View {
             results3 = []
             results4 = []
             finished = false
+            parentA = parentFields.fitting(parentA)
+            parentB = parentFields.fitting(parentB)
         }
     }
 
-    private func parentSection(label: String,
-                                hp: Binding<UInt8>, atk: Binding<UInt8>, def: Binding<UInt8>,
-                                spa: Binding<UInt8>, spd: Binding<UInt8>, spe: Binding<UInt8>,
-                                ability: Binding<UInt8>, gender: Binding<UInt8>,
-                                item: Binding<UInt8>, nature: Binding<UInt8>) -> some View {
-        SectionCard(title: label, icon: "figure.stand") {
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                IVField(label: "HP", value: hp)
-                IVField(label: "Atk", value: atk)
-                IVField(label: "Def", value: def)
-                IVField(label: "SpA", value: spa)
-                IVField(label: "SpD", value: spd)
-                IVField(label: "Spe", value: spe)
+    @ViewBuilder
+    private var gen3And4Inputs: some View {
+        // Seeds
+        SectionCard(title: "Seeds", icon: "number") {
+            HStack {
+                Text("Held Seed")
+                Spacer()
+                TextField("Hex", text: $seedHeldText)
+                    .textFieldStyle(.roundedBorder).scaledWidth(120)
+                    .multilineTextAlignment(.trailing)
+                    .autocorrectionDisabled()
             }
-
-            Picker("Gender", selection: gender) {
-                Text("Male").tag(UInt8(0))
-                Text("Female").tag(UInt8(1))
-                Text("Ditto").tag(UInt8(3))
+            HStack {
+                Text("Pickup Seed")
+                Spacer()
+                TextField("Hex", text: $seedPickupText)
+                    .textFieldStyle(.roundedBorder).scaledWidth(120)
+                    .multilineTextAlignment(.trailing)
+                    .autocorrectionDisabled()
             }
+            RNGIntField(label: "Initial Advance", value: $initialAdvances, range: RNGFieldRange.advances)
+            RNGIntField(label: "Max Advance", value: $maxAdvances, range: RNGFieldRange.advances)
+            RNGIntField(label: "Pickup Init Adv", value: $initialAdvancesPickup, range: RNGFieldRange.advances)
+            RNGIntField(label: "Pickup Max Adv", value: $maxAdvancesPickup, range: RNGFieldRange.advances)
 
-            Picker("Ability", selection: ability) {
-                Text("Ability 0").tag(UInt8(0))
-                Text("Ability 1").tag(UInt8(1))
+            if generation == .gen3 && selectedGame == .emerald {
+                RNGIntField(label: "Calibration", value: $calibration, range: RNGFieldRange.byte)
+                RNGIntField(label: "Min Redraw", value: $minRedraw, range: RNGFieldRange.byte)
+                RNGIntField(label: "Max Redraw", value: $maxRedraw, range: RNGFieldRange.byte)
             }
+        }
 
-            Picker("Nature", selection: nature) {
-                ForEach(0..<25, id: \.self) { i in
-                    Text(pfNatureNames[i]).tag(UInt8(i))
+        // Daycare: Gen 3 reads the compatibility, Gen 4 the Masuda method.
+        SectionCard(title: "Daycare", icon: "house") {
+            if generation == .gen3 {
+                Picker("Compatibility", selection: $compatibility) {
+                    Text("The two seem to get along (20%)").tag(20)
+                    Text("The two seem to get along very well (50%)").tag(50)
+                    Text("The two don't seem to like each other (70%)").tag(70)
                 }
+            } else {
+                Toggle("Masuda Method", isOn: $masuda)
             }
 
-            Picker("Held Item", selection: item) {
-                Text("None").tag(UInt8(0))
-                Text("Everstone").tag(UInt8(1))
-                Text("Power Weight (HP)").tag(UInt8(2))
-                Text("Power Bracer (Atk)").tag(UInt8(3))
-                Text("Power Belt (Def)").tag(UInt8(4))
-                Text("Power Lens (SpA)").tag(UInt8(5))
-                Text("Power Band (SpD)").tag(UInt8(6))
-                Text("Power Anklet (Spe)").tag(UInt8(7))
-            }
+            EggSpeciesPicker(generation: generation, specie: $eggSpecie)
+        }
+
+        EggParentCard(label: "Parent A", parent: $parentA, fields: parentFields)
+        EggParentCard(label: "Parent B", parent: $parentB, fields: parentFields)
+
+        FinderNatureGrid(selected: $selectedNatures)
+
+        Toggle("Shiny Only", isOn: $shinyOnly)
+            .padding(.horizontal)
+
+        Button {
+            generateEggs()
+        } label: {
+            Label("Generate", systemImage: "sparkles")
+        }
+        .buttonStyle(.primaryAction)
+        .disabled(tooManyResults || !canBreed)
+        if !canBreed {
+            Text(EggParent.cannotBreedText)
+                .font(.caption).foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if tooManyResults {
+            Text("These ranges would list about \(Int(estimatedResults).formatted()) eggs, more than \(Self.resultLimit.formatted()). Narrow the held or pickup advances, or filter by nature or shininess.")
+                .font(.caption).foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+
+        if finished && (generation == .gen3 ? results3.isEmpty : results4.isEmpty) {
+            Text(noResultsText(filters: setFilterNames, widen: "the held or pickup advances"))
+                .font(.caption).foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+
+        if generation == .gen3 && !results3.isEmpty {
+            eggResults3Section
+        }
+        if generation == .gen4 && !results4.isEmpty {
+            eggResults4Section
         }
     }
 
@@ -323,7 +444,7 @@ struct EggRNGView: View {
                     Text("IVs: \(r.ivs.map(String.init).joined(separator: "/"))")
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
-                    Text("Inherit: \(inheritanceString(r.inheritance))")
+                    Text("Inherit: \(EggParent.inheritanceText(r.inheritance))")
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.tertiary)
                 }
@@ -361,24 +482,13 @@ struct EggRNGView: View {
                     Text("IVs: \(r.ivs.map(String.init).joined(separator: "/"))")
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
-                    Text("Inherit: \(inheritanceString(r.inheritance))")
+                    Text("Inherit: \(EggParent.inheritanceText(r.inheritance))")
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.tertiary)
                 }
                 Divider()
             }
         }
-    }
-
-    private func inheritanceString(_ inh: [UInt8]) -> String {
-        let labels = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"]
-        return (0..<6).map { i in
-            switch inh[i] {
-            case 1: return "\(labels[i]):A"
-            case 2: return "\(labels[i]):B"
-            default: return "\(labels[i]):R"
-            }
-        }.joined(separator: " ")
     }
 
     private func generateEggs() {
@@ -390,13 +500,8 @@ struct EggRNGView: View {
         let initAdvP = UInt32(clamping: initialAdvancesPickup), maxAdvP = UInt32(clamping: maxAdvancesPickup)
         let cal = UInt8(clamping: calibration), minR = UInt8(clamping: minRedraw), maxR = UInt8(clamping: maxRedraw)
         let compat = UInt8(clamping: compatibility)
-        let pAIVs = [parentAHP, parentAAtk, parentADef, parentASpA, parentASpD, parentASpe]
-        let pBIVs = [parentBHP, parentBAtk, parentBDef, parentBSpA, parentBSpD, parentBSpe]
-        let pAA = parentAAbility, pBA = parentBAbility
-        let pAG = parentAGender, pBG = parentBGender
-        let pAI = parentAItem, pBI = parentBItem
-        let pAN = parentANature, pBN = parentBNature
-        let spec = UInt16(clamping: eggSpecie)
+        let a = parentFields.fitting(parentA), b = parentFields.fitting(parentB)
+        let spec = eggSpecie
         let mas = masuda
         let gameVal = selectedGame.pfGame
         let shiny = shinyOnly
@@ -418,12 +523,12 @@ struct EggRNGView: View {
                     initialAdvancesPickup: initAdvP, maxAdvancesPickup: maxAdvP,
                     calibration: cal, minRedraw: minR, maxRedraw: maxR,
                     method: eggMethod, compatibility: compat,
-                    parentAIVs: pAIVs, parentBIVs: pBIVs,
-                    parentAAbility: pAA, parentBAbility: pBA,
-                    parentAGender: pAG, parentBGender: pBG,
-                    parentAItem: pAI, parentBItem: pBI,
-                    parentANature: pAN, parentBNature: pBN,
-                    eggSpecie: spec, masuda: mas,
+                    parentAIVs: a.ivs, parentBIVs: b.ivs,
+                    parentAAbility: a.ability, parentBAbility: b.ability,
+                    parentAGender: a.gender, parentBGender: b.gender,
+                    parentAItem: a.item, parentBItem: b.item,
+                    parentANature: a.nature, parentBNature: b.nature,
+                    eggSpecie: spec, masuda: false,
                     tid: tID, sid: sID,
                     game: gameVal,
                     filterShiny: shinyFilter, natures: natArr)
@@ -437,11 +542,11 @@ struct EggRNGView: View {
                     seedHeld: seedH, seedPickup: seedP,
                     initialAdvances: initAdv, maxAdvances: maxAdv,
                     initialAdvancesPickup: initAdvP, maxAdvancesPickup: maxAdvP,
-                    parentAIVs: pAIVs, parentBIVs: pBIVs,
-                    parentAAbility: pAA, parentBAbility: pBA,
-                    parentAGender: pAG, parentBGender: pBG,
-                    parentAItem: pAI, parentBItem: pBI,
-                    parentANature: pAN, parentBNature: pBN,
+                    parentAIVs: a.ivs, parentBIVs: b.ivs,
+                    parentAAbility: a.ability, parentBAbility: b.ability,
+                    parentAGender: a.gender, parentBGender: b.gender,
+                    parentAItem: a.item, parentBItem: b.item,
+                    parentANature: a.nature, parentBNature: b.nature,
                     eggSpecie: spec, masuda: mas,
                     tid: tID, sid: sID,
                     game: gameVal,
@@ -1378,11 +1483,17 @@ struct Gen5IDView: View {
     /// The Gen 5 Timer's Standard mode: the result's second, after setting
     /// the DS's clock to its minute.
     static func sendToTimer(_ r: PFBridge.IDSearchResult5) {
+        sendToTimer(second: r.second, dateTimeText: r.dateTimeText, buttons: r.buttons, seed: r.seed)
+    }
+
+    /// Any Gen 5 search result: its second, and its time, buttons and seed
+    /// to show.
+    static func sendToTimer(second: Int, dateTimeText: String, buttons: UInt16, seed: UInt64) {
         let bridge = FinderTimerBridge.shared
         bridge.pendingGen = .gen5
-        bridge.pendingTargetSecond = r.second
-        bridge.selectedTime = r.dateTimeText + (r.buttons == 0 ? "" : ", holding \(Gen5Buttons.describe(r.buttons))")
-        bridge.selectedSeed = String(format: "%016llX", r.seed)
+        bridge.pendingTargetSecond = second
+        bridge.selectedTime = dateTimeText + (buttons == 0 ? "" : ", holding \(Gen5Buttons.describe(buttons))")
+        bridge.selectedSeed = String(format: "%016llX", seed)
         bridge.shouldSwitchToTimer = true
     }
 }

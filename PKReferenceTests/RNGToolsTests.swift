@@ -1987,7 +1987,7 @@ struct EggGeneratorTests {
                                              eggSpecie: 1, masuda: false, tid: 0, sid: 0, game: game.pfGame)
             #expect(!eggs.isEmpty, "\(game.rawValue)")
         }
-        #expect(EggRNGView.generations == [.gen3, .gen4])
+        #expect(EggRNGView.generations == [.gen3, .gen4, .gen5])
     }
 
     /// The estimate keeps Generate off for ranges that would run out of
@@ -2923,5 +2923,208 @@ struct Gen5ProfileTests {
         #expect(Gen5DSParametersCard.stored(defaults) == ds)
         #expect(Gen5DSParameterKeys.keypresses(from: "010000000") == [false, true] + Array(repeating: false, count: 7))
         #expect(Gen5Buttons.describe(0) == "None" && Gen5Buttons.describe((1 << 4) | (1 << 7)) == "A + Start")
+    }
+}
+
+// MARK: - Gen 5 Egg Tests
+
+/// The Eggs tool's Gen 5 tab: PokéFinder's EggGenerator5 and its egg
+/// searcher, with its parent rules.
+struct Gen5EggTests {
+    /// The test DS from the Gen 5 profile tests.
+    private let ds = Gen5DSParameters(mac: 0x0009_BF12_3456, timer0Min: 0xC79, timer0Max: 0xC79, vcount: 0x60,
+                                      gxstat: 6, vframe: 5, dsType: 0, language: 0)
+
+    /// A male with every IV 31 and a female with every IV 0, so each IV
+    /// shows which parent gave it.
+    private func daycare(male: EggParent = EggParent(ivs: Array(repeating: 31, count: 6), gender: 0),
+                         female: EggParent = EggParent(ivs: Array(repeating: 0, count: 6), gender: 1),
+                         femaleFirst: Bool = false) -> Gen5Daycare {
+        femaleFirst ? Gen5Daycare(parentA: female, parentB: male, specie: 1, masuda: false)
+                    : Gen5Daycare(parentA: male, parentB: female, specie: 1, masuda: false)
+    }
+
+    private func seed(_ game: PFGame) -> UInt64 {
+        PFBridge.gen5InitialSeed(game: game, profile: ds, timer0: 0xC79,
+                                 year: 2011, month: 3, day: 6, hour: 10, minute: 20, second: 33)
+    }
+
+    private func generate(_ game: PFGame, daycare: Gen5Daycare, maxAdvances: UInt32 = 50,
+                          filter: Gen5EggFilter = Gen5EggFilter()) -> [PFBridge.EggResult5] {
+        PFBridge.eggGenerate5(seed: seed(game), initialAdvances: 0, maxAdvances: maxAdvances, game: game,
+                              tid: 0, sid: 0, profile: ds, daycare: daycare, filter: filter)
+    }
+
+    /// Each egg inherits three IVs, each the parent's that's named.
+    @Test(arguments: [PFGame.black, .white2])
+    func inheritsThreeIVs(game: PFGame) throws {
+        let eggs = generate(game, daycare: daycare())
+        #expect(eggs.count == 51)
+        for egg in eggs {
+            #expect(egg.inheritance.filter { $0 != 0 }.count == 3)
+            for (iv, parent) in zip(egg.ivs, egg.inheritance) where parent != 0 {
+                #expect(iv == (parent == 1 ? 31 : 0))
+            }
+        }
+        // Black 2 and White 2 make the egg from the seed: every advance's
+        // is the same but its PID.
+        if game == .white2 {
+            #expect(Set(eggs.map(\.ivs)).count == 1 && Set(eggs.map(\.pid)).count > 1)
+        }
+    }
+
+    /// A power item always passes its stat; in Black 2 and White 2 an
+    /// Everstone always passes its holder's nature.
+    @Test func powerItemsAndEverstone() {
+        var male = EggParent(ivs: Array(repeating: 31, count: 6), gender: 0)
+        male.item = 7 // Power Anklet: Speed
+        var female = EggParent(ivs: Array(repeating: 0, count: 6), gender: 1)
+        female.item = 1
+        female.nature = 15 // Modest
+        let both = daycare(male: male, female: female)
+        for game in [PFGame.black, .black2] {
+            for egg in generate(game, daycare: both) {
+                #expect(egg.inheritance[5] == 1 && egg.ivs[5] == 31)
+            }
+        }
+        #expect(generate(.black2, daycare: both).allSatisfy { $0.nature == 15 })
+    }
+
+    /// Parents entered female first are swapped to the game's order, and
+    /// the inheritance still names them as entered.
+    @Test(arguments: [PFGame.white, .black2])
+    func reordersParents(game: PFGame) {
+        let maleFirst = daycare()
+        let femaleFirst = daycare(femaleFirst: true)
+        #expect(!maleFirst.isReversed && femaleFirst.isReversed)
+        #expect(femaleFirst.pf.genders == (0, 1) && femaleFirst.pf.parentAIVs.0 == 31)
+        let a = generate(game, daycare: maleFirst)
+        let b = generate(game, daycare: femaleFirst)
+        #expect(a.map(\.pid) == b.map(\.pid) && a.map(\.ivs) == b.map(\.ivs))
+        let swapped = a.map { $0.inheritance.map { $0 == 1 ? UInt8(2) : $0 == 2 ? 1 : 0 } }
+        #expect(b.map(\.inheritance) == swapped)
+        // The female, or else Ditto, goes second.
+        #expect(Gen5Daycare(parentA: EggParent(gender: 3), parentB: EggParent(gender: 2), specie: 81, masuda: false).isReversed)
+        #expect(Gen5Daycare(parentA: EggParent(gender: 1), parentB: EggParent(gender: 3), specie: 1, masuda: false).isReversed)
+        #expect(!Gen5Daycare(parentA: EggParent(gender: 3), parentB: EggParent(gender: 1), specie: 1, masuda: false).isReversed)
+        #expect(Gen5Daycare(parentA: EggParent(gender: 1), parentB: EggParent(gender: 0), specie: 1, masuda: false)
+            .yourParents([1, 2, 0]) == [2, 1, 0])
+    }
+
+    /// Only a female with her hidden ability passes it down, bred with a
+    /// male, as PokéFinder checks.
+    @Test func hiddenAbility() {
+        var female = EggParent(gender: 1)
+        female.ability = 2
+        let parents = daycare(female: female)
+        #expect(parents.blockedReason(hiddenAbility: true) == nil)
+        var filter = Gen5EggFilter()
+        filter.ability = 2
+        let eggs = generate(.black, daycare: parents, maxAdvances: 200, filter: filter)
+        #expect(!eggs.isEmpty && eggs.allSatisfy { $0.ability == 2 })
+        // Black 2 and White 2 fix the egg's ability from the seed: 60% of
+        // seeds give the hidden one, and none without it.
+        func black2Abilities(_ parents: Gen5Daycare) -> [UInt8] {
+            (0..<20).compactMap { second in
+                let seed = PFBridge.gen5InitialSeed(game: .black2, profile: ds, timer0: 0xC79, year: 2012, month: 7,
+                                                    day: 1, hour: 9, minute: 0, second: UInt8(second))
+                return PFBridge.eggGenerate5(seed: seed, initialAdvances: 0, maxAdvances: 0, game: .black2, tid: 0, sid: 0,
+                                             profile: ds, daycare: parents, filter: Gen5EggFilter()).first?.ability
+            }
+        }
+        #expect(black2Abilities(parents).contains(2) && !black2Abilities(daycare()).contains(2))
+        #expect(daycare().blockedReason(hiddenAbility: true) != nil)
+        #expect(daycare().blockedReason(hiddenAbility: false) == nil)
+        let ditto = Gen5Daycare(parentA: EggParent(gender: 3), parentB: female, specie: 1, masuda: false)
+        #expect(ditto.blockedReason(hiddenAbility: true) != nil)
+        let males = Gen5Daycare(parentA: EggParent(gender: 0), parentB: EggParent(gender: 0), specie: 1, masuda: false)
+        #expect(males.blockedReason(hiddenAbility: false) == EggParent.cannotBreedText)
+    }
+
+    /// The searcher finds the second an egg's seed was made on, and each
+    /// result regenerates from its seed.
+    @Test(arguments: [PFGame.black, .white2])
+    func searchFindsTheSeed(game: PFGame) async throws {
+        let parents = daycare()
+        let egg = try #require(generate(game, daycare: parents, maxAdvances: 0).first)
+        var filter = Gen5EggFilter()
+        filter.ivMin = egg.ivs
+        filter.ivMax = egg.ivs
+        filter.natures = [egg.nature]
+        let handle = try #require(PFBridge.eggSearch5Start(game: game, tid: 0, sid: 0, profile: ds, daycare: parents,
+                                                           start: (2011, 3, 6), end: (2011, 3, 6),
+                                                           initialAdvances: 0, maxAdvances: 0, filter: filter))
+        var found: [PFBridge.EggSearchResult5] = []
+        while !PFBridge.eggSearch5Done(handle) {
+            found += PFBridge.eggSearch5Results(handle, daycare: parents)
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        found += PFBridge.eggSearch5Results(handle, daycare: parents)
+        #expect(PFBridge.eggSearch5Progress(handle) == 100)
+        PFBridge.eggSearch5Free(handle)
+        let hit = try #require(found.first { $0.seed == seed(game) })
+        #expect(hit.hour == 10 && hit.minute == 20 && hit.second == 33 && hit.timer0 == 0xC79)
+        #expect(hit.egg == egg)
+        for r in found.prefix(20) {
+            let again = PFBridge.eggGenerate5(seed: r.seed, initialAdvances: 0, maxAdvances: 0, game: game,
+                                              tid: 0, sid: 0, profile: ds, daycare: parents, filter: filter)
+            #expect(again == [r.egg])
+        }
+        // Dates the wrong way round don't start.
+        #expect(PFBridge.eggSearch5Start(game: game, tid: 0, sid: 0, profile: ds, daycare: parents,
+                                         start: (2011, 3, 7), end: (2011, 3, 6),
+                                         initialAdvances: 0, maxAdvances: 0, filter: filter) == nil)
+    }
+
+    /// A Gen 5 egg result sends the Gen 5 Timer its second.
+    @MainActor
+    @Test func sendToTimer() throws {
+        let egg = try #require(generate(.black, daycare: daycare(), maxAdvances: 0).first)
+        let r = PFBridge.EggSearchResult5(year: 2011, month: 3, day: 6, hour: 10, minute: 20, second: 33,
+                                          seed: 0x1234, timer0: 0xC79, buttons: 0, egg: egg)
+        let bridge = FinderTimerBridge.shared
+        bridge.clear()
+        Gen5EggView.sendToTimer(r)
+        #expect(bridge.pendingGen == .gen5 && bridge.pendingTargetSecond == 33 && bridge.shouldSwitchToTimer)
+        #expect(bridge.selectedTime == "2011/03/06 10:20:33" && bridge.selectedSeed == "0000000000001234")
+        bridge.clear()
+    }
+
+    /// The species lists stop at each generation's last species, which the
+    /// generators' tables end at, and name every species.
+    @MainActor
+    @Test func eggSpecies() {
+        #expect(EggSpecies.all == EggSpecies.all.sorted())
+        for generation in [FinderGeneration.gen3, .gen4, .gen5] {
+            let list = EggSpecies.list(for: generation)
+            #expect(list.first == 1 && list.allSatisfy { $0 <= EggSpecies.last(in: generation) })
+            #expect([29, 32, 313, 314].allSatisfy(list.contains))
+            #expect(!list.map(PFBridge.specieName).contains("???"))
+        }
+        #expect(EggSpecies.list(for: .gen3).last == 374)
+        #expect(EggSpecies.list(for: .gen4).last == 489)
+        #expect(EggSpecies.list(for: .gen5).last == 636)
+    }
+
+    /// Who can breed, and what each game's cards show.
+    @MainActor
+    @Test func parentRules() {
+        for (a, b) in [(0, 1), (1, 0), (0, 3), (3, 0), (1, 3), (3, 1), (2, 3), (3, 2)] {
+            #expect(EggParent.canBreed(UInt8(a), UInt8(b)), "\(a) \(b)")
+        }
+        for (a, b) in [(0, 0), (1, 1), (2, 2), (3, 3), (0, 2), (2, 1)] {
+            #expect(!EggParent.canBreed(UInt8(a), UInt8(b)), "\(a) \(b)")
+        }
+        #expect(EggParentFields(game: .emerald).items == [0, 1] && EggParentFields(game: .emerald).abilities.isEmpty)
+        #expect(EggParentFields(game: .ruby).items.isEmpty && EggParentFields(game: .platinum).items.isEmpty)
+        #expect(EggParentFields(game: .black).abilities == [0, 1, 2] && EggParentFields(game: .white2).items == Array(0...7))
+        var parent = EggParent(gender: 1)
+        parent.ability = 2
+        parent.item = 5
+        let fitted = EggParentFields(game: .emerald).fitting(parent)
+        #expect(fitted.ability == 0 && fitted.item == 0)
+        #expect(EggParentFields(game: .black).fitting(parent) == parent)
+        #expect(EggParent.inheritanceText([1, 2, 0, 0, 0, 0]) == "HP:A Atk:B Def:R SpA:R SpD:R Spe:R")
+        #expect(chatotPitchText(5) == "L 5" && chatotPitchText(99) == "H 99")
     }
 }

@@ -824,6 +824,20 @@ nonisolated func noResultsText(filters: [String], widen: String? = nil) -> Strin
     }
 }
 
+/// Chatot's pitch, 0 to 99, as the Finder shows it: low (L) to high (H),
+/// then the number.
+nonisolated func chatotPitchText(_ chatot: UInt8) -> String {
+    let label: String
+    switch chatot {
+    case 0..<20: label = "L"
+    case 20..<40: label = "ML"
+    case 40..<60: label = "M"
+    case 60..<80: label = "MH"
+    default: label = "H"
+    }
+    return "\(label) \(chatot)"
+}
+
 /// Said under the Search button when a search stopped at the limit.
 let searchResultLimitNote = "Stopped at \(searchResultLimit.formatted()) results. Narrow the search to find the rest."
 
@@ -962,18 +976,7 @@ struct StaticSearchResult: Identifiable, Sendable {
         default: return "?"
         }
     }
-    var chatotPitch: String? {
-        guard let c = chatot else { return nil }
-        let label: String
-        switch c {
-        case 0..<20: label = "L"
-        case 20..<40: label = "ML"
-        case 40..<60: label = "M"
-        case 60..<80: label = "MH"
-        default: label = "H"
-        }
-        return "\(label) \(c)"
-    }
+    var chatotPitch: String? { chatot.map(chatotPitchText) }
     var callName: String? {
         guard let c = call else { return nil }
         switch c {
@@ -2877,6 +2880,8 @@ struct RNGToolsView: View {
             // by the `finder_*` launch arguments.
             .task { await DebugSnapshot.openSheet("finder") { selectedTool = RNGToolTab.finder.rawValue } }
             .task { await DebugSnapshot.openSheet("routes") { selectedTool = RNGToolTab.encounters.rawValue } }
+            // `-debugOpenSheet eggs5`: the Eggs tool's Gen 5 tab.
+            .task { await DebugSnapshot.openSheet("eggs5") { selectedTool = RNGToolTab.eggs.rawValue } }
             #endif
             .onChange(of: FinderTimerBridge.shared.shouldSwitchToTimer) {
                 if FinderTimerBridge.shared.shouldSwitchToTimer {

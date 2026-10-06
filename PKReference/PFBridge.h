@@ -786,7 +786,10 @@ typedef struct {
     uint8_t ability;
     uint8_t gender;
     uint8_t shiny;
+    uint8_t hiddenPower;
+    /// Which parent gave each IV: 0 none, 1 the first, 2 the second.
     uint8_t inheritance[6];
+    /// Chatot's pitch, 0 to 99, for finding where you are.
     uint8_t chatot;
 } PFEggGeneratorState5;
 
@@ -846,32 +849,6 @@ PFWildGeneratorState5 *pf_wildGenerate5(uint64_t seed,
                                          const bool natures[25], const bool powers[16],
                                          const bool encounterSlots[12],
                                          int *outCount);
-
-// MARK: - Gen 5 Egg Generator
-
-PFEggGeneratorState5 *pf_eggGenerate5(uint64_t seed,
-                                        uint32_t initialAdvances,
-                                        uint32_t maxAdvances,
-                                        uint32_t offset,
-                                        const uint8_t parentAIVs[6], const uint8_t parentBIVs[6],
-                                        uint8_t parentAAbility, uint8_t parentBAbility,
-                                        uint8_t parentAGender, uint8_t parentBGender,
-                                        uint8_t parentAItem, uint8_t parentBItem,
-                                        uint8_t parentANature, uint8_t parentBNature,
-                                        uint16_t eggSpecie, bool masuda,
-                                        uint16_t tid, uint16_t sid,
-                                        uint32_t game,
-                                        // Profile5 fields
-                                        uint64_t mac, const bool keypresses[9],
-                                        uint8_t vcount, uint8_t gxstat, uint8_t vframe,
-                                        bool skipLR, uint16_t timer0Min, uint16_t timer0Max,
-                                        bool memoryLink, bool shinyCharm,
-                                        uint8_t dsType, uint8_t language,
-                                        // Filter
-                                        uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
-                                        const uint8_t ivMin[6], const uint8_t ivMax[6],
-                                        const bool natures[25], const bool powers[16],
-                                        int *outCount);
 
 // MARK: - Gen 5 ID Generator
 
@@ -1052,6 +1029,71 @@ void pf_profileSearch5_free(PFProfileSearch5Handle handle);
 /// SHA1).
 uint64_t pf_gen5InitialSeed(uint32_t game, const PFProfile5 *profile, uint16_t timer0, uint16_t buttons,
                             uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second);
+
+// MARK: - Gen 5 Egg Generator
+
+/// The parents, as PokéFinder's Daycare holds them, in the game's order:
+/// the female, or else Ditto, second.
+typedef struct {
+    uint8_t parentAIVs[6];
+    uint8_t parentBIVs[6];
+    /// 0, 1, or 2 for a hidden ability.
+    uint8_t abilities[2];
+    /// 0 male, 1 female, 2 genderless, 3 Ditto.
+    uint8_t genders[2];
+    /// 0 none, 1 Everstone, 2 to 7 the power items (HP, Atk, Def, SpA,
+    /// SpD, Spe), 8 Destiny Knot.
+    uint8_t items[2];
+    uint8_t natures[2];
+    uint16_t specie;
+    bool masuda;
+} PFDaycare;
+
+/// PokéFinder's EggGenerator5 from one seed: Black and White work out
+/// each advance's egg; Black 2 and White 2 make the egg from the seed and
+/// each advance's PID.
+PFEggGeneratorState5 *pf_eggGenerate5(uint64_t seed,
+                                        uint32_t initialAdvances,
+                                        uint32_t maxAdvances,
+                                        uint32_t offset,
+                                        uint32_t game, uint16_t tid, uint16_t sid,
+                                        const PFProfile5 *profile,
+                                        const PFDaycare *daycare,
+                                        // Filter
+                                        uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
+                                        const uint8_t ivMin[6], const uint8_t ivMax[6],
+                                        const bool natures[25], const bool powers[16],
+                                        int *outCount);
+
+// MARK: - Gen 5 Egg Searcher
+
+typedef struct {
+    PFDateTime dateTime;
+    uint64_t seed;
+    uint16_t timer0;
+    uint16_t buttons;
+    PFEggGeneratorState5 egg;
+} PFEggSearchResult5;
+
+typedef void *PFEggSearch5Handle;
+
+/// PokéFinder's Gen 5 egg searcher (Searcher5 with EggGenerator5) over
+/// every second of the dates, on its own thread, with the profile's Timer0
+/// range and keypresses. Nil when the dates or Timer0s are the wrong way
+/// round.
+PFEggSearch5Handle pf_eggSearch5_start(uint32_t game, uint16_t tid, uint16_t sid,
+                                       const PFProfile5 *profile, const PFDaycare *daycare,
+                                       uint16_t startYear, uint8_t startMonth, uint8_t startDay,
+                                       uint16_t endYear, uint8_t endMonth, uint8_t endDay,
+                                       uint32_t initialAdvances, uint32_t maxAdvances,
+                                       uint8_t filterGender, uint8_t filterAbility, uint8_t filterShiny,
+                                       const uint8_t ivMin[6], const uint8_t ivMax[6],
+                                       const bool natures[25], const bool powers[16]);
+int pf_eggSearch5_progress(PFEggSearch5Handle handle);
+bool pf_eggSearch5_done(PFEggSearch5Handle handle);
+PFEggSearchResult5 *pf_eggSearch5_getResults(PFEggSearch5Handle handle, int *outCount);
+void pf_eggSearch5_cancel(PFEggSearch5Handle handle);
+void pf_eggSearch5_free(PFEggSearch5Handle handle);
 
 // MARK: - Gen 5 IDs
 
