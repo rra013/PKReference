@@ -39,7 +39,7 @@ not yet in `main`.
 Before that, #23–#56 were the UI pass, game data into JSON, iPad fixes, the
 Mac app, Siri Phase 1 and the rename to PK Reference.
 
-Full suite on 2026-10-06, on `backend-integration` with Phase 4c: 1,303 tests,
+Full suite on 2026-10-06, on `backend-integration` with Phase 4d: 1,314 tests,
 all passing on the iPhone 17 Pro Max simulator. The iOS and Mac builds had no warnings.
 
 ---
@@ -507,6 +507,9 @@ xcodebuild build -project PKReference.xcodeproj -scheme PKReference -destination
     -finder_mode Searcher -finder_game FireRed -finder_encounterMode Static
     -finder_encounterCategory Gifts -frlg_version fr_nx`, goes from the
     Finder to an Eevee target and its first seed's Calibrate.
+  - `-debugOpenSheet metaEvents` (Events, from the Meta tab) and
+    `metaEventFilters` (its filter sheet), with `-defaultTab meta`. Events
+    loads from Limitless, so give it `-debugSnapshotDelay 8`.
   - `-debugOpenSettings YES`: the Settings window, as `<name>-Settings`.
   - `-debugMenus YES` prints the menu bar with shortcuts, as `[menu]` lines.
 
@@ -537,7 +540,7 @@ From the recent PRs, each also noted in its description:
 
 - **Launching into a tab with a search field under More.** When a tab with a
   search field (Mon Index, Move Index, Ability Index, Speed Tiers,
-  Tournaments, Team Search) is under More *and* set as Open To, its large
+  Team Search) is under More *and* set as Open To, its large
   title appears only after the first scroll at launch (iOS 26.4). Tapping
   into it is fine; four workarounds didn't help. (#32)
 - **Mon Index haptic under More.** The selection tick when opening a Pokémon
@@ -626,9 +629,9 @@ is in [Recent work](#recent-work) and the README.
    - Names Limitless writes that the alias table doesn't know still search,
      but saving a team reports them; a log of them would show the gaps.
 6. **The backend integration**, on `backend-integration` (PRs go there,
-   not to `main`). Phases 0–3 are done; next is Phase 4, the Meta tab in
-   place of Tournaments, planned in
-   [`BackendIntegration-PHASE4.md`](BackendIntegration-PHASE4.md). Phases
+   not to `main`). Phases 0–3 are done. Phase 4, the Meta tab in place of
+   Tournaments, is under way: its PRs and what's left are in
+   [`BackendIntegration-PHASE4.md`](BackendIntegration-PHASE4.md) §9. Phases
    5–7 (ladder and singles, the planning flows, launch) are in
    [`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md). The server
    runs on the owner's machine in Docker; leave their containers, topics and

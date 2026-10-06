@@ -77,7 +77,7 @@ struct TabLayout: Equatable {
     /// tab, so hiding the default tab can't leave the app opening to one
     /// that isn't there.
     func launchTab(for raw: String) -> AppTab {
-        if let tab = AppTab(rawValue: raw), visible.contains(tab) { return tab }
+        if let tab = Self.tab(named: raw), visible.contains(tab) { return tab }
         return visible[0]
     }
 
@@ -136,8 +136,36 @@ struct TabLayout: Equatable {
         defaults.removeObject(forKey: legacyEnabledKey)
     }
 
+    /// Tabs that were renamed: the stored name, and the tab it became. The
+    /// Tournaments tab became Meta, with Events inside it (2026-10).
+    static let renamedTabs = ["tournaments": AppTab.meta]
+
+    /// Moves the default tab, the order and the hidden tabs from a renamed
+    /// tab's old name to its new one, so it keeps its place and stays hidden
+    /// if it was. Without this, the old name is dropped as unknown and the
+    /// tab comes back at the end, shown. Runs at launch, after
+    /// `migrateLegacyStorage(in:)`; does nothing once no setting names an
+    /// old tab.
+    static func migrateRenamedTabs(in defaults: UserDefaults = .standard) {
+        func renamed(_ raw: String) -> String {
+            raw.split(separator: ",", omittingEmptySubsequences: false)
+                .map { renamedTabs[String($0)]?.rawValue ?? String($0) }
+                .joined(separator: ",")
+        }
+        for key in [orderKey, hiddenKey, AppSettings.defaultTab.name] {
+            guard let raw = defaults.string(forKey: key) else { continue }
+            let new = renamed(raw)
+            if new != raw { defaults.set(new, forKey: key) }
+        }
+    }
+
+    /// The tab a stored name means, including a renamed tab's old name.
+    static func tab(named raw: String) -> AppTab? {
+        AppTab(rawValue: raw) ?? renamedTabs[raw]
+    }
+
     private static func parse(_ raw: String) -> [AppTab] {
-        raw.split(separator: ",").compactMap { AppTab(rawValue: String($0)) }
+        raw.split(separator: ",").compactMap { tab(named: String($0)) }
     }
 
     private static func serialize(_ tabs: [AppTab]) -> String {

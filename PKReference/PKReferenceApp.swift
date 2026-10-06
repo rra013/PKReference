@@ -15,6 +15,7 @@ struct PokedexApp: App {
 
     init() {
         TabLayout.migrateLegacyStorage()
+        TabLayout.migrateRenamedTabs()
         IntentIndex.watchSaves()
         #if DEBUG
         AppNavigator.shared.requestFromLaunchArguments()

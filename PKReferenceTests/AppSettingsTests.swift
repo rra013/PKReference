@@ -25,7 +25,8 @@ struct AppSettingsTests {
          AppSettings.typeBackgrounds.name,
          AppSettings.championsRegulation.name, AppSettings.instantSetDelete.name,
          AppSettings.warnBeforeLeavingTab.name, AppSettings.matchupColors.name,
-         AppSettings.metaServerEnabled.name, AppSettings.metaServerAddress.name]
+         AppSettings.metaServerEnabled.name, AppSettings.metaServerAddress.name,
+         AppSettings.metaWindow.name]
     }
 
     @Test("Key names match what earlier versions stored")
@@ -37,7 +38,8 @@ struct AppSettingsTests {
                           "typeBackgrounds",
                           "championsRegulationRaw", "instantSetDelete",
                           "warnBeforeLeavingTab", "matchupColors",
-                          "metaServerEnabled", "metaServerAddress"])
+                          "metaServerEnabled", "metaServerAddress",
+                          "metaWindow"])
     }
 
     @Test("No two settings share a key")
@@ -59,6 +61,7 @@ struct AppSettingsTests {
         #expect(AppSettings.warnBeforeLeavingTab.defaultValue == true)
         #expect(AppSettings.metaServerEnabled.defaultValue == false)
         #expect(AppSettings.metaServerAddress.defaultValue == "http://localhost:8080")
+        #expect(AppSettings.metaWindow.defaultValue == .days30)
     }
 
     /// A throwaway defaults suite, removed when `body` returns.

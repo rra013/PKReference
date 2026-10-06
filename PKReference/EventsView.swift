@@ -1,8 +1,13 @@
 //
-//  TournamentsView.swift
+//  EventsView.swift
 //  PKReference
 //
 //  Created by Rishi Anand on 5/1/26.
+//
+//  Events: Limitless's tournaments, browsed live by game and format, with
+//  each one's standings and team sheets. It was the Tournaments tab; it's
+//  now a page inside the Meta tab (BackendIntegration-PHASE4.md §2.2), and
+//  always reads Limitless, whether or not the PK Reference server is on.
 //
 
 import SwiftUI
@@ -12,7 +17,7 @@ import WebKit
 // MARK: - View Model
 
 @Observable
-final class TournamentsViewModel {
+final class EventsViewModel {
     var games: [LimitlessGame] = []
     var tournaments: [LimitlessTournament] = []
     var selectedGameID: String = "VGC"
@@ -23,6 +28,12 @@ final class TournamentsViewModel {
     var errorMessage: String?
     var currentPage = 1
     var hasMorePages = true
+
+    /// Opens on one VGC format, such as the Meta tab's regulation ("M-C"),
+    /// or every format.
+    init(format: String? = nil) {
+        selectedFormatID = format
+    }
 
     var selectedGame: LimitlessGame? {
         games.first { $0.id == selectedGameID }
@@ -78,7 +89,7 @@ final class TournamentsViewModel {
             }
             hasMorePages = results.count >= 50
         } catch {
-            errorMessage = "Failed to load tournaments: \(error.localizedDescription)"
+            errorMessage = "Failed to load events: \(error.localizedDescription)"
         }
         isLoading = false
     }
@@ -90,57 +101,63 @@ final class TournamentsViewModel {
     }
 }
 
-// MARK: - Tournaments Tab
+// MARK: - Events
 
-struct TournamentsTab: View {
-    @State private var vm = TournamentsViewModel()
+/// The event list, pushed from the Meta tab.
+struct EventsView: View {
+    @State private var vm: EventsViewModel
     @State private var showFilters = false
 
+    init(format: String? = nil) {
+        _vm = State(initialValue: EventsViewModel(format: format))
+    }
+
     var body: some View {
-        TabNavigationStack {
-            Group {
-                if vm.isLoading && vm.tournaments.isEmpty {
-                    ProgressView("Loading tournaments…")
-                } else if let error = vm.errorMessage, vm.tournaments.isEmpty {
-                    ContentUnavailableView {
-                        Label("Failed to Load", systemImage: "exclamationmark.triangle")
-                    } description: {
-                        Text(error)
-                    } actions: {
-                        Button("Retry") {
-                            Task { await vm.loadTournaments() }
-                        }
-                    }
-                } else if vm.filteredTournaments.isEmpty {
-                    ContentUnavailableView.search(text: vm.searchText)
-                } else {
-                    tournamentList
-                }
-            }
-            .navigationTitle("Tournaments")
-            .searchable(text: $vm.searchText, prompt: "Search tournaments")
-            .toolbar {
-                ToolbarItem(placement: .automatic) {
-                    Button {
-                        showFilters = true
-                    } label: {
-                        Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
+        Group {
+            if vm.isLoading && vm.tournaments.isEmpty {
+                ProgressView("Loading events…")
+            } else if let error = vm.errorMessage, vm.tournaments.isEmpty {
+                ContentUnavailableView {
+                    Label("Failed to Load", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(error)
+                } actions: {
+                    Button("Retry") {
+                        Task { await vm.loadTournaments() }
                     }
                 }
+            } else if vm.filteredTournaments.isEmpty {
+                ContentUnavailableView.search(text: vm.searchText)
+            } else {
+                tournamentList
             }
-            .sheet(isPresented: $showFilters) {
-                TournamentFilterSheet(vm: vm)
-                .sheetSize()
-            }
-            .task {
-                if vm.games.isEmpty {
-                    await vm.loadGames()
-                }
-                if vm.tournaments.isEmpty {
-                    await vm.loadTournaments()
+        }
+        .navigationTitle("Events")
+        .searchable(text: $vm.searchText, prompt: "Search events")
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    showFilters = true
+                } label: {
+                    Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
                 }
             }
         }
+        .sheet(isPresented: $showFilters) {
+            EventFilterSheet(vm: vm)
+            .sheetSize()
+        }
+        .task {
+            if vm.games.isEmpty {
+                await vm.loadGames()
+            }
+            if vm.tournaments.isEmpty {
+                await vm.loadTournaments()
+            }
+        }
+        #if DEBUG && os(macOS)
+        .task { await DebugSnapshot.openSheet("metaEventFilters") { showFilters = true } }
+        #endif
     }
 
     private var tournamentList: some View {
@@ -162,7 +179,7 @@ struct TournamentsTab: View {
                     NavigationLink {
                         TournamentDetailView(tournament: tournament)
                     } label: {
-                        TournamentRow(tournament: tournament)
+                        EventRow(tournament: tournament)
                     }
                 }
 
@@ -174,7 +191,7 @@ struct TournamentsTab: View {
                         }
                 }
             } header: {
-                Text("\(vm.filteredTournaments.count) tournaments")
+                Text("\(vm.filteredTournaments.count) events")
             }
         }
         .scrollDismissesKeyboard(.interactively)
@@ -183,7 +200,7 @@ struct TournamentsTab: View {
 
 // MARK: - Tournament Row
 
-private struct TournamentRow: View {
+struct EventRow: View {
     let tournament: LimitlessTournament
 
     var body: some View {
@@ -209,8 +226,8 @@ private struct TournamentRow: View {
 
 // MARK: - Filter Sheet
 
-private struct TournamentFilterSheet: View {
-    @Bindable var vm: TournamentsViewModel
+private struct EventFilterSheet: View {
+    @Bindable var vm: EventsViewModel
     @Environment(\.dismiss) private var dismiss
 
     private let playerThresholds = [0, 8, 16, 32, 64, 128, 256]

@@ -208,6 +208,53 @@ struct TabLayoutTests {
         }
     }
 
+    @Test("The Tournaments tab becomes Meta, keeping its place, its hidden state and the default tab")
+    func migratesRenamedTab() {
+        withDefaults { defaults in
+            defaults.set("monIndex,tournaments,teams", forKey: TabLayout.orderKey)
+            defaults.set("tournaments", forKey: TabLayout.hiddenKey)
+            defaults.set("tournaments", forKey: AppSettings.defaultTab.name)
+            TabLayout.migrateRenamedTabs(in: defaults)
+            #expect(defaults.string(forKey: TabLayout.orderKey) == "monIndex,meta,teams")
+            #expect(defaults.string(forKey: TabLayout.hiddenKey) == "meta")
+            #expect(defaults.string(forKey: AppSettings.defaultTab.name) == "meta")
+
+            let layout = TabLayout(orderRaw: defaults.string(forKey: TabLayout.orderKey) ?? "",
+                                   hiddenRaw: defaults.string(forKey: TabLayout.hiddenKey) ?? "")
+            #expect(layout.order.prefix(3) == [.monIndex, .meta, .teams])
+            #expect(!layout.visible.contains(.meta))
+
+            // Twice changes nothing more.
+            TabLayout.migrateRenamedTabs(in: defaults)
+            #expect(defaults.string(forKey: TabLayout.orderKey) == "monIndex,meta,teams")
+        }
+    }
+
+    @Test("A legacy list naming Tournaments converts, then becomes Meta")
+    func migratesLegacyListWithRenamedTab() {
+        withDefaults { defaults in
+            defaults.set("tournaments,monIndex", forKey: TabLayout.legacyEnabledKey)
+            TabLayout.migrateLegacyStorage(in: defaults)
+            TabLayout.migrateRenamedTabs(in: defaults)
+            let layout = TabLayout(orderRaw: defaults.string(forKey: TabLayout.orderKey) ?? "",
+                                   hiddenRaw: defaults.string(forKey: TabLayout.hiddenKey) ?? "")
+            #expect(layout.visible == [.meta, .monIndex])
+            #expect(TabLayout(orderRaw: "tournaments", hiddenRaw: "").order.first == .meta, "read before migrating")
+            #expect(TabLayout().launchTab(for: "tournaments") == .meta)
+        }
+    }
+
+    @Test("Nothing stored, or nothing renamed, is left alone")
+    func renameLeavesOthersAlone() {
+        withDefaults { defaults in
+            TabLayout.migrateRenamedTabs(in: defaults)
+            #expect(defaults.string(forKey: TabLayout.orderKey) == nil)
+            defaults.set("teams,monIndex", forKey: TabLayout.orderKey)
+            TabLayout.migrateRenamedTabs(in: defaults)
+            #expect(defaults.string(forKey: TabLayout.orderKey) == "teams,monIndex")
+        }
+    }
+
     @Test("Conversion does nothing once the new order is stored")
     func migrationRunsOnce() {
         withDefaults { defaults in

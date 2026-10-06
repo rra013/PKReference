@@ -53,6 +53,8 @@ enum AppSettings {
     static let metaServerEnabled = SettingKey(name: MetaServerSettings.enabledKey, defaultValue: false)
     static let metaServerAddress = SettingKey(name: MetaServerSettings.addressKey,
                                               defaultValue: MetaServerSettings.defaultAddress)
+    /// The Meta tab's window: the last 14 days, 30 days, or the regulation.
+    static let metaWindow = SettingKey(name: "metaWindow", defaultValue: MetaAPI.Window.days30)
 }
 
 extension AppStorage {
