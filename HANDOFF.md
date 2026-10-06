@@ -36,7 +36,7 @@ says what changed and what was checked.
 Before that, #23–#56 were the UI pass, game data into JSON, iPad fixes, the
 Mac app, Siri Phase 1 and the rename to PK Reference.
 
-Full suite on 2026-10-06, with BDSP eggs: 1,280 tests, all passing
+Full suite on 2026-10-06, with the backend's species golden test: 1,281 tests, all passing
 on the iPhone 17 Pro Max simulator. The iOS and Mac builds had no warnings.
 
 ---

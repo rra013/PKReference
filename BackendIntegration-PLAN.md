@@ -327,8 +327,11 @@ Each phase is one PR into `backend-integration`, or two where it's large.
      - `TeamStore` tables: events, phases, teams, members, moves, matches.
      - The usage counters count only final standings. Before, an event
        fetched while it ran was counted once, part-way, and never fixed.
-   - **1b, normalize once:** `TeamNormalizer` on the app's vocabulary, with
-     golden files both test suites read.
+   - **1b, normalize once:** `SpeciesVocabularies`, a port of the app's
+     `TeamSearchVocabulary`, gives each stored member its species key and
+     Mega Stone. A golden file recorded from the app
+     (`golden/species-identity.json`, 171 cases) is checked by both test
+     suites.
 2. **Insight projections and API v1.**
    - Usage windows, top-cut rate, trends, cores, full sets, win rates, and a
      first version of archetypes.

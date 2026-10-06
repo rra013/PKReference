@@ -9,12 +9,14 @@ on:
       - "backend/**"
       - "champions-*.json"
       - "PKReference/showdown-champions-data.json"
+      - "PKReference/team_search_vocab.json"
       - ".github/workflows/backend.yml"
   pull_request:
     paths:
       - "backend/**"
       - "champions-*.json"
       - "PKReference/showdown-champions-data.json"
+      - "PKReference/team_search_vocab.json"
       - ".github/workflows/backend.yml"
 
 # The job only reads the repository.

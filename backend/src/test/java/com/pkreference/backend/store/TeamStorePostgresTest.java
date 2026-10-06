@@ -2,6 +2,7 @@ package com.pkreference.backend.store;
 
 import com.pkreference.backend.ingest.EventFetchRepository;
 import com.pkreference.backend.model.Events.Tournament;
+import com.pkreference.backend.standardize.SpeciesVocabularies;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -21,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @JdbcTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers(disabledWithoutDocker = true)
-@Import({TeamStore.class, EventFetchRepository.class})
+@Import({TeamStore.class, SpeciesVocabularies.class, EventFetchRepository.class})
 class TeamStorePostgresTest extends TeamStoreTestBase {
     @Container
     @ServiceConnection

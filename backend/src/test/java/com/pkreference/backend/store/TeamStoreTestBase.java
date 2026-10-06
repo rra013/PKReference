@@ -59,6 +59,16 @@ abstract class TeamStoreTestBase {
         assertThat(jdbc.queryForMap("select name, item, ability, nature from team_member where player = 'player-01' and slot = 0"))
                 .containsEntry("NAME", "Grimmsnarl").containsEntry("ITEM", "Light Clay")
                 .containsEntry("ABILITY", "Prankster").containsEntry("NATURE", "Careful");
+
+        // Species keys the app's way, and Mega Stones only on their own species.
+        assertThat(count("select count(*) from team_member where species_key is null")).isZero();
+        assertThat(jdbc.queryForObject("select species_key from team_member where player = 'player-01' and slot = 0",
+                String.class)).isEqualTo("grimmsnarl");
+        assertThat(jdbc.queryForObject("""
+                select mega_stone from team_member where player = 'player-01' and name = 'Charizard'""", String.class))
+                .isEqualTo("charizarditey");
+        assertThat(count("select count(*) from team_member where mega_stone is not null and item not like '%ite%'"))
+                .isZero();
     }
 
     @Test
