@@ -1,7 +1,8 @@
 # PK Reference: handoff
 
-State of `main` as of 2026-10-05, how the codebase fits together for the
-next change, and what's worth doing next. The [README](README.md) describes
+State of `main` and of the `backend-integration` branch as of 2026-10-06,
+how the codebase fits together for the next change, and what's worth doing
+next. The [README](README.md) describes
 the app itself; this file is for whoever works on it.
 
 ## Contents
@@ -20,8 +21,9 @@ the app itself; this file is for whoever works on it.
 
 ## Recent work
 
-From #57 to #85 (2026-09-30 to 2026-10-05), by area. Each PR's description
-says what changed and what was checked.
+From #57 to #101 (2026-09-30 to 2026-10-06), by area. Each PR's description
+says what changed and what was checked. #93–#101 are on `backend-integration`,
+not yet in `main`.
 
 | PRs | Area |
 |---|---|
@@ -31,13 +33,14 @@ says what changed and what was checked.
 | [#70](https://github.com/rra013/PKReference/pull/70)–[#83](https://github.com/rra013/PKReference/pull/83), [#87](https://github.com/rra013/PKReference/pull/87)–[#89](https://github.com/rra013/PKReference/pull/89) | RNG tools: FireRed/LeafGreen initial seeds and calibration from Ten Lines (#70–#72), a Mac crash opening Calibrate (#73), then the fixes from the 2026-10-03 audit (#74–#83, #87–#89), last of all wild areas from PokéFinder's tables, the Gen 4 tools' year, and Gen 5 profiles. See [Feature notes](#rng-tools). |
 | [#91](https://github.com/rra013/PKReference/pull/91) | RNG tools: the Eggs tool's Gen 5 tab, with PokéFinder's egg generator and its searcher over dates with the DS's parameters. Every egg tab now shows only the parent fields its game reads, and picks the species by name. |
 | [#92](https://github.com/rra013/PKReference/pull/92) | RNG tools: the Finder's BDSP Egg mode takes the egg's species, Ditto and genderless parents, the Destiny Knot and a hidden-ability filter, checks and orders the parents as PokéFinder's Eggs8 does, and applies the Oval Charm. |
-| [#84](https://github.com/rra013/PKReference/pull/84), [#85](https://github.com/rra013/PKReference/pull/85) | An optional backend in `backend/`: Limitless tournaments through Kafka into usage counts served over REST, with hand-typed names standardized. The app doesn't use it yet. |
+| [#84](https://github.com/rra013/PKReference/pull/84), [#85](https://github.com/rra013/PKReference/pull/85) | An optional backend in `backend/`: Limitless tournaments through Kafka into usage counts served over REST, with hand-typed names standardized. |
+| [#93](https://github.com/rra013/PKReference/pull/93)–[#101](https://github.com/rra013/PKReference/pull/101) | On `backend-integration`: the backend integration's plan and phases 0–3. The backend keeps every event's teams and matches, names species the app's way, and serves insights and Team Search's corpus at `/v1`; the app's Settings → PK Reference Server (Beta), off by default, reads Team Search's corpus from it. See [`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md) §2. |
 
 Before that, #23–#56 were the UI pass, game data into JSON, iPad fixes, the
 Mac app, Siri Phase 1 and the rename to PK Reference.
 
-Full suite on 2026-10-06, with the PK Reference server option: 1,285 tests, all passing
-on the iPhone 17 Pro Max simulator. The iOS and Mac builds had no warnings.
+Full suite on 2026-10-06, on `backend-integration` after #101: 1,285 tests,
+all passing on the iPhone 17 Pro Max simulator. The iOS and Mac builds had no warnings.
 
 ---
 
@@ -92,23 +95,22 @@ effects (`HeldItem.builtIns`, with `typeBoostingItemMap` and
 `typeResistBerryMap`), the Battle Sim's dispatch lists for moves that need
 their own code, and the damage engines.
 
-**`backend/`**: an optional Java 21 / Spring Boot service, separate from the
-app ([`backend/README.md`](backend/README.md)). Every 30 minutes it walks
-Limitless's tournament list back through a lookback (longer once to backfill),
-within its keyless limit of 50 requests in 5 minutes, and fetches each event's
-details, standings and matches by the app's rules (16 players or more, final
-48 hours after the start). It streams them through Kafka, stores every team and
-match in Postgres (the team store), counts usage from final standings, and
-serves insights from the store at `GET /v1/...` (usage by window, top-cut
-rate, trends, win rates, sets, teammates, cores and archetypes; cached, with
-ETags, and described in Swagger UI at `/swagger-ui.html`) besides the older
-counts at `GET /api/usage`. `standings.fetched` and
-`pairings.fetched` keep every event for good, so anything built from them can
-be rebuilt. `docker compose up -d` runs Kafka and Postgres, with their data in
-volumes; the store's tests also run on Postgres through Testcontainers. Its `NameStandardizer` reads every repo-root
-`champions-*.json` and `showdown-champions-data.json`, which Maven bundles at
-build time, so a new regulation needs nothing there. `mvn verify` runs its tests. The app doesn't
-call it yet (see [What's next](#whats-next)).
+**`backend/`**: an optional Java 21 / Spring Boot service with Kafka and
+Postgres, separate from the app. It collects Limitless's events and serves
+insights and Team Search's corpus at `/v1`. Running, testing and rebuilding it
+are in [`backend/README.md`](backend/README.md); where it's going is in
+[`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md). Its
+`NameStandardizer` and `SpeciesVocabularies` read the repo-root
+`champions-*.json` and `PKReference/`'s `team_search_vocab.json` and
+`showdown-champions-data.json`, which Maven bundles, so a new regulation needs
+nothing there; a change to how the app names species must keep
+`SpeciesIdentityGoldenTests` passing on both sides.
+
+**`PKReference/MetaServer.swift`**: the app's side of the server. Settings →
+PK Reference Server (Beta) stores `metaServerEnabled` and `metaServerAddress`;
+`PreferredCorpusFetcher`, `TeamCorpusStore`'s default source, reads them at
+each call and asks the server, then Limitless whenever the server can't
+answer.
 
 **RNG tools** (`RNGToolsView.swift` and the files beside it): PokéFinder's
 C++ core is called through `PFBridge.h`/`.mm`, with `PFBridgeSwift.swift` as
@@ -449,6 +451,10 @@ changes to the backend and the data files it reads
 they have no CI.
 
 The Mac app builds from the same target.
+It only builds from a checkout as deep as the owner's
+(`/Users/rra/Documents/YukiSoft/PKDex`): the project finds Homebrew's
+`libzstd` by a path relative to the project folder
+(`../../../../../opt/homebrew/…`).
 This signs it to run on this Mac only:
 
 ```bash
@@ -602,23 +608,22 @@ is in [Recent work](#recent-work) and the README.
    developer account. Left out on purpose: a menu command for paste import,
    since the calc has two sides to paste into.
 5. **Team Search open risks.**
-   - Confirm Limitless's rate limits and terms before corpus builds grow.
-     It returned HTTP 429 after about five full crawls in an hour, so tests
-     don't crawl it.
+   - Limitless rate-limits hard (its limit and the app's HTTP 429s are in
+     the backend plan's §2 and §3), so tests don't crawl it. Its terms for a
+     public service are still to be asked (the plan's Phase 7).
    - Early in a regulation there's little data. An "include last
      regulation's teams" option (keeping only teams legal now) was planned
      but not built.
    - Names Limitless writes that the alias table doesn't know still search,
      but saving a team reports them; a log of them would show the gaps.
-6. **Use the backend in the app.** Started 2026-10-06 on the
-   `backend-integration` branch: see
-   [`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md). The backend
-   runs on the owner's Mac against Docker's Kafka and live Limitless; item
-   5's rate limits and terms apply to it too. Settings → PK Reference Server
-   (Beta), off by default, has Team Search and the Problem Solver build their
-   corpus from it (`MetaServer.swift`: the same two calls, which the server
-   answers in Limitless's shapes), falling back to Limitless whenever it
-   can't answer. Next is the plan's Phase 4, the Meta tab.
+6. **The backend integration**, on `backend-integration` (PRs go there,
+   not to `main`). Phases 0–3 are done; next is Phase 4, the Meta tab in
+   place of Tournaments, planned in
+   [`BackendIntegration-PHASE4.md`](BackendIntegration-PHASE4.md). Phases
+   5–7 (ladder and singles, the planning flows, launch) are in
+   [`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md). The server
+   runs on the owner's machine in Docker; leave their containers, topics and
+   consumer groups alone, and check changes on a separate stack.
 7. **FireRed and LeafGreen's open items.** Wild calibration (Ten Lines'
    `check_seeds_wild`); Teachy TV on Switch, which Ten Lines hasn't worked
    out either; and the Switch lists' settings nobody has farmed yet (Ten
@@ -654,9 +659,10 @@ is in [Recent work](#recent-work) and the README.
 | [`PKReference/ShowdownPort-NOTES.md`](PKReference/ShowdownPort-NOTES.md) | Scope and wiring of the `@smogon/calc` port |
 | [`PKReference/AbilityReference.md`](PKReference/AbilityReference.md) | Which abilities the legacy damage engine models (matchups the port can't take) |
 | [`RNGRewrite-PLAN.md`](RNGRewrite-PLAN.md) | Plan for an independent RNG core (on hold) |
-| [`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md) | Plan for wiring the backend into the app: data sources, design, UI and phases |
+| [`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md) | The backend integration's roadmap: what's done, data sources, design, metric definitions, UI, remaining phases and the owner's decisions |
+| [`BackendIntegration-PHASE4.md`](BackendIntegration-PHASE4.md) | Phase 4 in detail: the Meta tab, the app's `/v1` client and cache, and its PRs |
 | [`tools/README.md`](tools/README.md) | Adding a Champions regulation, and the scripts that regenerate the bundled data |
-| [`backend/README.md`](backend/README.md) | Running and testing the optional backend |
+| [`backend/README.md`](backend/README.md) | Running, testing, backfilling and rebuilding the optional backend, and its API |
 
 Removed on 2026-10-06, in git history: `RNGFixes-PLAN.md` (every PR built;
 its rules, patterns and the owner's decisions are in
