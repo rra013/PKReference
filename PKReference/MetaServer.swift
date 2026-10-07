@@ -24,6 +24,20 @@ nonisolated enum MetaServerSettings {
     /// network address.
     static let defaultAddress = "http://localhost:8080"
 
+    /// The API key, from the Keychain, or nil when none is saved. Only a
+    /// server with keys configured needs one.
+    static func apiKey() -> String? {
+        MetaServerKeychain.read()
+    }
+
+    /// Whether the key may go to `url`: over HTTPS, or to this machine. Over
+    /// plain HTTP anywhere else, anyone on the way could read it.
+    static func canSendKey(to url: URL) -> Bool {
+        if url.scheme?.lowercased() == "https" { return true }
+        let host = url.host()?.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        return host == "localhost" || host == "127.0.0.1" || host == "::1"
+    }
+
     /// The server to use, or nil when the switch is off or the address
     /// doesn't read as an http(s) URL.
     static func baseURL(_ defaults: UserDefaults = .standard) -> URL? {
@@ -50,10 +64,15 @@ nonisolated enum MetaServerError: LocalizedError, Equatable {
     case notHTTP
     /// The answer came, but not in a shape this version of the app reads.
     case unreadable
+    /// There's an API key, and the address isn't HTTPS: it wasn't sent.
+    case insecureKey
 
     var errorDescription: String? {
         switch self {
+        case .http(401): return "The server needs an API key: add yours in Settings, or check it's the right one."
         case .http(let status): return "The server answered HTTP \(status)."
+        case .insecureKey:
+            return "The API key is only sent over HTTPS, or to this device: use the server's https:// address."
         case .notHTTP: return "The server's answer wasn't HTTP."
         case .unreadable:
             return "The server's answer is in a format this version can't read. Update the app or the server."
@@ -66,6 +85,8 @@ nonisolated enum MetaServerError: LocalizedError, Equatable {
 nonisolated struct MetaServerClient: Sendable {
     let baseURL: URL
     var session: URLSession = MetaServerClient.session
+    /// Sent as `Authorization: Bearer`, only where `canSendKey(to:)` allows.
+    var apiKey: String? = MetaServerSettings.apiKey()
 
     /// No URL cache. The server says its answers may be reused for 15
     /// minutes, and URLSession's cache did, so Settings' connection test and
@@ -102,6 +123,10 @@ nonisolated struct MetaServerClient: Sendable {
     func fetch(_ url: URL, etag: String?) async throws -> Fetched {
         var request = URLRequest(url: url)
         if let etag { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
+        if let apiKey {
+            guard MetaServerSettings.canSendKey(to: url) else { throw MetaServerError.insecureKey }
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw MetaServerError.notHTTP }
         if http.statusCode == 304, etag != nil { return .notModified }

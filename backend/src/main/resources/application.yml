@@ -63,9 +63,16 @@ pkref:
     # which shares the address when it runs on the same machine.
     requests-per-window: 40
     window: 5m
+  # API keys, as SHA-256 hashes (backend/scripts/new-api-key.sh), comma-separated. None, and every
+  # request is let in, as on a server only this machine can reach.
+  api:
+    key-hashes: ${PKREF_API_KEY_HASHES:}
 
-# The /v1 responses are JSON lists; gzip them.
+# Listen on this machine only. Other devices reach the API through Tailscale (README), which
+# forwards to 127.0.0.1:8080. SERVER_ADDRESS=0.0.0.0 opens it to every network the machine is on.
 server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  # The /v1 responses are JSON lists; gzip them.
   compression:
     enabled: true
     mime-types: application/json

@@ -20,8 +20,8 @@ Limitless --poll--> EventDiscovery    --> tournaments.discovered
 ## Run
 ```sh
 cd backend
-docker compose up -d                 # Kafka on :9092, Kafka UI on :8081, Postgres on :5432
-mvn spring-boot:run                  # API on :8080, Swagger UI at /swagger-ui.html
+docker compose up -d                 # Kafka on :9092, Kafka UI on :8081, Postgres on :5432, all on 127.0.0.1
+mvn spring-boot:run                  # API on 127.0.0.1:8080, Swagger UI at /swagger-ui.html
 curl 'localhost:8080/v1/formats'
 ```
 Set `LIMITLESS_GAME` and `LIMITLESS_FORMATS` (comma-separated, such as `M-C,M-B`; empty for every format)
@@ -89,10 +89,104 @@ counts. Nothing calls them; the plan drops them by Phase 7.
 ### Using it from the app
 Settings → PK Reference Server (Beta) in the app, off by default, takes the server's address,
 `http://localhost:8080` by default: that reaches this machine from the simulator and the Mac app. A phone
-needs this Mac's network address, and asks for local network access. Test Connection lists the formats
+uses the Tailscale address (below). Test Connection lists the formats
 `/v1/formats` reports. With the switch on, Team Search and the Problem Solver read their corpus from
 `/v1/.../tournaments` and `/standings`, and from Limitless whenever the server can't answer
 (`PKReference/MetaServer.swift`).
+
+### Reaching it from your phone
+Everything listens on this machine only (`127.0.0.1`): Kafka UI has no login, Kafka and Postgres take
+anyone who reaches them, and the API answers anyone. A phone reaches the API, and nothing else, through
+[Tailscale](https://tailscale.com): a private network of your own devices, with HTTPS, nothing opened on
+the router, and nothing on the public internet. An API key is the second lock.
+
+1. **The key.** Run `scripts/new-api-key.sh`. It prints a key, for the app, and its hash, for the
+   server. Put the hash in `backend/.env` (git ignores it), then start the server with it:
+   ```sh
+   echo 'PKREF_API_KEY_HASHES=<hash>' >> .env
+   set -a; . ./.env; set +a; mvn spring-boot:run
+   ```
+   With a hash set, every request needs `Authorization: Bearer <key>`, or gets a 401; answers say
+   `Cache-Control: private`. Several keys are comma-separated hashes; remove a hash to retire its key.
+   Swagger UI still opens, and its Authorize button takes the key. Keep the key out of the repository,
+   chats and screenshots: the server only ever has its hash.
+2. **Tailscale.** Install it on this Mac and the phone, signed in to the same account, then give the
+   API an HTTPS address on your tailnet:
+   ```sh
+   tailscale serve --bg 8080
+   ```
+   It prints the address, such as `https://your-mac.your-tailnet.ts.net`. Only your devices can reach
+   it. Don't use `tailscale funnel`, which puts it on the public internet.
+3. **The app.** Settings → PK Reference Server (Beta): that address, and the key under API Key, which
+   the app keeps in the Keychain and sends only over HTTPS (or to this machine). Test Connection says if
+   the key is wrong.
+
+Without Tailscale, `SERVER_ADDRESS=0.0.0.0` opens the API to every network this machine is on, over
+plain HTTP, where the key can be read: keep it to a network you trust. The ports `docker compose`
+publishes change to `127.0.0.1` when it next recreates the containers (`docker compose up -d`); their
+data stays in the volumes. Postgres keeps the password it was created with (`pkref`), which only
+matters to something that can reach it.
+
+### Running it on a server (Oracle Cloud)
+The same stack runs on one small Linux machine: Oracle Cloud's Always Free Arm VM fits it, and its Arm
+processor is the same architecture as an Apple-silicon Mac. `docker-compose.server.yml` adds the API
+itself (built on the machine from this repository by `Dockerfile`), memory limits, restarts and a real
+Postgres password, and keeps Kafka UI off unless asked for. Everything is still published on `127.0.0.1`
+only; the phone and the Mac reach the API through Tailscale, as above.
+
+Measured on the Arm image: the API uses about 400 MB, Kafka 550 MB and Postgres 100 MB.
+
+1. **The VM.** In the Oracle console, Compute → Instances → Create instance:
+   - image: Canonical Ubuntu 24.04 (aarch64);
+   - shape: Ampere `VM.Standard.A1.Flex`, **1 OCPU and 4 GB**. Oracle reclaims an Always Free
+     instance that's idle for 7 days (95th-percentile CPU, network and memory all under 20%); the
+     stack's roughly 1.5 GB with the system is over 20% of 4 GB, and the limits above still fit;
+   - SSH key: paste your public key (`~/.ssh/id_ed25519.pub`); keep the public IPv4 address, for the
+     first login and for the machine's own downloads.
+2. **First login, and the software:**
+   ```sh
+   ssh ubuntu@<public-ip>
+   sudo apt update && sudo apt -y upgrade
+   sudo apt -y install docker.io docker-compose-v2 git
+   sudo usermod -aG docker ubuntu          # then log out and in again
+   curl -fsSL https://tailscale.com/install.sh | sh
+   sudo tailscale up --ssh                 # sign in with the account your phone and Mac use
+   ```
+   From then on, `ssh ubuntu@<machine name>` reaches it over Tailscale. **Delete the SSH (port 22)
+   ingress rule** from the instance's subnet security list in the Oracle console: the machine then
+   takes nothing from the internet.
+3. **The code, and its settings.** On the server:
+   ```sh
+   git clone -b backend-integration https://github.com/rra013/PKReference.git
+   cd PKReference/backend
+   umask 077 && cat > .env <<EOF
+   POSTGRES_PASSWORD=$(openssl rand -hex 24)
+   PKREF_API_KEY_HASHES=<the hash from scripts/new-api-key.sh, run on your Mac>
+   LIMITLESS_FORMATS=M-C
+   LIMITLESS_LOOKBACK=120d
+   EOF
+   ```
+   Make the key on your Mac (`scripts/new-api-key.sh`) and bring only its hash to the server.
+   `LIMITLESS_LOOKBACK=120d` backfills on the first start (hours, under Limitless's limit); set it back
+   to `7d` afterwards.
+4. **Start it, and give it an address:**
+   ```sh
+   docker compose -f docker-compose.yml -f docker-compose.server.yml up -d --build
+   sudo tailscale serve --bg 8080
+   ```
+   The first build takes about 10 minutes. The first `tailscale serve` asks you to turn on HTTPS for
+   your tailnet (a link to its admin page). It then prints the HTTPS address
+   (`https://<machine name>.<tailnet>.ts.net`) for the app's Settings, with the key.
+5. **Backups.** `crontab -e`, and add
+   `0 4 * * * /home/ubuntu/PKReference/backend/scripts/backup.sh`. It keeps 14 days of Postgres dumps
+   in `~/pkref-backups`. Copy them off the machine now and then, from the Mac:
+   `scp '<machine name>:pkref-backups/*' ~/pkref-backups/`.
+
+**Updating:** `git pull`, then the `docker compose … up -d --build` line again. **Logs:**
+`docker logs -f pkref-api`. **Kafka UI:** `docker compose -f docker-compose.yml -f
+docker-compose.server.yml --profile ui up -d kafka-ui`, then `ssh -L 8081:127.0.0.1:8081 <machine name>`
+and open `localhost:8081` on the Mac. Once the server runs there, stop the one on the Mac, so Limitless
+sees one crawler.
 
 ### Finding events, and backfilling
 Every 30 minutes `EventDiscovery` walks each format's tournament list back through the lookback

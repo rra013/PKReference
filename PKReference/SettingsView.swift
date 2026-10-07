@@ -26,6 +26,10 @@ struct SettingsView: View {
     @AppStorage(AppSettings.metaServerAddress) private var metaServerAddress: String
     @State private var metaServerStatus: String?
     @State private var isTestingMetaServer = false
+    /// Whether an API key is saved in the Keychain; the key itself is never
+    /// shown again.
+    @State private var hasMetaServerKey = MetaServerSettings.apiKey() != nil
+    @State private var metaServerKeyInput = ""
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -219,6 +223,24 @@ struct SettingsView: View {
                                 .keyboardType(.URL)
                                 #endif
                         }
+                        if hasMetaServerKey {
+                            LabeledContent("API Key", value: "Saved in the Keychain")
+                            Button("Remove Key", role: .destructive) {
+                                MetaServerKeychain.remove()
+                                hasMetaServerKey = false
+                                metaServerStatus = nil
+                            }
+                        } else {
+                            SecureField("API Key", text: $metaServerKeyInput, prompt: Text("Only if the server needs one"))
+                                .autocorrectionDisabled()
+                                #if os(iOS)
+                                .textInputAutocapitalization(.never)
+                                #endif
+                                .onSubmit(saveMetaServerKey)
+                            if !metaServerKeyInput.isEmpty {
+                                Button("Save Key", action: saveMetaServerKey)
+                            }
+                        }
                         Button {
                             testMetaServer()
                         } label: {
@@ -238,7 +260,7 @@ struct SettingsView: View {
                 } header: {
                     Text("PK Reference Server (Beta)")
                 } footer: {
-                    Text("Team Search and the Problem Solver read tournament teams from your PK Reference server instead of downloading them from Limitless. Whenever the server can't be reached, they use Limitless as before.")
+                    Text("The Meta tab, Team Search and the Problem Solver read tournament data from your PK Reference server. Whenever the server can't be reached, they use Limitless as before. A server that needs an API key gets it only over HTTPS, or on this device; the key is kept in the Keychain.")
                 }
 
                 // MARK: - Data Management
@@ -355,6 +377,16 @@ struct SettingsView: View {
     }
 
     /// Asks the server what it has, and says so under the button.
+    private func saveMetaServerKey() {
+        guard MetaServerKeychain.save(metaServerKeyInput) else {
+            metaServerStatus = "The key couldn't be saved in the Keychain."
+            return
+        }
+        metaServerKeyInput = ""
+        hasMetaServerKey = MetaServerSettings.apiKey() != nil
+        testMetaServer()
+    }
+
     private func testMetaServer() {
         guard let url = MetaServerSettings.url(from: metaServerAddress) else {
             metaServerStatus = "That address doesn't look like one: try http://localhost:8080."
@@ -367,12 +399,12 @@ struct SettingsView: View {
                 // Always asks the server, so the counts are today's.
                 let answer = try await MetaInsights(baseURL: url).load(MetaAPI.formats, force: true)
                 if let failure = answer.refreshError {
-                    metaServerStatus = "Couldn't reach \(url.absoluteString). \(failure.message)"
+                    metaServerStatus = "\(url.absoluteString): \(failure.message)"
                 } else {
                     metaServerStatus = answer.value.summary
                 }
             } catch {
-                metaServerStatus = "Couldn't reach \(url.absoluteString). \(MetaFailure(error).message)"
+                metaServerStatus = "\(url.absoluteString): \(MetaFailure(error).message)"
             }
             isTestingMetaServer = false
         }

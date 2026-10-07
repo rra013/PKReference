@@ -1,2 +1,5 @@
 # Screen recordings of simulator runs, kept locally (the RNG fixes' checks).
 RNGRuns/
+
+# The backend's secrets (PKREF_API_KEY_HASHES and the like).
+backend/.env
