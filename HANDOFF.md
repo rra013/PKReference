@@ -639,8 +639,10 @@ is in [Recent work](#recent-work) and the README.
    (the planning flows, launch), all in
    [`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md). Not yet
    checked: VoiceOver read aloud over the Meta tab, on a device. The server
-   runs on the owner's machine in Docker; leave their containers, topics and
-   consumer groups alone, and check changes on a separate stack.
+   runs on the owner's machine in Docker, moving to their Oracle Cloud Arm VM
+   (`backend/docker-compose.server.yml`, private to their tailnet); leave
+   their containers, topics and consumer groups alone, and check changes on a
+   separate stack (another Compose project, with its own names and ports).
 7. **FireRed and LeafGreen's open items.** Wild calibration (Ten Lines'
    `check_seeds_wild`); Teachy TV on Switch, which Ten Lines hasn't worked
    out either; and the Switch lists' settings nobody has farmed yet (Ten

@@ -1,0 +1,8 @@
+# Only what backend/Dockerfile copies goes to Docker: the server's sources and the app's data
+# files it bundles. Everything else (the app, its models, PokéFinder) stays out.
+*
+!backend/pom.xml
+!backend/src/main
+!champions-*.json
+!PKReference/showdown-champions-data.json
+!PKReference/team_search_vocab.json

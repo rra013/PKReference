@@ -326,7 +326,8 @@ Each phase is one PR into `backend-integration`, or several where it's large.
    - My games, on the device.
 7. **Launch** (when the app ships).
    - Hosting: one small host with single-node Kafka (KRaft), Postgres and
-     the service, behind a CDN. Until then, the owner's local Docker setup.
+     the service, behind a CDN. Until then, the owner's Oracle Cloud Arm VM
+     (`docker-compose.server.yml`), private to their tailnet.
    - Monitoring: ingest lag, the newest event's age, dead-letter growth and
      unknown names.
    - Backups and the cost.
@@ -381,7 +382,9 @@ Each phase is one PR into `backend-integration`, or several where it's large.
 ## 9. The owner's decisions (2026-10-06)
 
 1. **Hosting:** the owner's local Docker setup while the app isn't deployed.
-   Hosting is decided when the app ships (Phase 7).
+   Hosting is decided when the app ships (Phase 7). Updated 2026-10-06: the
+   server moves to an Oracle Cloud Always Free Arm VM, reached only through
+   Tailscale ([`backend/README.md`](backend/README.md#running-it-on-a-server-oracle-cloud)).
 2. **The Meta tab:** it replaces the Tournaments tab. Team Search stays its
    own tab.
 3. **Scope:** doubles and singles. Limitless covers doubles only, so singles

@@ -1,0 +1,58 @@
+# The whole server on one machine (an Oracle Cloud Arm VM, say), on top of docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.server.yml up -d --build
+#
+# Adds the API itself, built from the repository (Dockerfile), and sets memory limits, restarts and
+# a real Postgres password. Everything is published on 127.0.0.1 only; other devices reach the API
+# through Tailscale (README, "Running it on a server"). Settings come from backend/.env, which git
+# ignores: POSTGRES_PASSWORD and PKREF_API_KEY_HASHES are required.
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    image: pkref-api
+    container_name: pkref-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      SERVER_ADDRESS: 0.0.0.0           # inside the container; the host publishes it on 127.0.0.1
+      DATABASE_URL: jdbc:postgresql://postgres:5432/pkref
+      DATABASE_USER: pkref
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in backend/.env}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      PKREF_API_KEY_HASHES: ${PKREF_API_KEY_HASHES:?set PKREF_API_KEY_HASHES in backend/.env}
+      LIMITLESS_FORMATS: ${LIMITLESS_FORMATS:-}
+      LIMITLESS_LOOKBACK: ${LIMITLESS_LOOKBACK:-7d}
+      JAVA_TOOL_OPTIONS: -Xmx768m
+    mem_limit: 1g
+
+  kafka:
+    restart: unless-stopped
+    environment:
+      KAFKA_HEAP_OPTS: -Xmx512m -Xms512m
+    mem_limit: 1g
+
+  postgres:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in backend/.env}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pkref -d pkref"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 512m
+
+  # Kafka UI only on request: docker compose ... --profile ui up -d kafka-ui, then open it through an
+  # SSH tunnel (ssh -L 8081:127.0.0.1:8081 <vm>). It has no login.
+  kafka-ui:
+    profiles: ["ui"]
+    mem_limit: 512m
