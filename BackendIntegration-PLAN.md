@@ -141,7 +141,9 @@ Showdown sampler ───→ replays.fetched → replays.normalized            
 ### 4.2 Metrics
 
 Each definition goes into the app's info sheets word for word. They describe
-what `MetaService` computes.
+what `MetaService` computes. The ladder's metrics (ladder usage, rating
+band, lead share, its trend and spreads) are defined the same way in the
+Phase 5 file, §6.4.
 
 - **Usage:** the share of published teams in the window that have the
   Pokémon. Each team counts once.
@@ -175,9 +177,6 @@ what `MetaService` computes.
   app's corpus.
 - **Sample size:** every number comes with how many teams, events or
   matches it's from.
-
-The ladder's metrics (ladder usage, rating band, lead share, its trend and
-spreads) are defined in the Phase 5 file, §6.4.
 
 ### 4.3 The API
 
