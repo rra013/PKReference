@@ -19,17 +19,27 @@ import java.util.TreeSet;
 public final class SpeciesVocabulary {
     /** A member's species: "arcanine", or "arcanine:hisui" with its form words sorted. */
     public record Identity(String speciesId, Set<String> formWords) {
+        /**
+         * The species key the whole system uses: the ID alone, or the ID, a colon and its form
+         * words in alphabetical order.
+         */
         public String key() {
             return formWords.isEmpty() ? speciesId : speciesId + ":" + String.join("-", new TreeSet<>(formWords));
         }
     }
 
+    /** One species: its ID, name, the name's words, and the form words its regulation lists for it. */
     private record Species(String id, String name, List<String> words, Set<String> formWords) {}
 
     private final Map<String, List<Species>> byFirstWord = new HashMap<>();
     /** Stone ID to the species ID it's for. */
     private final Map<String, String> megaStones = new HashMap<>();
 
+    /**
+     * Builds the lookups from the three files, already parsed. {@code JsonNode} is Jackson's tree
+     * form of JSON, read here by path ({@code regulation.path("mega_stones")}) because only a few
+     * fields of large files are wanted.
+     */
     public SpeciesVocabulary(JsonNode regulation, JsonNode learnsets, JsonNode vocabulary) {
         Set<String> noise = new HashSet<>();
         vocabulary.path("form_noise").forEach(n -> noise.add(n.asText()));

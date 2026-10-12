@@ -9,8 +9,10 @@ public class ProcessedTournament {
     @Id
     private String id;
 
+    /** For Hibernate, which builds entities through a no-argument constructor. */
     protected ProcessedTournament() {}
 
+    /** Marks the event with this id as counted. */
     public ProcessedTournament(String id) {
         this.id = id;
     }

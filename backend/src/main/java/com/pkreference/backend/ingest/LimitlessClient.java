@@ -19,7 +19,16 @@ import java.io.InterruptedIOException;
 import java.time.Clock;
 import java.util.List;
 
-/** Thin client for the Limitless play API, same endpoints as the app's LimitlessAPI actor. */
+/**
+ * Thin client for the Limitless play API, same endpoints as the app's LimitlessAPI actor.
+ *
+ * <p>{@code @Component}: Spring makes one of these at start-up and hands it to EventDiscovery and
+ * EventFetcher, whose constructors ask for it. {@code RestClient} is Spring's HTTP client; each
+ * call below is "GET this path, turn the JSON answer into these records".
+ *
+ * <p>Limitless allows 50 requests in 5 minutes without a key, so every request goes through a
+ * RequestThrottle first: discovery and the fetcher never need to think about the limit.
+ */
 @Component
 public class LimitlessClient {
     private static final Logger log = LoggerFactory.getLogger(LimitlessClient.class);
@@ -28,12 +37,22 @@ public class LimitlessClient {
     private final RestClient http;
     private final LimitlessProperties props;
 
+    /**
+     * The constructor Spring uses ({@code @Autowired} picks it, since there are two): the real
+     * clock and a real sleep. {@code RestClient.Builder} is injected fresh for each class that
+     * asks, so configuring it here affects only this client.
+     */
     @Autowired
     public LimitlessClient(RestClient.Builder builder, LimitlessProperties props) {
         this(builder, props, new RequestThrottle(props.requestsPerWindow(), props.window(),
                 Clock.systemUTC(), d -> Thread.sleep(d.toMillis())));
     }
 
+    /**
+     * For tests, which pass a throttle on a fake clock. An interceptor wraps every request this
+     * client sends: wait for a turn, send, then tell the throttle what Limitless's
+     * {@code ratelimit} header said was left.
+     */
     LimitlessClient(RestClient.Builder builder, LimitlessProperties props, RequestThrottle throttle) {
         this.props = props;
         // Every request, retries included, waits its turn and reports Limitless's count back.
@@ -61,11 +80,17 @@ public class LimitlessClient {
         }).retrieve().body(new ParameterizedTypeReference<List<Tournament>>() {}));
     }
 
+    /** An event's organizer, platform and phases (Swiss rounds, top cut). */
     public TournamentDetails details(String tournamentId) {
         return withRetry(() -> http.get().uri("/tournaments/{id}/details", tournamentId)
                 .retrieve().body(TournamentDetails.class));
     }
 
+    /**
+     * An event's standings, with each player's team when the event published them.
+     * {@code ParameterizedTypeReference} is how a generic type ({@code List<Standing>}) is named at
+     * run time, where Java has erased it: without it Jackson would build a list of plain maps.
+     */
     public List<Standing> standings(String tournamentId) {
         return withRetry(() -> http.get().uri("/tournaments/{id}/standings", tournamentId)
                 .retrieve().body(new ParameterizedTypeReference<List<Standing>>() {}));
@@ -100,6 +125,10 @@ public class LimitlessClient {
         }
     }
 
+    /**
+     * The Retry-After header's seconds, kept between 1 and 30; 5 when it's missing or isn't a
+     * number.
+     */
     private static long retryAfterSeconds(HttpClientErrorException e) {
         var header = e.getResponseHeaders() == null ? null : e.getResponseHeaders().getFirst("Retry-After");
         try {

@@ -29,15 +29,22 @@ import java.util.regex.Pattern;
         A month's stats appear on the 1st of the next month. Read-only and cached (15 minutes, with ETags). \
         Shares are 0 to 1.""")
 public class LadderController {
+    /** {@code Cache-Control: max-age=900, public}, as MetaController's: 15 minutes. */
     static final CacheControl CACHE = CacheControl.maxAge(Duration.ofMinutes(15)).cachePublic();
+    /** A month as the API takes it: four digits, a hyphen, 01 to 12. */
     private static final Pattern MONTH = Pattern.compile("^\\d{4}-(0[1-9]|1[0-2])$");
 
     private final LadderService ladder;
 
+    /** Constructor injection: Spring supplies each parameter from the beans it has made. */
     public LadderController(LadderService ladder) {
         this.ladder = ladder;
     }
 
+    /**
+     * GET /v1/ladder: what the app reads first, to find the format id for a regulation's doubles or
+     * singles ladder.
+     */
     @GetMapping
     @Operation(summary = "The ladder stats stored",
             description = "Each format, month and rating the server has, with its regulation, doubles or singles, "
@@ -46,6 +53,11 @@ public class LadderController {
         return ResponseEntity.ok().cacheControl(CACHE).body(ladder.index());
     }
 
+    /**
+     * GET /v1/ladder/{format}?rating=1760&month=2026-09. {@code required = false} with a boxed type
+     * ({@code Integer}) lets a parameter be left out, arriving as null for the service to default.
+     * A rating that isn't a number never reaches this method: Spring answers 400 itself.
+     */
     @GetMapping("/{format}")
     @Operation(summary = "One month of a format's ladder",
             description = "Every Pokémon used that month, most used first, each with its usage, its change since the "
@@ -64,11 +76,13 @@ public class LadderController {
         return ResponseEntity.ok().cacheControl(CACHE).body(ladder.stats(format, rating, month));
     }
 
+    /** A month that isn't one: 400, with the reason as JSON. */
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<Map<String, String>> badRequest(IllegalArgumentException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
     }
 
+    /** A format, month or rating that isn't stored: 404, with the reason as JSON. */
     @ExceptionHandler(NoSuchElementException.class)
     ResponseEntity<Map<String, String>> notFound(NoSuchElementException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));

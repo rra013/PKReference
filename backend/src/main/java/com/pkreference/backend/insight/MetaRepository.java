@@ -19,11 +19,22 @@ import java.util.Set;
 /**
  * Reads the team store for the insights. Plain rows only: the counting is MetaService's, in Java,
  * so the SQL stays the same on H2 and Postgres.
+ *
+ * <p>The pattern in every method: SQL in a text block ({@code """}), values passed as {@code ?}
+ * parameters, and a lambda that turns each row of the result into a record. A lambda taking
+ * {@code (rs, n)} is a RowMapper, returning one object a row, and {@code jdbc.query} returns the
+ * list of them; one taking only {@code rs} is a RowCallbackHandler, used where the rows are
+ * gathered into a map or a set instead.
+ *
+ * <p>Most queries take a window, {@code [from, to)}: events dated from {@code from} up to but not
+ * including {@code to}. {@code from} is null for the whole regulation, and then the
+ * {@code event_date >= ?} condition and its parameter are both left off.
  */
 @Repository
 public class MetaRepository {
     private final JdbcTemplate jdbc;
 
+    /** Constructor injection: Spring supplies each parameter from the beans it has made. */
     public MetaRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
@@ -35,11 +46,16 @@ public class MetaRepository {
     /** One team member, with its event's date. */
     public record MemberRow(String eventId, String player, Instant eventDate, int slot, String speciesKey,
                             String megaStone, String item, String ability, String nature) {
+        /** "eventId|player": how a team is identified everywhere in the insights. */
         public String team() {
             return eventId + "|" + player;
         }
     }
 
+    /**
+     * Each stored format's events, teams with a published team, date range and newest fetch. The
+     * {@code left join} keeps events that have no such teams, counting them as events with 0 teams.
+     */
     public List<FormatRow> formats() {
         return jdbc.query("""
                 select e.format, count(distinct e.id), count(distinct t.event_id || '|' || t.player),
@@ -91,6 +107,7 @@ public class MetaRepository {
      */
     public record TopCut(Set<String> teams, Set<String> bracketEvents) {}
 
+    /** Who played in a bracket phase, and which events had one, in [from, to). */
     public TopCut topCut(String format, Instant from, Instant to) {
         var args = new ArrayList<Object>(List.of(format, timestamp(to)));
         String since = from == null ? "" : " and e.event_date >= ?";
@@ -110,10 +127,12 @@ public class MetaRepository {
 
     /** A match both players played: result is P1, P2, TIE or DOUBLE_LOSS (PairingResult). */
     public record PairingRow(String eventId, String player1, String player2, String result) {
+        /** Player 1's team, as "eventId|player". */
         public String team1() {
             return eventId + "|" + player1;
         }
 
+        /** Player 2's team, as "eventId|player". */
         public String team2() {
             return eventId + "|" + player2;
         }
@@ -166,6 +185,7 @@ public class MetaRepository {
     /** One player's entry, with its event: what an example team or a winner needs. */
     public record PlacingRow(String eventId, String player, String name, Integer placing, int wins, int losses,
                              int ties, String eventName, Instant eventDate, int players) {
+        /** "eventId|player". */
         public String team() {
             return eventId + "|" + player;
         }
@@ -195,6 +215,7 @@ public class MetaRepository {
                 PLACING, eventIds.toArray());
     }
 
+    /** Shared by placings and winners, which select the same columns. */
     private static final RowMapper<PlacingRow> PLACING = (rs, n) -> new PlacingRow(rs.getString(1), rs.getString(2),
             rs.getString(3), rs.getObject(4, Integer.class), rs.getInt(5), rs.getInt(6), rs.getInt(7),
             rs.getString(8), instant(rs, 9), rs.getInt(10));
@@ -228,15 +249,21 @@ public class MetaRepository {
         return rows;
     }
 
+    /** "?, ?, ?" for an {@code in (...)} list of n values: the values still go in as parameters. */
     private static String placeholders(int n) {
         return String.join(", ", java.util.Collections.nCopies(n, "?"));
     }
 
+    /** A {@code timestamp with time zone} column as an Instant, or null. */
     private static Instant instant(ResultSet rs, int column) throws SQLException {
         var value = rs.getObject(column, OffsetDateTime.class);
         return value == null ? null : value.toInstant();
     }
 
+    /**
+     * An Instant as the type the JDBC drivers compare with a {@code timestamp with time zone}
+     * column.
+     */
     private static OffsetDateTime timestamp(Instant instant) {
         return OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
     }

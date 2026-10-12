@@ -8,6 +8,15 @@ import java.util.List;
 /**
  * Limitless and how events are found. minPlayers, settleAfter and refetchAfter match the app's
  * TeamCorpusConfiguration, so the server keeps the events Team Search would.
+ *
+ * <p>{@code @ConfigurationProperties(prefix = "pkref.limitless")} tells Spring to build this record
+ * from the settings under {@code pkref.limitless} in application.yml: {@code poll-interval: 30m}
+ * becomes {@code pollInterval}, a {@code Duration}; {@code formats: M-C,M-B} becomes a list. Each
+ * setting there can name an environment variable ({@code ${LIMITLESS_LOOKBACK:7d}}), which is how a
+ * deployment changes it without a rebuild. The record is then a bean like any other: classes that
+ * need the settings take a {@code LimitlessProperties} in their constructor.
+ *
+ * <p>A record is immutable, so the settings can't change while the server runs.
  */
 @ConfigurationProperties(prefix = "pkref.limitless")
 public record LimitlessProperties(
@@ -39,6 +48,11 @@ public record LimitlessProperties(
         return new LimitlessProperties(null, game, formats, 0, true, null, 0, null, 0, null, 0, null, null, null);
     }
 
+    /**
+     * The compact constructor: it runs on every construction, before the fields are set, and fills
+     * in a default for anything left out (null, or zero for a number). So the defaults live here,
+     * in one place, and a test can pass nulls and zeros for "the default".
+     */
     public LimitlessProperties {
         if (baseUrl == null) baseUrl = "https://play.limitlesstcg.com/api";
         formats = formats == null ? List.of() : formats.stream().map(String::trim).filter(f -> !f.isEmpty()).toList();

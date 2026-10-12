@@ -26,6 +26,7 @@ public class CorpusRepository {
 
     private final JdbcTemplate jdbc;
 
+    /** Spring passes in the JdbcTemplate it built on the configured data source. */
     public CorpusRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
@@ -79,6 +80,7 @@ public class CorpusRepository {
                 }, eventId);
     }
 
+    /** Limitless always sends these as text; a stored null goes back as "". */
     private static String orEmpty(String s) {
         return s == null ? "" : s;
     }

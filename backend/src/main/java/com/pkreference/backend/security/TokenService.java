@@ -52,14 +52,20 @@ public class TokenService {
         KEY_REMOVED
     }
 
+    /**
+     * Thrown by verify, carrying why. A checked exception, so the filter has to decide what to
+     * answer.
+     */
     public static final class InvalidTokenException extends Exception {
         private final Refusal refusal;
 
+        /** The exception's message is the refusal's name, for the logs of anything that prints it. */
         InvalidTokenException(Refusal refusal) {
             super(refusal.name());
             this.refusal = refusal;
         }
 
+        /** Why the token was refused. */
         public Refusal refusal() {
             return refusal;
         }
@@ -74,6 +80,10 @@ public class TokenService {
     private final boolean keysRequired;
     private final Clock clock;
 
+    /**
+     * Made by SecurityConfig. Uses the configured secret, or 32 random bytes when none is set.
+     * Keeps the short ids of the configured keys, to check each token's subject against.
+     */
     public TokenService(ApiAuthProperties properties, Clock clock) {
         this.secret = properties.tokenSecret() != null
                 ? properties.tokenSecret().getBytes(StandardCharsets.UTF_8) : randomSecret();
@@ -83,6 +93,7 @@ public class TokenService {
         this.clock = clock;
     }
 
+    /** 32 bytes from the operating system's secure random source, new each start. */
     private static byte[] randomSecret() {
         byte[] bytes = new byte[ApiAuthProperties.MIN_SECRET_BYTES];
         new SecureRandom().nextBytes(bytes);

@@ -54,9 +54,22 @@ import java.util.stream.Collectors;
 
 /**
  * The insights, worked out from the team store when asked: usage in a window, its share of top-cut
- * teams, its trend, and each Pokémon's sets, items, moves and teammates. Results are kept until
- * the store changes (or the hour does, which moves the windows), so a burst of requests is one
+ * teams, its trend, and each Pokémon's sets, items, moves and teammates. Results are kept until the
+ * store changes (or the hour does, which moves the windows), so a burst of requests is one
  * computation. Definitions are BackendIntegration-PLAN.md §4.2's.
+ *
+ * <p>The design choice: there are no "usage" tables. Each number is computed from the stored teams at
+ * the moment it's asked for, in memory, and then remembered. At a few thousand teams a format that
+ * takes milliseconds, and it means a change to a definition is a code change with nothing to
+ * migrate or backfill.
+ *
+ * <p>How a request flows: MetaController calls a public method here; it reads rows through
+ * MetaRepository; {@code Teams.of} indexes them both ways (each team's Pokémon, each Pokémon's
+ * teams); the counting happens over those two maps; the result is rounded into a MetaResponses
+ * record. Every public method does this inside {@code memoize}.
+ *
+ * <p>A team is identified by "eventId|player" throughout, and a Pokémon by its species key
+ * ("arcanine:hisui").
  */
 @Service
 public class MetaService {
@@ -78,14 +91,18 @@ public class MetaService {
     private final MetaRepository repository;
     private final NameStandardizer names;
     private final Clock clock;
+    // Results already worked out, by what was asked plus the store's version plus the hour
+    // (memoize).
     private final Map<String, Object> memo = new ConcurrentHashMap<>();
 
+    /** Constructor injection: Spring supplies each parameter from the beans it has made. */
     public MetaService(MetaRepository repository, NameStandardizer names, Clock clock) {
         this.repository = repository;
         this.names = names;
         this.clock = clock;
     }
 
+    /** GET /v1/formats: each stored format's counts and dates. */
     public Formats formats() {
         Instant now = clock.instant();
         return memoize("formats", now, () -> new Formats(now, repository.formats().stream()
@@ -93,12 +110,18 @@ public class MetaService {
                 .toList()));
     }
 
+    /**
+     * GET /v1/formats/{f}/pokemon: every Pokémon on a team in the window, most used first, each
+     * with its usage, top-cut usage, trend and win record. Four reads (members, top-cut teams, the
+     * trend's two fortnights, pairings), then counting.
+     */
     public PokemonList pokemon(String format, MetaWindow window) {
         Instant now = clock.instant();
         return memoize("pokemon|" + format + "|" + window.id(), now, () -> {
             Instant from = window.from(now);
             Teams teams = Teams.of(repository.members(format, from, now));
             var topCut = repository.topCut(format, from, now);
+            // Only top-cut teams whose team was published can be counted for a Pokémon.
             Set<String> topCutTeams = intersect(topCut.teams(), teams.keysByTeam.keySet());
             Map<String, Double> trends = trends(format, now);
             Map<String, int[]> records = records(teams, repository.pairings(format, from, now));
@@ -143,6 +166,8 @@ public class MetaService {
                 }
             }
 
+            // A whole set is its item, ability, nature and sorted moves, used together as one map
+            // key.
             Map<List<Object>, Integer> sets = new HashMap<>();
             for (MemberRow m : members) {
                 List<String> moves = new ArrayList<>(movesByMember.getOrDefault(memberId(m), Set.of()));
@@ -188,6 +213,11 @@ public class MetaService {
         });
     }
 
+    /**
+     * The {@code size}-Pokémon combinations on the most teams. Lift is the share of teams with all
+     * of them over the product of their separate usages: what chance would give if they were chosen
+     * independently. Above 1, they're picked together more than chance explains.
+     */
     private static List<Core> topCores(Teams teams, int size) {
         Map<List<String>, Integer> counts = new HashMap<>();
         for (Set<String> keys : teams.keysByTeam.values()) {
@@ -221,7 +251,7 @@ public class MetaService {
             Teams teams = g.teams();
             int n = teams.count();
 
-            // Records: overall, and against each other archetype.
+            // Records: overall, and against each other archetype. Each int[3] is wins, losses, ties.
             Map<String, int[]> overall = new HashMap<>();
             Map<String, Map<String, int[]>> against = new HashMap<>();
             for (PairingRow p : repository.pairings(format, g.from(), now)) {
@@ -341,6 +371,12 @@ public class MetaService {
     private record Grouping(Instant from, Teams teams, Set<String> topCutTeams, List<List<String>> cores,
                             Map<String, String> archetypeOf, Map<String, Set<String>> members) {}
 
+    /**
+     * Sorts the window's teams into archetypes. Counts every four-Pokémon combination, keeps those
+     * on enough teams, most common first, and drops any that shares three or more Pokémon with one
+     * already kept. Then each team goes to the first kept core it contains. Memoized by itself,
+     * because the archetype list and each archetype's page both start from it.
+     */
     private Grouping grouping(String format, MetaWindow window, Instant now) {
         return memoize("grouping|" + format + "|" + window.id(), now, () -> {
             Instant from = window.from(now);
@@ -388,6 +424,10 @@ public class MetaService {
         return out;
     }
 
+    /**
+     * The recursion behind combinations: extend {@code current} with each later key in turn, and
+     * record it when it's full.
+     */
     private static void combine(List<String> keys, int size, int start, List<String> current, List<List<String>> out) {
         if (current.size() == size) {
             out.add(List.copyOf(current));
@@ -418,6 +458,10 @@ public class MetaService {
         return trends;
     }
 
+    /**
+     * One Pokémon's row: its teams, its share of all teams and of top-cut teams (null when there
+     * were none), its trend and its record.
+     */
     private static PokemonUsage usage(String key, Set<String> withIt, int teams, Set<String> topCutTeams, Double trend,
                                       int[] record) {
         int inTopCut = (int) withIt.stream().filter(topCutTeams::contains).count();
@@ -451,6 +495,7 @@ public class MetaService {
         };
     }
 
+    /** Adds the outcome to every Pokémon on {@code mine} that isn't also on {@code theirs}. */
     private static void tally(Map<String, int[]> records, Set<String> mine, Set<String> theirs, int outcome) {
         for (String key : mine) {
             if (!theirs.contains(key)) records.computeIfAbsent(key, k -> new int[3])[outcome]++;
@@ -470,6 +515,10 @@ public class MetaService {
         return new WinRecord(r[0], r[1], r[2], n, round(p), round(centre - half), round(centre + half));
     }
 
+    /**
+     * Usage in each week of the window, weeks starting on Monday (UTC), oldest first: the page's
+     * chart.
+     */
     private static List<WeekUsage> weekly(Teams teams, Set<String> withIt) {
         Map<LocalDate, int[]> weeks = new TreeMap<>();
         teams.dateByTeam.forEach((team, date) -> {
@@ -484,6 +533,10 @@ public class MetaService {
                 .toList();
     }
 
+    /**
+     * Counts one field (item, ability, nature, Mega Stone) over a Pokémon's members and returns the
+     * commonest, as shares of {@code total}.
+     */
     private static List<Share> shares(List<MemberRow> members, Function<MemberRow, String> value, int total) {
         Map<String, Integer> counts = new HashMap<>();
         for (MemberRow m : members) {
@@ -493,6 +546,10 @@ public class MetaService {
         return top(counts, total);
     }
 
+    /**
+     * The TOP_VALUES biggest counts, as shares of {@code total}; equal counts in name order, so the
+     * answer doesn't change between calls.
+     */
     private static List<Share> top(Map<String, Integer> counts, int total) {
         return counts.entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed().thenComparing(Map.Entry::getKey))
@@ -513,32 +570,42 @@ public class MetaService {
      */
     @SuppressWarnings("unchecked")
     private <T> T memoize(String key, Instant now, Supplier<T> compute) {
+        // The cache key includes the store's version, so any write makes every earlier result
+        // unreachable, and the hour, so a window ("the last 14 days") moves forward even when
+        // nothing is written.
         String full = key + "|" + repository.version() + "|" + now.truncatedTo(ChronoUnit.HOURS);
         Object known = memo.get(full);
         if (known != null) return (T) known;
         T value = compute.get();
+        // Old versions' results are never read again; clearing now and then is all the eviction
+        // this needs.
         if (memo.size() > 500) memo.clear();
         memo.put(full, value);
         return value;
     }
 
+    /** The elements of {@code a} that are also in {@code b}. */
     private static Set<String> intersect(Set<String> a, Set<String> b) {
         return a.stream().filter(b::contains).collect(Collectors.toSet());
     }
 
+    /** One team member, as "event|player|slot": what MetaRepository.moves keys its rows by. */
     private static String memberId(MemberRow m) {
         return m.eventId() + "|" + m.player() + "|" + m.slot();
     }
 
+    /** "" back to null: sets are keyed with "" for a missing part, since List.of takes no nulls. */
     private static String blankToNull(Object o) {
         String s = o.toString();
         return s.isEmpty() ? null : s;
     }
 
+    /** {@code part / whole}, rounded; 0 when there's nothing to divide by. */
     private static double ratio(int part, int whole) {
         return whole == 0 ? 0 : round((double) part / whole);
     }
 
+    /** To four decimal places: shares are sent as 0.4819, not 0.48192771084337. */
     private static double round(double x) {
         return Math.round(x * 10_000) / 10_000.0;
     }
@@ -546,6 +613,10 @@ public class MetaService {
     /** Teams with a published team: each one's Pokémon (once each) and its event's date. */
     record Teams(Map<String, Set<String>> keysByTeam, Map<String, Set<String>> teamsByKey,
                          Map<String, Instant> dateByTeam, Set<String> eventIds) {
+        /**
+         * Indexes member rows both ways. Members with no species key (stored before keys were
+         * added) are skipped.
+         */
         static Teams of(List<MemberRow> rows) {
             Map<String, Set<String>> keysByTeam = new HashMap<>();
             Map<String, Set<String>> teamsByKey = new HashMap<>();
@@ -561,10 +632,12 @@ public class MetaService {
             return new Teams(keysByTeam, teamsByKey, dateByTeam, events);
         }
 
+        /** How many teams have a published team. */
         int count() {
             return keysByTeam.size();
         }
 
+        /** How many events those teams are from. */
         int events() {
             return eventIds.size();
         }

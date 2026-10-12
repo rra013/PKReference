@@ -54,12 +54,17 @@ public class LadderReducer {
     static final Comparator<String> BYTES =
             (a, b) -> Arrays.compareUnsigned(a.getBytes(StandardCharsets.UTF_8), b.getBytes(StandardCharsets.UTF_8));
 
+    /**
+     * One entry of a chaos file's objects: an id (an item, a move, a spread, a teammate) and its
+     * weighted count.
+     */
     private record Count(String id, double count) {}
 
     private final ObjectMapper mapper;
     private final SpeciesVocabularies vocabularies;
     private final NameStandardizer names;
 
+    /** Spring passes in its JSON mapper and the two name services; all three are beans. */
     public LadderReducer(ObjectMapper mapper, SpeciesVocabularies vocabularies, NameStandardizer names) {
         this.mapper = mapper;
         this.vocabularies = vocabularies;
@@ -77,6 +82,9 @@ public class LadderReducer {
         List<Pokemon> pokemon = new ArrayList<>();
         long battles = 0;
         boolean sawData = false;
+        // A streaming parser walks the JSON token by token instead of loading it all. Only one
+        // Pokémon's entry is turned into a tree at a time ({@code mapper.readTree(parser)} reads
+        // just the value the parser is standing on).
         try (JsonParser parser = mapper.getFactory().createParser(chaos)) {
             if (parser.nextToken() != JsonToken.START_OBJECT) throw new IOException("Not Smogon's stats: no object");
             while (parser.nextToken() == JsonToken.FIELD_NAME) {
@@ -156,6 +164,10 @@ public class LadderReducer {
         return counts;
     }
 
+    /**
+     * The counts added up in list order, which is key order: adding doubles in another order can
+     * give a different last bit.
+     */
     private static double sum(List<Count> counts) {
         double sum = 0;
         for (Count c : counts) sum += c.count();

@@ -21,6 +21,12 @@ Smogon --poll-->    LadderDiscovery   --> ladder.stats (each monthly file, reduc
                     LadderController  --> GET /v1/ladder, /v1/ladder/{format}
 ```
 
+![The architecture: sources, ingest, Kafka topics, consumers, Postgres, and the read path](docs/architecture.svg)
+
+**New to the code?** [`docs/PKReference-backend-guide.pdf`](docs/PKReference-backend-guide.pdf) is a study
+guide: how the data flows, the Spring and Kafka ideas the project uses and where, every table and
+endpoint, and every class and method, taken from the comments in the source.
+
 ## Run
 ```sh
 cd backend

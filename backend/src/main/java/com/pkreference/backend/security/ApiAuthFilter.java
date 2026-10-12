@@ -53,12 +53,26 @@ public class ApiAuthFilter extends OncePerRequestFilter {
     private final List<byte[]> hashBytes;
     private final TokenService tokens;
 
+    /**
+     * Not a {@code @Component}: SecurityConfig creates it and registers it, so its order and paths
+     * are set in one place. The hashes are turned from hex text into bytes once, here, for the
+     * comparison in keyId.
+     */
     public ApiAuthFilter(ApiAuthProperties properties, TokenService tokens) {
         hashes = properties.keyHashes();
         hashBytes = hashes.stream().map(HexFormat.of()::parseHex).toList();
         this.tokens = tokens;
     }
 
+    /**
+     * Runs for every request, before any controller. {@code chain.doFilter} passes the request on
+     * to the next filter and finally the controller; returning without calling it ends the request
+     * here.
+     *
+     * <p>In order: no keys configured, or a documentation path: let it through. No credential: 401.
+     * The token path: the credential must be an API key. Anything else: it must be a valid access
+     * token, and the response is wrapped so its caching is marked private.
+     */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
@@ -104,6 +118,10 @@ public class ApiAuthFilter extends OncePerRequestFilter {
         return credential.isEmpty() ? null : credential;
     }
 
+    /**
+     * Answers 401 with a JSON body {@code {"error": ..., "code": ...}}, never cached. The log line
+     * names the path and the reason but not the credential.
+     */
     private static void refuse(HttpServletRequest request, HttpServletResponse response, String code, String message)
             throws IOException {
         log.info("Refused {} {} from {}: {}", request.getMethod(), request.getRequestURI(), request.getRemoteAddr(), code);
@@ -116,6 +134,7 @@ public class ApiAuthFilter extends OncePerRequestFilter {
         response.getWriter().write("{\"error\":\"" + message + "\",\"code\":\"" + code + "\"}");
     }
 
+    /** The request's path within the application, as the client sent it. */
     private static String path(HttpServletRequest request) {
         return request.getRequestURI().substring(request.getContextPath().length());
     }
@@ -145,6 +164,10 @@ public class ApiAuthFilter extends OncePerRequestFilter {
         return found;
     }
 
+    /**
+     * SHA-256 of the key's bytes. Every JVM has SHA-256, so the checked exception can't happen in
+     * practice.
+     */
     static byte[] sha256(String key) {
         try {
             return MessageDigest.getInstance("SHA-256").digest(key.getBytes(StandardCharsets.UTF_8));
@@ -155,20 +178,27 @@ public class ApiAuthFilter extends OncePerRequestFilter {
 
     /** Turns {@code Cache-Control: public} into {@code private}. */
     private static final class PrivateCaching extends HttpServletResponseWrapper {
+        /** Wraps the real response: every other call passes straight through to it. */
         PrivateCaching(HttpServletResponse response) {
             super(response);
         }
 
+        /** Controllers set Cache-Control through one of these two; both are rewritten. */
         @Override
         public void setHeader(String name, String value) {
             super.setHeader(name, privately(name, value));
         }
 
+        /** As setHeader: the other way a header can be written. */
         @Override
         public void addHeader(String name, String value) {
             super.addHeader(name, privately(name, value));
         }
 
+        /**
+         * The value with "public" replaced by "private", when the header is Cache-Control;
+         * otherwise as it is.
+         */
         private static String privately(String name, String value) {
             return HttpHeaders.CACHE_CONTROL.equalsIgnoreCase(name) && value != null
                     ? value.replace("public", "private") : value;

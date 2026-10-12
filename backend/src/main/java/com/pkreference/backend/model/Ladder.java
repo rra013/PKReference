@@ -10,6 +10,11 @@ import java.util.List;
  * Ladder stats, reduced from one of Smogon's monthly files to what the app shows
  * (BackendIntegration-PHASE5.md §3). The app's SmogonLadder.reduce makes the same record from the
  * same files; golden/ladder-fixture.json keeps the two equal.
+ *
+ * <p>As Events' records are, these are wire types: {@code Stats} is both the value of a
+ * {@code ladder.stats} Kafka record (inside {@code StatsFetched}) and what ladder_stats stores as
+ * JSON text. The {@code @Schema} annotations change nothing at run time: springdoc reads them to
+ * describe each field in Swagger UI.
  */
 public final class Ladder {
     private Ladder() {}
@@ -18,6 +23,10 @@ public final class Ladder {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Share(String value, double share) {}
 
+    /**
+     * One Pokémon's month. {@code Double leadShare} is the boxed type because it can be absent
+     * (null); {@code double usage} can't.
+     */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Pokemon(
             @Schema(description = "Smogon's name, unique in the record. A Pokémon holding its Mega Stone is its own entry.",
@@ -37,6 +46,7 @@ public final class Ladder {
                     example = "[{\"value\": \"Adamant:2/32/0/0/0/32\", \"share\": 0.29624}]") List<Share> spreads,
             @Schema(description = "Other entries of the record, by their names.") List<Share> teammates) {}
 
+    /** One of Smogon's files, reduced: a format's month at one rating. */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Stats(
             @Schema(description = "The version of the rule that reduced Smogon's file.") int reduction,
@@ -52,10 +62,15 @@ public final class Ladder {
     /** Topic ladder.stats, key = "format|month|rating". */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record StatsFetched(Stats stats, Instant fetchedAt) {
+        /**
+         * The Kafka record's key: one key per file, so the compacted topic keeps the newest record
+         * of each.
+         */
         public String key() {
             return key(stats.format(), stats.month(), stats.rating());
         }
 
+        /** "format|month|rating". */
         public static String key(String format, String month, int rating) {
             return format + "|" + month + "|" + rating;
         }

@@ -30,6 +30,11 @@ public class SpeciesVocabularies {
 
     private final Map<String, SpeciesVocabulary> byFormat = new HashMap<>();
 
+    /**
+     * Reads the bundled files once, at start-up. They're on the classpath under
+     * {@code regulations/} because pom.xml copies them there from the repository's root, where the
+     * app keeps them.
+     */
     public SpeciesVocabularies() {
         var mapper = new ObjectMapper();
         var resolver = new PathMatchingResourcePatternResolver();
@@ -74,6 +79,7 @@ public class SpeciesVocabularies {
         return format == null ? null : byFormat.get(format.toLowerCase(Locale.ROOT));
     }
 
+    /** Parses one bundled JSON file, closing it afterwards. */
     private static JsonNode read(ObjectMapper mapper, Resource resource) throws IOException {
         try (InputStream in = resource.getInputStream()) {
             return mapper.readTree(in);

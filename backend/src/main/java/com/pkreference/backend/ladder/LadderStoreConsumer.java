@@ -13,10 +13,15 @@ import org.springframework.stereotype.Component;
 public class LadderStoreConsumer {
     private final LadderStore store;
 
+    /** Constructor injection: Spring supplies each parameter from the beans it has made. */
     public LadderStoreConsumer(LadderStore store) {
         this.store = store;
     }
 
+    /**
+     * Called for each record on ladder.stats, already turned from JSON back into a
+     * {@code StatsFetched}. The store decides whether it's newer than what it has.
+     */
     @KafkaListener(topics = Topics.LADDER_STATS, groupId = "ladder-store")
     public void onStats(StatsFetched event) {
         store.put(event);

@@ -25,9 +25,19 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 /**
- * API v1: read-only, the same for everyone, and cached. Responses may be reused for 15 minutes,
- * and carry a weak ETag, so a client that has the current one gets a 304 with no body. Swagger UI
- * at /swagger-ui.html shows it, from these annotations.
+ * API v1: read-only, the same for everyone, and cached. Responses may be reused for 15 minutes, and
+ * carry a weak ETag, so a client that has the current one gets a 304 with no body. Swagger UI at
+ * /swagger-ui.html shows it, from these annotations.
+ *
+ * <p>A controller is the web's edge of the application: it turns an HTTP request into a method call
+ * and the returned object into JSON. It holds no logic of its own. Each method here checks its
+ * parameters, asks MetaService, and wraps the answer with caching headers.
+ *
+ * <p>The annotations on a method are of two kinds. Spring's route the request:
+ * {@code @GetMapping("/formats/{format}/pokemon")} says which path and verb, {@code @PathVariable}
+ * takes a piece of the path, {@code @RequestParam} a query parameter. springdoc's ({@code @Tag},
+ * {@code @Operation}, {@code @Parameter}) only describe the endpoint for Swagger UI and change
+ * nothing about how it runs.
  */
 @RestController
 @RequestMapping("/v1")
@@ -35,16 +45,27 @@ import java.util.NoSuchElementException;
         Tournament insights from Limitless events: usage, top-cut rate, trends, win rates, sets, cores and \
         archetypes, and the newest events. Read-only and cached (15 minutes, with ETags). Shares are 0 to 1.""")
 public class MetaController {
+    /**
+     * {@code Cache-Control: max-age=900, public}: any cache may reuse an answer for 15 minutes.
+     * With API keys configured, ApiAuthFilter rewrites {@code public} to {@code private} on the way
+     * out.
+     */
     static final CacheControl CACHE = CacheControl.maxAge(Duration.ofMinutes(15)).cachePublic();
     static final int MAX_EVENTS = 50;
     private static final String WINDOW = "14d, 30d (the default) or regulation (every stored event of the format).";
 
     private final MetaService meta;
 
+    /** Spring passes in the one MetaService bean. */
     public MetaController(MetaService meta) {
         this.meta = meta;
     }
 
+    /**
+     * GET /v1/formats. {@code ResponseEntity} is a response with its status and headers settable,
+     * where returning the body alone would only allow a plain 200. The app's Test Connection button
+     * calls this one.
+     */
     @GetMapping("/formats")
     @Operation(summary = "The formats with data",
             description = "Each Limitless format stored: its events, teams, first and last event, and when it was last fetched.")
@@ -52,6 +73,10 @@ public class MetaController {
         return ResponseEntity.ok().cacheControl(CACHE).body(meta.formats());
     }
 
+    /**
+     * GET /v1/formats/{format}/pokemon?window=30d: the Meta tab's list. A window that isn't one is
+     * a 400 (MetaWindow.parse throws).
+     */
     @GetMapping("/formats/{format}/pokemon")
     @Operation(summary = "Every Pokémon's usage",
             description = "Each Pokémon on a team in the window: usage, top-cut rate, trend and win record, most used first.")
@@ -61,6 +86,10 @@ public class MetaController {
         return ResponseEntity.ok().cacheControl(CACHE).body(meta.pokemon(format, MetaWindow.parse(window)));
     }
 
+    /**
+     * GET /v1/formats/{format}/pokemon/{key}: one Pokémon's page. Java tells this method from the
+     * one above by its parameters.
+     */
     @GetMapping("/formats/{format}/pokemon/{key}")
     @Operation(summary = "One Pokémon's page",
             description = "Its usage and record, items, abilities, natures, moves, Mega Stones, teammates, top whole "
@@ -72,6 +101,7 @@ public class MetaController {
         return ResponseEntity.ok().cacheControl(CACHE).body(meta.pokemon(format, key, MetaWindow.parse(window)));
     }
 
+    /** GET /v1/formats/{format}/cores: pairs and trios chosen together. */
     @GetMapping("/formats/{format}/cores")
     @Operation(summary = "Pokémon chosen together",
             description = "The 20 most common pairs and trios (on at least 4 teams), with their lift over chance.")
@@ -81,6 +111,7 @@ public class MetaController {
         return ResponseEntity.ok().cacheControl(CACHE).body(meta.cores(format, MetaWindow.parse(window)));
     }
 
+    /** GET /v1/formats/{format}/archetypes: the Meta tab's Teams to Beat. */
     @GetMapping("/formats/{format}/archetypes")
     @Operation(summary = "Archetypes and their matchups",
             description = "Teams grouped by their core of four: each archetype's usage, top-cut rate, record, and "
@@ -91,6 +122,7 @@ public class MetaController {
         return ResponseEntity.ok().cacheControl(CACHE).body(meta.archetypes(format, MetaWindow.parse(window)));
     }
 
+    /** GET /v1/formats/{format}/archetypes/{id}: one archetype's page. */
     @GetMapping("/formats/{format}/archetypes/{id}")
     @Operation(summary = "One archetype, with example teams",
             description = "The archetype as the list has it, and its best-placed teams with their sets. 404 when "
@@ -103,6 +135,10 @@ public class MetaController {
         return ResponseEntity.ok().cacheControl(CACHE).body(meta.archetype(format, id, MetaWindow.parse(window)));
     }
 
+    /**
+     * GET /v1/formats/{format}/events?limit=10: the Meta tab's Recent Events. A limit outside 1 to
+     * 50 is a 400.
+     */
     @GetMapping("/formats/{format}/events")
     @Operation(summary = "The newest stored events",
             description = "Newest first, each with its size, whether its standings are final, its top cut's size "
@@ -114,11 +150,20 @@ public class MetaController {
         return ResponseEntity.ok().cacheControl(CACHE).body(meta.events(format, limit));
     }
 
+    /**
+     * {@code @ExceptionHandler}: when a method of this controller throws IllegalArgumentException
+     * (a window that isn't one, a limit out of range), Spring calls this instead of answering 500,
+     * and the client gets a 400 with the reason as JSON.
+     */
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<Map<String, String>> badRequest(IllegalArgumentException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
     }
 
+    /**
+     * The same for NoSuchElementException, which MetaService throws for a Pokémon or archetype the
+     * window doesn't have: a 404.
+     */
     @ExceptionHandler(NoSuchElementException.class)
     ResponseEntity<Map<String, String>> notFound(NoSuchElementException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));

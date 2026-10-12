@@ -27,9 +27,16 @@ public class RequestThrottle {
     private final Duration window;
     private final Clock clock;
     private final Sleeper sleeper;
+    // When each request of the current window went, oldest first.
     private final Deque<Instant> sent = new ArrayDeque<>();
+    // Set when Limitless itself says none are left: nothing goes before this.
     private Instant blockedUntil = Instant.MIN;
 
+    /**
+     * {@code clock} and {@code sleeper} are passed in rather than being the system's, so a test can
+     * run hours of throttling in a millisecond: its fake clock moves when the fake sleeper is
+     * called.
+     */
     public RequestThrottle(int limit, Duration window, Clock clock, Sleeper sleeper) {
         if (limit < 1) throw new IllegalArgumentException("limit must be at least 1");
         this.limit = limit;
@@ -72,6 +79,7 @@ public class RequestThrottle {
         }
     }
 
+    /** The first number the pattern captures, or null when the header doesn't have it. */
     private static Integer number(Matcher m) {
         return m.find() ? Integer.valueOf(m.group(1)) : null;
     }

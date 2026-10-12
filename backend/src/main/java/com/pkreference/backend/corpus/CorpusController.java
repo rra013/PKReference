@@ -35,10 +35,15 @@ public class CorpusController {
 
     private final CorpusRepository corpus;
 
+    /** Constructor injection: Spring supplies each parameter from the beans it has made. */
     public CorpusController(CorpusRepository corpus) {
         this.corpus = corpus;
     }
 
+    /**
+     * GET /v1/formats/{format}/tournaments?page=1&limit=50. {@code defaultValue} makes a parameter
+     * optional. A limit over 100 is cut to 100 rather than refused, as a page size usually is.
+     */
     @GetMapping("/formats/{format}/tournaments")
     @Operation(summary = "A page of a format's events",
             description = "Newest first, as Limitless's GET /tournaments lists them.")
@@ -51,6 +56,7 @@ public class CorpusController {
                 .body(corpus.tournaments(format, page, Math.min(limit, MAX_LIMIT)));
     }
 
+    /** GET /v1/tournaments/{id}/standings: what the app's Team Search asks for each event it lists. */
     @GetMapping("/tournaments/{id}/standings")
     @Operation(summary = "One event's standings and teams",
             description = "As Limitless's GET /tournaments/{id}/standings returns them. 404 when the event isn't stored.")
@@ -60,11 +66,13 @@ public class CorpusController {
         return ResponseEntity.ok().cacheControl(CACHE).body(standings);
     }
 
+    /** A page or limit under 1: 400, with the reason as JSON. */
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<Map<String, String>> badRequest(IllegalArgumentException e) {
         return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
     }
 
+    /** An event that isn't stored: 404, with the reason as JSON. */
     @ExceptionHandler(NoSuchElementException.class)
     ResponseEntity<Map<String, String>> notFound(NoSuchElementException e) {
         return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));

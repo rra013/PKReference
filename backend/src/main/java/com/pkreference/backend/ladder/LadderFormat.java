@@ -15,6 +15,11 @@ public record LadderFormat(String id, String regulation, String mode, int bestOf
     public static final String DOUBLES = "doubles";
     public static final String SINGLES = "singles";
 
+    /**
+     * "gen", digits, "champions", then "vgc" and a year or "bss", then "reg" and the regulation's
+     * letters, then optionally "bo3". The regulation's group is reluctant ({@code +?}) so that a
+     * trailing "bo3" is matched as best-of-three rather than as part of the regulation.
+     */
     private static final Pattern ID = Pattern.compile("^gen\\d+champions(vgc\\d{4}|bss)reg([a-z0-9]+?)(bo3)?$");
 
     /**

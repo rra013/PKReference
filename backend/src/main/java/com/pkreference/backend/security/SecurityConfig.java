@@ -15,6 +15,14 @@ import java.time.Clock;
 /**
  * Signing in to the API, put together: the tokens, and the check ahead of every other filter and on
  * every path but Swagger UI's (/v1 and the older /api/usage).
+ *
+ * <p>{@code @Configuration} marks a class whose {@code @Bean} methods Spring calls once each at
+ * start-up, keeping what they return as beans. It's the alternative to {@code @Component} for
+ * objects that need arguments or set-up a bare constructor call can't express, as the filter's
+ * registration below does.
+ *
+ * <p>This project doesn't use Spring Security. One filter and one small token service do what it
+ * needs, and can be read from top to bottom.
  */
 @Configuration
 public class SecurityConfig {
@@ -22,12 +30,22 @@ public class SecurityConfig {
     static final String API_KEY = "apiKey";
     static final String ACCESS_TOKEN = "accessToken";
 
-    /** One for the whole server: its secret is what makes a token made here verify here. */
+    /**
+     * One for the whole server: its secret is what makes a token made here verify here.
+     *
+     * <p>{@code ObjectProvider<Clock>} asks for a bean that may not exist: the application defines a
+     * Clock, but a test that builds only the web layer may not, and then the system clock is used.
+     */
     @Bean
     TokenService tokenService(ApiAuthProperties properties, ObjectProvider<Clock> clock) {
         return new TokenService(properties, clock.getIfAvailable(Clock::systemUTC));
     }
 
+    /**
+     * Registers the filter on every path ("/*") and puts it first: {@code HIGHEST_PRECEDENCE} means
+     * it runs before the ETag filter and everything else, so nothing does any work for a request
+     * that will be refused.
+     */
     @Bean
     FilterRegistrationBean<ApiAuthFilter> apiAuth(ApiAuthProperties properties, TokenService tokens) {
         var registration = new FilterRegistrationBean<>(new ApiAuthFilter(properties, tokens));
