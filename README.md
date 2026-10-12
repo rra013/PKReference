@@ -346,7 +346,9 @@ back to Limitless whenever the server can't be reached.
   suggestion to add it to the search. Composition details show each
   Pokémon's ladder usage too. Smogon publishes stats a month at a time, so
   until the selected regulation has its own, the newest earlier
-  regulation's stats are used, and labelled as such.
+  regulation's stats are used, and labelled as such. With the PK Reference
+  server on, the stats come from it, and from Smogon whenever it can't
+  answer.
 - **Data:** each event's results are downloaded once and cached; pull to
   refresh for new events. If Limitless is limiting requests, the app waits
   and retries. Smogon's stats are cached per month. Settings → Clear Tournament
@@ -521,13 +523,14 @@ project has no Swift package dependencies.
    later launches work offline, except for Events and Team Search's new
    events. The Mac app is sandboxed, with outgoing network access.
 
-**Tests:** 1,335 tests written with Swift Testing. They cover the damage engines
+**Tests:** 1,352 tests written with Swift Testing. They cover the damage engines
 and the port, the battle engine by mechanic tier, the EV and two-hit solvers,
 speed tiers, paste parsing and import, Champions filters and legality, RNG
 tools, ML parity, the tournament import and data store, Team Search's parser,
 engine, Smogon suggestions and Apple Intelligence reading (with canned
-answers), the PK Reference server option (over a stubbed network), and the
-bundled license files. None of them need the network or a SwiftData store.
+answers), the PK Reference server option (over a stubbed network), the
+ladder's records (checked against the server's on a shared golden file), and
+the bundled license files. None of them need the network or a SwiftData store.
 
 The command, and what to watch for running it and building the Mac app,
 are in [`HANDOFF.md`](HANDOFF.md#building-and-testing).

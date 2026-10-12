@@ -112,7 +112,7 @@ final class TeamSearchModel {
     private(set) var interpreterAvailability: TeamInterpreterAvailability = .unsupported
 
     private let store: TeamCorpusStore
-    private let smogonStore: SmogonUsageStore
+    private let ladderStore: LadderStore
     private let loadVocabulary: @Sendable (ChampionsRegulation) throws -> TeamSearchVocabulary
     private let interpreter: TeamQueryInterpreting
     private let now: () -> Date
@@ -127,7 +127,7 @@ final class TeamSearchModel {
 
     init(regulation: ChampionsRegulation = .current,
          store: TeamCorpusStore = .shared,
-         smogonStore: SmogonUsageStore = .shared,
+         ladderStore: LadderStore = .shared,
          loadVocabulary: @escaping @Sendable (ChampionsRegulation) throws -> TeamSearchVocabulary = {
              try TeamSearchVocabulary.bundled(for: $0)
          },
@@ -135,7 +135,7 @@ final class TeamSearchModel {
          now: @escaping () -> Date = Date.init) {
         self.regulation = regulation
         self.store = store
-        self.smogonStore = smogonStore
+        self.ladderStore = ladderStore
         self.loadVocabulary = loadVocabulary
         self.interpreter = interpreter
         self.now = now
@@ -210,15 +210,19 @@ final class TeamSearchModel {
         }
     }
 
-    /// Loads Smogon's stats: the cached choice at once, then a check for a
+    /// Loads Smogon's stats, from the PK Reference server or from Smogon
+    /// (LadderStore): what's on the device at once, then a check for a
     /// newer month. Failures leave the insights as they were.
     private func loadInsights(for regulation: ChampionsRegulation, forceRefresh: Bool) async {
         guard let vocabulary = parser?.vocabulary else { return }
-        if insights == nil, let cached = await smogonStore.cachedUsage(for: regulation) {
-            await applyInsights(cached, vocabulary: vocabulary, for: regulation)
+        let request = LadderRequest.teamSearch(regulation)
+        if insights == nil, let cached = await ladderStore.cached(request, fallBack: true) {
+            await applyInsights(SmogonUsage(cached.stats), vocabulary: vocabulary, for: regulation)
         }
-        guard let usage = try? await smogonStore.usage(for: regulation, forceRefresh: forceRefresh),
-              usage != insights?.usage else { return }
+        guard let stats = try? await ladderStore.fetch(request, fallBack: true, force: forceRefresh).answer?.stats
+        else { return }
+        let usage = SmogonUsage(stats)
+        guard usage != insights?.usage else { return }
         await applyInsights(usage, vocabulary: vocabulary, for: regulation)
     }
 

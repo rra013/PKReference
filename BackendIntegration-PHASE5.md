@@ -196,10 +196,13 @@ Swagger UI describes them.
 - **`LadderStore`** answers "the stats for this regulation, mode, best of
   and rating":
   1. the server, through `MetaInsights` and its cache, when the switch is on;
-  2. otherwise, or when the server can't answer, Smogon's own files:
-     the month is chosen from Smogon's listing (kept for 12 hours), the file
-     downloaded once, reduced, and kept on disk. A published month never
-     changes, so a reduced month never expires.
+  2. otherwise, or when the server can't answer, Smogon's own files
+     (`SmogonLadderStore`): the month is chosen from Smogon's listing (kept
+     for 12 hours), the file downloaded once, reduced, and kept on disk. A
+     published month never changes, so a reduced month never expires.
+  `load` shows what there is and never downloads from Smogon; `fetch`
+  downloads. `SmogonLadderStore.offer` says which month and file a download
+  would be, and how big, from the listing alone.
 - **Opening a ladder view never starts a download from Smogon**, as
   opening Tournaments never downloads events. It shows what's on the device;
   when there's nothing, a card names the month and the file's size (the
@@ -305,14 +308,14 @@ from Smogon.
 
 | PR | What |
 |---|---|
-| 5a | This file, and the plan's updates |
-| 5b | Backend: `SmogonClient`, `LadderDiscovery`, `LadderReducer`, `ladder.stats`, `ladder_stats`, `/v1/ladder`, the golden file, README |
-| 5c | App data: the shapes, `SmogonLadder.reduce` against the golden file, `LadderStore`, Team Search reading through it, Settings' storage row |
+| 5a, #112 | This file, and the plan's updates |
+| 5b, #113 | Backend: `SmogonClient`, `LadderDiscovery`, `LadderReducer`, `ladder.stats`, `ladder_stats`, `/v1/ladder`, the golden file, README |
+| 5c | App data: the shapes (`MetaLadderAPI.swift`), `SmogonLadder.reduce` against the golden file, `SmogonLadderStore` and `LadderStore`, Team Search reading through them, Settings' storage row |
 | 5d | App screens: the switch, ladder home, the list, the Pokémon's ladder page, info sheets |
 | 5e | Save Set and Calc Against This with real stat points; Mon Index's ladder line; HANDOFF and README brought up to date |
 
-Each is checked on its own before it's opened, and merged before the next
-is opened.
+Each is checked on its own before it's opened. A later one sits on the
+ones before it until they merge.
 
 ## 8. Checks
 

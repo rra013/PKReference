@@ -287,7 +287,7 @@ struct SettingsView: View {
                     Button {
                         Task {
                             try? await TeamCorpusStore.shared.clearCache()
-                            try? await SmogonUsageStore.shared.clearCache()
+                            try? await SmogonLadderStore.shared.clearCache()
                             try? await MetaCache.shared.clear()
                             teamSearchCacheBytes = await teamSearchCacheSize()
                         }
@@ -474,17 +474,17 @@ struct SettingsView: View {
         try? modelContext.save()
         Task {
             try? await TeamCorpusStore.shared.clearCache()
-            try? await SmogonUsageStore.shared.clearCache()
+            try? await SmogonLadderStore.shared.clearCache()
             try? await MetaCache.shared.clear()
             teamSearchCacheBytes = 0
         }
     }
 
-    /// Team Search's tournament teams and Smogon usage stats, and the PK
-    /// Reference server's answers.
+    /// Team Search's tournament teams, the ladder stats made from Smogon's
+    /// files, and the PK Reference server's answers.
     private func teamSearchCacheSize() async -> Int {
         let teams = await TeamCorpusStore.shared.cacheSize()
-        let usage = await SmogonUsageStore.shared.cacheSize()
+        let usage = await SmogonLadderStore.shared.cacheSize()
         let meta = await MetaCache.shared.size()
         return teams + usage + meta
     }

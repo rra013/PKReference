@@ -1,0 +1,1262 @@
+{
+ "reduction": 1,
+ "format": "gen9championsvgc2026regmb",
+ "regulation": "M-B",
+ "mode": "doubles",
+ "bestOf": 1,
+ "month": "2026-09",
+ "rating": 1760,
+ "battles": 326464,
+ "fetchedAt": "2026-10-12T16:47:25.461616Z",
+ "previousMonth": "2026-08",
+ "ratings": [
+  0,
+  1500,
+  1630,
+  1760
+ ],
+ "pokemon": [
+  {
+   "name": "Kingambit",
+   "key": "kingambit",
+   "megaStone": null,
+   "usage": 0.5799434,
+   "trend": 0.10750589999999999,
+   "usageByRating": [
+    {
+     "rating": 0,
+     "usage": 0.33560969999999996
+    },
+    {
+     "rating": 1500,
+     "usage": 0.42216790000000004
+    },
+    {
+     "rating": 1630,
+     "usage": 0.49191789999999996
+    },
+    {
+     "rating": 1760,
+     "usage": 0.5799434
+    }
+   ],
+   "leadShare": 0.0633048,
+   "abilities": [
+    {
+     "value": "Defiant",
+     "share": 0.99514
+    }
+   ],
+   "items": [
+    {
+     "value": "Chople Berry",
+     "share": 0.36506
+    },
+    {
+     "value": "Black Glasses",
+     "share": 0.28716
+    },
+    {
+     "value": "Life Orb",
+     "share": 0.2154
+    },
+    {
+     "value": "Focus Sash",
+     "share": 0.06363
+    },
+    {
+     "value": "Occa Berry",
+     "share": 0.06107
+    }
+   ],
+   "moves": [
+    {
+     "value": "Sucker Punch",
+     "share": 0.99914
+    },
+    {
+     "value": "Kowtow Cleave",
+     "share": 0.98716
+    },
+    {
+     "value": "Protect",
+     "share": 0.68072
+    },
+    {
+     "value": "Iron Head",
+     "share": 0.65125
+    },
+    {
+     "value": "Low Kick",
+     "share": 0.40217
+    },
+    {
+     "value": "Swords Dance",
+     "share": 0.26896
+    },
+    {
+     "value": "Brick Break",
+     "share": 0.00569
+    }
+   ],
+   "natures": [
+    {
+     "value": "Adamant",
+     "share": 0.9492
+    },
+    {
+     "value": "Brave",
+     "share": 0.04319
+    }
+   ],
+   "spreads": [
+    {
+     "value": "Adamant:32/32/0/0/1/1",
+     "share": 0.12542
+    },
+    {
+     "value": "Adamant:32/32/0/0/2/0",
+     "share": 0.1132
+    },
+    {
+     "value": "Adamant:22/29/0/0/0/15",
+     "share": 0.08306
+    },
+    {
+     "value": "Adamant:32/3/2/0/29/0",
+     "share": 0.07093
+    },
+    {
+     "value": "Adamant:32/15/0/0/19/0",
+     "share": 0.03431
+    },
+    {
+     "value": "Adamant:5/29/0/0/4/28",
+     "share": 0.02977
+    },
+    {
+     "value": "Adamant:8/19/3/0/4/32",
+     "share": 0.02957
+    },
+    {
+     "value": "Adamant:32/32/2/0/0/0",
+     "share": 0.02838
+    },
+    {
+     "value": "Adamant:32/32/0/0/0/2",
+     "share": 0.0282
+    },
+    {
+     "value": "Adamant:0/32/0/0/2/32",
+     "share": 0.02558
+    }
+   ],
+   "teammates": [
+    {
+     "value": "Basculegion",
+     "share": 0.56447
+    },
+    {
+     "value": "Whimsicott",
+     "share": 0.40217
+    },
+    {
+     "value": "Floette-Mega",
+     "share": 0.37332
+    },
+    {
+     "value": "Garchomp",
+     "share": 0.35968
+    },
+    {
+     "value": "Sneasler",
+     "share": 0.35503
+    },
+    {
+     "value": "Charizard-Mega-Y",
+     "share": 0.27847
+    },
+    {
+     "value": "Sylveon",
+     "share": 0.18746
+    },
+    {
+     "value": "Raichu-Mega-Y",
+     "share": 0.15987
+    },
+    {
+     "value": "Arcanine-Hisui",
+     "share": 0.15883
+    },
+    {
+     "value": "Farigiraf",
+     "share": 0.13532
+    },
+    {
+     "value": "Incineroar",
+     "share": 0.13164
+    },
+    {
+     "value": "Sinistcha",
+     "share": 0.11857
+    },
+    {
+     "value": "Froslass-Mega",
+     "share": 0.11138
+    },
+    {
+     "value": "Staraptor-Mega",
+     "share": 0.10098
+    },
+    {
+     "value": "Dragonite-Mega",
+     "share": 0.09778
+    },
+    {
+     "value": "Delphox-Mega",
+     "share": 0.09153
+    },
+    {
+     "value": "Aerodactyl-Mega",
+     "share": 0.08987
+    },
+    {
+     "value": "Dragonite",
+     "share": 0.08685
+    },
+    {
+     "value": "Blastoise-Mega",
+     "share": 0.08256
+    },
+    {
+     "value": "Lycanroc-Dusk",
+     "share": 0.06753
+    },
+    {
+     "value": "Scovillain-Mega",
+     "share": 0.06366
+    },
+    {
+     "value": "Metagross-Mega",
+     "share": 0.04481
+    },
+    {
+     "value": "Kleavor",
+     "share": 0.03554
+    },
+    {
+     "value": "Tsareena",
+     "share": 0.035
+    }
+   ]
+  },
+  {
+   "name": "Basculegion",
+   "key": "basculegion",
+   "megaStone": null,
+   "usage": 0.4210649,
+   "trend": 0.10619970000000001,
+   "usageByRating": [
+    {
+     "rating": 0,
+     "usage": 0.2621453
+    },
+    {
+     "rating": 1500,
+     "usage": 0.32175139999999997
+    },
+    {
+     "rating": 1630,
+     "usage": 0.3588001
+    },
+    {
+     "rating": 1760,
+     "usage": 0.4210649
+    }
+   ],
+   "leadShare": 0.0450964,
+   "abilities": [
+    {
+     "value": "Adaptability",
+     "share": 0.97442
+    },
+    {
+     "value": "Swift Swim",
+     "share": 0.02549
+    }
+   ],
+   "items": [
+    {
+     "value": "Life Orb",
+     "share": 0.53483
+    },
+    {
+     "value": "Choice Scarf",
+     "share": 0.24419
+    },
+    {
+     "value": "Mystic Water",
+     "share": 0.12343
+    },
+    {
+     "value": "Sitrus Berry",
+     "share": 0.04449
+    },
+    {
+     "value": "Focus Sash",
+     "share": 0.02898
+    },
+    {
+     "value": "Colbur Berry",
+     "share": 0.02154
+    }
+   ],
+   "moves": [
+    {
+     "value": "Last Respects",
+     "share": 0.99831
+    },
+    {
+     "value": "Aqua Jet",
+     "share": 0.97325
+    },
+    {
+     "value": "Wave Crash",
+     "share": 0.96401
+    },
+    {
+     "value": "Protect",
+     "share": 0.74804
+    },
+    {
+     "value": "Flip Turn",
+     "share": 0.24876
+    },
+    {
+     "value": "Liquidation",
+     "share": 0.02577
+    },
+    {
+     "value": "Head Smash",
+     "share": 0.01286
+    },
+    {
+     "value": "Waterfall",
+     "share": 0.00649
+    },
+    {
+     "value": "Psychic Fangs",
+     "share": 0.0061
+    },
+    {
+     "value": "Soak",
+     "share": 0.00519
+    }
+   ],
+   "natures": [
+    {
+     "value": "Adamant",
+     "share": 0.65625
+    },
+    {
+     "value": "Jolly",
+     "share": 0.32701
+    },
+    {
+     "value": "Brave",
+     "share": 0.01262
+    }
+   ],
+   "spreads": [
+    {
+     "value": "Jolly:2/32/0/0/0/32",
+     "share": 0.19488
+    },
+    {
+     "value": "Adamant:2/32/0/0/0/32",
+     "share": 0.07137
+    },
+    {
+     "value": "Jolly:0/32/1/0/1/32",
+     "share": 0.05409
+    },
+    {
+     "value": "Adamant:0/31/14/0/0/21",
+     "share": 0.04566
+    },
+    {
+     "value": "Adamant:4/28/13/0/0/21",
+     "share": 0.04515
+    },
+    {
+     "value": "Adamant:4/18/4/0/15/25",
+     "share": 0.04328
+    },
+    {
+     "value": "Adamant:0/18/30/0/0/18",
+     "share": 0.04325
+    },
+    {
+     "value": "Adamant:4/28/8/0/5/21",
+     "share": 0.0411
+    },
+    {
+     "value": "Adamant:0/28/11/0/0/27",
+     "share": 0.02661
+    },
+    {
+     "value": "Jolly:0/32/2/0/0/32",
+     "share": 0.02586
+    }
+   ],
+   "teammates": [
+    {
+     "value": "Kingambit",
+     "share": 0.77978
+    },
+    {
+     "value": "Whimsicott",
+     "share": 0.56243
+    },
+    {
+     "value": "Floette-Mega",
+     "share": 0.50712
+    },
+    {
+     "value": "Garchomp",
+     "share": 0.42359
+    },
+    {
+     "value": "Charizard-Mega-Y",
+     "share": 0.35255
+    },
+    {
+     "value": "Sneasler",
+     "share": 0.28306
+    },
+    {
+     "value": "Arcanine-Hisui",
+     "share": 0.14214
+    },
+    {
+     "value": "Dragonite-Mega",
+     "share": 0.13199
+    },
+    {
+     "value": "Froslass-Mega",
+     "share": 0.13153
+    },
+    {
+     "value": "Dragonite",
+     "share": 0.11748
+    },
+    {
+     "value": "Raichu-Mega-Y",
+     "share": 0.09857
+    },
+    {
+     "value": "Lycanroc-Dusk",
+     "share": 0.09441
+    },
+    {
+     "value": "Scovillain-Mega",
+     "share": 0.08731
+    },
+    {
+     "value": "Metagross-Mega",
+     "share": 0.06528
+    },
+    {
+     "value": "Farigiraf",
+     "share": 0.05831
+    },
+    {
+     "value": "Staraptor-Mega",
+     "share": 0.05123
+    },
+    {
+     "value": "Sylveon",
+     "share": 0.05062
+    },
+    {
+     "value": "Incineroar",
+     "share": 0.04578
+    },
+    {
+     "value": "Kleavor",
+     "share": 0.04543
+    },
+    {
+     "value": "Pelipper",
+     "share": 0.04079
+    },
+    {
+     "value": "Archaludon",
+     "share": 0.03799
+    },
+    {
+     "value": "Sinistcha",
+     "share": 0.0317
+    },
+    {
+     "value": "Ceruledge",
+     "share": 0.02523
+    },
+    {
+     "value": "Venusaur-Mega",
+     "share": 0.02518
+    }
+   ]
+  },
+  {
+   "name": "Garchomp",
+   "key": "garchomp",
+   "megaStone": null,
+   "usage": 0.33677860000000004,
+   "trend": 0.014986700000000075,
+   "usageByRating": [
+    {
+     "rating": 0,
+     "usage": 0.2665746
+    },
+    {
+     "rating": 1500,
+     "usage": 0.3013794
+    },
+    {
+     "rating": 1630,
+     "usage": 0.29945150000000004
+    },
+    {
+     "rating": 1760,
+     "usage": 0.33677860000000004
+    }
+   ],
+   "leadShare": 0.0446578,
+   "abilities": [
+    {
+     "value": "Rough Skin",
+     "share": 0.98848
+    },
+    {
+     "value": "Sand Veil",
+     "share": 0.01152
+    }
+   ],
+   "items": [
+    {
+     "value": "Choice Scarf",
+     "share": 0.33447
+    },
+    {
+     "value": "Sitrus Berry",
+     "share": 0.30491
+    },
+    {
+     "value": "Life Orb",
+     "share": 0.28775
+    },
+    {
+     "value": "Roseli Berry",
+     "share": 0.02477
+    },
+    {
+     "value": "Lum Berry",
+     "share": 0.01459
+    },
+    {
+     "value": "Expert Belt",
+     "share": 0.00648
+    },
+    {
+     "value": "Focus Sash",
+     "share": 0.00605
+    },
+    {
+     "value": "White Herb",
+     "share": 0.0058
+    }
+   ],
+   "moves": [
+    {
+     "value": "Dragon Claw",
+     "share": 0.92277
+    },
+    {
+     "value": "Rock Slide",
+     "share": 0.88129
+    },
+    {
+     "value": "Earthquake",
+     "share": 0.86489
+    },
+    {
+     "value": "Protect",
+     "share": 0.62016
+    },
+    {
+     "value": "Stomping Tantrum",
+     "share": 0.50704
+    },
+    {
+     "value": "Rock Tomb",
+     "share": 0.06161
+    },
+    {
+     "value": "Poison Jab",
+     "share": 0.03729
+    },
+    {
+     "value": "Bulldoze",
+     "share": 0.02381
+    },
+    {
+     "value": "Breaking Swipe",
+     "share": 0.01712
+    },
+    {
+     "value": "Scale Shot",
+     "share": 0.00929
+    },
+    {
+     "value": "Draco Meteor",
+     "share": 0.00765
+    },
+    {
+     "value": "Dragon Tail",
+     "share": 0.0074
+    },
+    {
+     "value": "Earth Power",
+     "share": 0.00731
+    },
+    {
+     "value": "Power Gem",
+     "share": 0.00724
+    },
+    {
+     "value": "Dragon Pulse",
+     "share": 0.00707
+    }
+   ],
+   "natures": [
+    {
+     "value": "Adamant",
+     "share": 0.5452
+    },
+    {
+     "value": "Jolly",
+     "share": 0.43837
+    },
+    {
+     "value": "Modest",
+     "share": 0.00694
+    },
+    {
+     "value": "Hardy",
+     "share": 0.00593
+    }
+   ],
+   "spreads": [
+    {
+     "value": "Jolly:2/32/0/0/0/32",
+     "share": 0.18565
+    },
+    {
+     "value": "Adamant:2/32/0/0/0/32",
+     "share": 0.09755
+    },
+    {
+     "value": "Adamant:31/0/26/0/6/3",
+     "share": 0.05683
+    },
+    {
+     "value": "Jolly:21/7/6/0/0/32",
+     "share": 0.0546
+    },
+    {
+     "value": "Adamant:10/20/9/0/0/27",
+     "share": 0.05222
+    },
+    {
+     "value": "Adamant:14/20/0/0/0/32",
+     "share": 0.04232
+    },
+    {
+     "value": "Adamant:31/0/20/0/3/12",
+     "share": 0.02977
+    },
+    {
+     "value": "Adamant:31/1/7/0/4/23",
+     "share": 0.02496
+    },
+    {
+     "value": "Jolly:6/28/0/0/0/32",
+     "share": 0.02367
+    },
+    {
+     "value": "Jolly:13/20/0/0/1/32",
+     "share": 0.01914
+    }
+   ],
+   "teammates": [
+    {
+     "value": "Charizard-Mega-Y",
+     "share": 0.67124
+    },
+    {
+     "value": "Kingambit",
+     "share": 0.61843
+    },
+    {
+     "value": "Basculegion",
+     "share": 0.52722
+    },
+    {
+     "value": "Whimsicott",
+     "share": 0.46603
+    },
+    {
+     "value": "Floette-Mega",
+     "share": 0.46546
+    },
+    {
+     "value": "Sylveon",
+     "share": 0.23359
+    },
+    {
+     "value": "Incineroar",
+     "share": 0.22054
+    },
+    {
+     "value": "Sneasler",
+     "share": 0.20458
+    },
+    {
+     "value": "Venusaur",
+     "share": 0.14365
+    },
+    {
+     "value": "Toxapex",
+     "share": 0.10066
+    },
+    {
+     "value": "Farigiraf",
+     "share": 0.0982
+    },
+    {
+     "value": "Dragonite-Mega",
+     "share": 0.09026
+    },
+    {
+     "value": "Aerodactyl-Mega",
+     "share": 0.07792
+    },
+    {
+     "value": "Staraptor-Mega",
+     "share": 0.05374
+    },
+    {
+     "value": "Sinistcha",
+     "share": 0.05185
+    },
+    {
+     "value": "Delphox-Mega",
+     "share": 0.04147
+    },
+    {
+     "value": "Aerodactyl",
+     "share": 0.03746
+    },
+    {
+     "value": "Froslass-Mega",
+     "share": 0.0339
+    },
+    {
+     "value": "Rotom-Wash",
+     "share": 0.03382
+    },
+    {
+     "value": "Gholdengo",
+     "share": 0.02935
+    },
+    {
+     "value": "Metagross-Mega",
+     "share": 0.02574
+    },
+    {
+     "value": "Glimmora",
+     "share": 0.02338
+    },
+    {
+     "value": "Tyranitar",
+     "share": 0.02322
+    },
+    {
+     "value": "Corviknight",
+     "share": 0.02028
+    }
+   ]
+  },
+  {
+   "name": "Charizard-Mega-Y",
+   "key": "charizard",
+   "megaStone": "Charizardite Y",
+   "usage": 0.3014813,
+   "trend": 0.036269700000000016,
+   "usageByRating": [
+    {
+     "rating": 0,
+     "usage": 0.1522986
+    },
+    {
+     "rating": 1500,
+     "usage": 0.194829
+    },
+    {
+     "rating": 1630,
+     "usage": 0.2333604
+    },
+    {
+     "rating": 1760,
+     "usage": 0.3014813
+    }
+   ],
+   "leadShare": 0.0587892,
+   "abilities": [
+    {
+     "value": "Drought",
+     "share": 1.0
+    }
+   ],
+   "items": [
+    {
+     "value": "Charizardite Y",
+     "share": 1.0
+    }
+   ],
+   "moves": [
+    {
+     "value": "Protect",
+     "share": 0.99908
+    },
+    {
+     "value": "Heat Wave",
+     "share": 0.99833
+    },
+    {
+     "value": "Weather Ball",
+     "share": 0.92373
+    },
+    {
+     "value": "Solar Beam",
+     "share": 0.59242
+    },
+    {
+     "value": "Ancient Power",
+     "share": 0.29816
+    },
+    {
+     "value": "Hurricane",
+     "share": 0.09794
+    },
+    {
+     "value": "Overheat",
+     "share": 0.02904
+    },
+    {
+     "value": "Air Slash",
+     "share": 0.02291
+    },
+    {
+     "value": "Scorching Sands",
+     "share": 0.01919
+    },
+    {
+     "value": "Helping Hand",
+     "share": 0.01273
+    }
+   ],
+   "natures": [
+    {
+     "value": "Modest",
+     "share": 0.61196
+    },
+    {
+     "value": "Timid",
+     "share": 0.22732
+    },
+    {
+     "value": "Bold",
+     "share": 0.15767
+    }
+   ],
+   "spreads": [
+    {
+     "value": "Timid:12/0/14/8/0/32",
+     "share": 0.07496
+    },
+    {
+     "value": "Bold:30/0/22/1/0/13",
+     "share": 0.0647
+    },
+    {
+     "value": "Bold:32/0/32/2/0/0",
+     "share": 0.06365
+    },
+    {
+     "value": "Timid:2/0/0/32/0/32",
+     "share": 0.06135
+    },
+    {
+     "value": "Modest:28/0/13/1/0/24",
+     "share": 0.04824
+    },
+    {
+     "value": "Modest:2/0/0/32/0/32",
+     "share": 0.03695
+    },
+    {
+     "value": "Modest:32/0/2/32/0/0",
+     "share": 0.02879
+    },
+    {
+     "value": "Modest:20/0/18/11/1/16",
+     "share": 0.02616
+    },
+    {
+     "value": "Modest:24/0/16/9/0/17",
+     "share": 0.02388
+    },
+    {
+     "value": "Modest:30/0/30/1/0/5",
+     "share": 0.02088
+    }
+   ],
+   "teammates": [
+    {
+     "value": "Garchomp",
+     "share": 0.75182
+    },
+    {
+     "value": "Kingambit",
+     "share": 0.53628
+    },
+    {
+     "value": "Whimsicott",
+     "share": 0.51512
+    },
+    {
+     "value": "Basculegion",
+     "share": 0.49148
+    },
+    {
+     "value": "Floette-Mega",
+     "share": 0.42228
+    },
+    {
+     "value": "Venusaur",
+     "share": 0.25459
+    },
+    {
+     "value": "Sylveon",
+     "share": 0.24121
+    },
+    {
+     "value": "Incineroar",
+     "share": 0.19491
+    },
+    {
+     "value": "Archaludon",
+     "share": 0.11932
+    },
+    {
+     "value": "Toxapex",
+     "share": 0.11179
+    },
+    {
+     "value": "Sneasler",
+     "share": 0.10537
+    },
+    {
+     "value": "Pelipper",
+     "share": 0.10419
+    },
+    {
+     "value": "Farigiraf",
+     "share": 0.10186
+    },
+    {
+     "value": "Grimmsnarl",
+     "share": 0.10042
+    },
+    {
+     "value": "Swampert-Mega",
+     "share": 0.09098
+    },
+    {
+     "value": "Aerodactyl-Mega",
+     "share": 0.08053
+    },
+    {
+     "value": "Sinistcha",
+     "share": 0.0378
+    },
+    {
+     "value": "Meowscarada",
+     "share": 0.02741
+    },
+    {
+     "value": "Aerodactyl",
+     "share": 0.02465
+    },
+    {
+     "value": "Blastoise-Mega",
+     "share": 0.02438
+    },
+    {
+     "value": "Venusaur-Mega",
+     "share": 0.02382
+    },
+    {
+     "value": "Staraptor-Mega",
+     "share": 0.02107
+    },
+    {
+     "value": "Tyranitar",
+     "share": 0.02051
+    },
+    {
+     "value": "Gholdengo",
+     "share": 0.01963
+    }
+   ]
+  },
+  {
+   "name": "Floette-Mega",
+   "key": "floette",
+   "megaStone": "Floettite",
+   "usage": 0.27890149999999997,
+   "trend": 0.10742049999999997,
+   "usageByRating": [
+    {
+     "rating": 0,
+     "usage": 0.1369875
+    },
+    {
+     "rating": 1500,
+     "usage": 0.18070799999999998
+    },
+    {
+     "rating": 1630,
+     "usage": 0.1870475
+    },
+    {
+     "rating": 1760,
+     "usage": 0.27890149999999997
+    }
+   ],
+   "leadShare": 0.0431241,
+   "abilities": [
+    {
+     "value": "Fairy Aura",
+     "share": 1.0
+    }
+   ],
+   "items": [
+    {
+     "value": "Floettite",
+     "share": 1.0
+    }
+   ],
+   "moves": [
+    {
+     "value": "Protect",
+     "share": 0.99903
+    },
+    {
+     "value": "Dazzling Gleam",
+     "share": 0.98941
+    },
+    {
+     "value": "Moonblast",
+     "share": 0.91659
+    },
+    {
+     "value": "Light of Ruin",
+     "share": 0.80208
+    },
+    {
+     "value": "Calm Mind",
+     "share": 0.16422
+    },
+    {
+     "value": "Draining Kiss",
+     "share": 0.0878
+    },
+    {
+     "value": "Psychic",
+     "share": 0.02586
+    },
+    {
+     "value": "Substitute",
+     "share": 0.00838
+    }
+   ],
+   "natures": [
+    {
+     "value": "Modest",
+     "share": 0.56166
+    },
+    {
+     "value": "Timid",
+     "share": 0.27048
+    },
+    {
+     "value": "Bold",
+     "share": 0.15819
+    }
+   ],
+   "spreads": [
+    {
+     "value": "Modest:29/0/4/28/0/5",
+     "share": 0.16904
+    },
+    {
+     "value": "Bold:26/0/31/0/0/9",
+     "share": 0.14955
+    },
+    {
+     "value": "Timid:2/0/0/32/0/32",
+     "share": 0.13261
+    },
+    {
+     "value": "Timid:4/0/8/32/0/22",
+     "share": 0.0622
+    },
+    {
+     "value": "Modest:2/0/0/32/0/32",
+     "share": 0.06114
+    },
+    {
+     "value": "Modest:14/0/14/19/0/19",
+     "share": 0.06027
+    },
+    {
+     "value": "Modest:22/0/7/5/0/32",
+     "share": 0.02248
+    },
+    {
+     "value": "Modest:14/0/22/5/0/25",
+     "share": 0.0218
+    },
+    {
+     "value": "Modest:26/0/13/5/0/22",
+     "share": 0.017
+    },
+    {
+     "value": "Modest:9/0/0/25/0/32",
+     "share": 0.01531
+    }
+   ],
+   "teammates": [
+    {
+     "value": "Kingambit",
+     "share": 0.78706
+    },
+    {
+     "value": "Basculegion",
+     "share": 0.77395
+    },
+    {
+     "value": "Whimsicott",
+     "share": 0.67515
+    },
+    {
+     "value": "Garchomp",
+     "share": 0.57072
+    },
+    {
+     "value": "Charizard-Mega-Y",
+     "share": 0.46229
+    },
+    {
+     "value": "Sneasler",
+     "share": 0.22768
+    },
+    {
+     "value": "Dragonite",
+     "share": 0.17872
+    },
+    {
+     "value": "Arcanine-Hisui",
+     "share": 0.17347
+    },
+    {
+     "value": "Incineroar",
+     "share": 0.16393
+    },
+    {
+     "value": "Sinistcha",
+     "share": 0.12035
+    },
+    {
+     "value": "Dragonite-Mega",
+     "share": 0.11548
+    },
+    {
+     "value": "Farigiraf",
+     "share": 0.06254
+    },
+    {
+     "value": "Delphox-Mega",
+     "share": 0.04583
+    },
+    {
+     "value": "Venusaur",
+     "share": 0.0309
+    },
+    {
+     "value": "Torkoal",
+     "share": 0.02401
+    },
+    {
+     "value": "Aerodactyl-Mega",
+     "share": 0.02348
+    },
+    {
+     "value": "Garchomp-Mega",
+     "share": 0.01886
+    },
+    {
+     "value": "Metagross-Mega",
+     "share": 0.01724
+    },
+    {
+     "value": "Kangaskhan-Mega",
+     "share": 0.01457
+    },
+    {
+     "value": "Pyroar-Mega",
+     "share": 0.0136
+    },
+    {
+     "value": "Ninetales",
+     "share": 0.01281
+    },
+    {
+     "value": "Milotic",
+     "share": 0.01248
+    },
+    {
+     "value": "Lycanroc-Dusk",
+     "share": 0.01199
+    },
+    {
+     "value": "Gholdengo",
+     "share": 0.01195
+    }
+   ]
+  }
+ ]
+}
