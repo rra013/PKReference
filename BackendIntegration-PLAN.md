@@ -8,7 +8,9 @@ This file is the roadmap: the goals, the design, the metrics' definitions,
 the owner's decisions and the phases. How to run the backend is in
 [`backend/README.md`](backend/README.md), the project's state in
 [`HANDOFF.md`](HANDOFF.md), and the app's features in [`README.md`](README.md).
-Phase 4 has its own file, [`BackendIntegration-PHASE4.md`](BackendIntegration-PHASE4.md).
+Phases 4 and 5 have their own files,
+[`BackendIntegration-PHASE4.md`](BackendIntegration-PHASE4.md) and
+[`BackendIntegration-PHASE5.md`](BackendIntegration-PHASE5.md).
 
 **Branch:** `backend-integration`, made from `main` at 4b2587e. Each phase is
 one or two PRs into it. It merges into `main` at milestones, with the app's
@@ -87,7 +89,7 @@ Checked on 2026-10-06 unless marked otherwise.
 | **Limitless pairings** (`/tournaments/{id}/pairings`) | Every match: round, phase, table, players, winner | No key | Used: win rates, archetype matchups |
 | **Limitless details** (`/details`) | Phases (Swiss, top cut) | No key | Used: who made top cut |
 | **Limitless webhook** (`tournament:ended`) | A POST when an event ends | Needs an approved access key, which also raises rate limits | Later (§9): replaces polling |
-| **Smogon stats** (monthly) | Ladder usage, items, abilities, moves, **spreads**, teammates, **checks and counters**, at ratings 0/1500/1630/1760, Bo1 and Bo3; leads files | Public files | Phase 5: move the app's download to the server. M-C is there from 2026-09 |
+| **Smogon stats** (monthly) | Ladder usage, items, abilities, moves, **spreads** (real stat points), teammates, at ratings 0/1500/1630/1760, Bo1 and Bo3; leads files. Its checks and counters are nearly empty for Champions (checked 2026-10-12) | Public files | Phase 5: move the app's download to the server. M-C is there from 2026-09, doubles and BSS |
 | **Showdown replays** (`replay.pokemonshowdown.com/search.json?format=…`, 51 per page, with ratings; each replay's `.json` has its log) | Team preview (all 6), which 4 were brought, leads, who won, at each rating | Public; be gentle | Phase 5, once Showdown's staff have been asked (§9) |
 | **Showdown replays by player** (`search.json?user=…`) | One player's games | Public | **On the device**, for "My games" (§5.4). Nothing goes to our server |
 | **RK9** (official Regionals, Internationals, Worlds) | Official pairings, standings and team lists: the highest-stakes data | No public API | Ask for permission (later). Until then, Limitless covers grassroots and online events |
@@ -121,7 +123,7 @@ Still to come:
 ```
 Limitless webhook ─→ tournaments.ended (replaces the poll; §9)
 Smogon monthly job ─→ ladder.stats (key format|month|rating)            Phase 5
-Showdown sampler ───→ replays.fetched → replays.normalized               Phase 5
+Showdown sampler ───→ replays.fetched → replays.normalized               once Showdown's staff have been asked (§9)
 ```
 
 - **Normalize once, the app's way.** The backend reads the app's own data
@@ -174,6 +176,9 @@ what `MetaService` computes.
 - **Sample size:** every number comes with how many teams, events or
   matches it's from.
 
+The ladder's metrics (ladder usage, rating band, lead share, its trend and
+spreads) are defined in the Phase 5 file, §6.4.
+
 ### 4.3 The API
 
 Version 1 is read-only, the same for every user, and cached: every response
@@ -193,7 +198,7 @@ has examples.
 | `GET /v1/formats/{f}/events` | Recent events, with their winners and top cut | Built (4b) |
 | `GET /v1/formats/{f}/archetypes/{id}` | One archetype's example teams | Built (4b) |
 | `GET /v1/formats/{f}/pokemon/{key}` matchups | The archetypes it does best and worst against | Later |
-| `GET /v1/ladder/{f}?rating=&month=` | Smogon's stats, already reduced; leads, and brings once replays are in | Phase 5 |
+| `GET /v1/ladder`, `GET /v1/ladder/{format}?rating=&month=` | What ladder stats are stored; one month of Smogon's stats at a rating, already reduced, with leads, the month's trend and usage at each rating. Brings once replays are in | Phase 5 |
 | `GET /v1/events/upcoming` | The event calendar | Phase 6 |
 
 `/api/usage`, the first backend's all-time counts, is still served. Nothing
@@ -253,14 +258,16 @@ it (Phase 7 at the latest).
 
 It **replaces the Tournaments tab** (decided 2026-10-06) and becomes the home
 for tournament and ladder data. The Tournaments list moves into it as Events.
-It covers doubles and singles (decided 2026-10-06); singles waits for Phase 5.
+It covers doubles and singles (decided 2026-10-06); singles waits for Phase 5,
+which also makes the switch below three-way: Tournaments, Doubles Ladder and
+Singles Ladder (decided 2026-10-12).
 Team Search keeps its own tab (decided 2026-09-24), with links both ways.
 
 ```
 ┌ Meta ─────────────────────────────┐
 │ M-C (Settings) · 212 events ·     │
 │ 9,410 teams · 12m ago             │
-│ [ Tournaments | Ladder 1760+ ]    │
+│ [Tournaments|Doubles Ladder|Sing…]│
 │                                   │
 │ What's winning                    │
 │  Incineroar   48%  ▲6  top cut 55%│
@@ -304,7 +311,8 @@ date. Then:
 **Climb the ladder.** Pick a rating band. Then:
 1. What's common at that band, and what changes at the next one up
    (Smogon's 0/1500/1630/1760 cutoffs).
-2. What people bring and lead with (replays, Phase 5).
+2. What people lead with (Smogon's leads files, Phase 5) and bring
+   (replays, later).
 3. The threats to the team at that band.
 4. **My games** (optional): enter a Showdown username. The app fetches that
    player's public replays **itself** and shows their record against each
@@ -315,12 +323,14 @@ date. Then:
 
 Each phase is one PR into `backend-integration`, or several where it's large.
 
-5. **Ladder and singles.**
+5. **Ladder and singles.** Planned in detail in
+   [`BackendIntegration-PHASE5.md`](BackendIntegration-PHASE5.md).
    - Smogon's monthly download moves to the server (`ladder.stats`), with a
      rating band picker covering Bo1 and Bo3, for doubles and BSS. This is
-     what brings singles to the Meta tab, and its Doubles/Singles switch.
+     what brings singles to the Meta tab, and its Tournaments, Doubles
+     Ladder and Singles Ladder switch. Leads come from Smogon's leads files.
    - Once Showdown's staff have been asked (later; see §9), the replay
-     sampler: leads, brings and win rates by band.
+     sampler: brings and win rates by band. Not part of the Phase 5 file.
 6. **The planning flows.**
    - Prepare for an event and Climb the ladder.
    - Teams' "Check against the meta" and Damage Calc's "Common sets".
@@ -403,3 +413,11 @@ Each phase is one PR into `backend-integration`, or several where it's large.
    30 days.
 9. **Remote access:** only the owner, from their phone, through Tailscale
    with an API key; nothing on the public internet.
+
+Decided 2026-10-12, for Phase 5:
+
+10. **The Meta tab's switch:** one control with three choices, Tournaments,
+    Doubles Ladder and Singles Ladder.
+11. **Megas on the ladder** have their own rows, as Smogon counts them.
+12. **The ladder without the server:** the app downloads Smogon's file
+    itself and works out the same numbers.
