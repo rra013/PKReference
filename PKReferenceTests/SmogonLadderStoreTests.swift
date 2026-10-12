@@ -214,6 +214,35 @@ struct SmogonLadderStoreTests {
         #expect(await again.cached(Self.teamSearchMB) == first)
     }
 
+    @Test("When the month chosen isn't downloaded yet, the newest month on the device is what's cached")
+    func newestDownloaded() async throws {
+        let dir = Self.tempDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let clock = TestClock(TeamSearchFixtures.now)
+        let august = try await Self.store(FakeSmogon(["2026-08": [Self.mb]]), clock: clock, directory: dir)
+            .stats(Self.teamSearchMB)
+
+        // September comes out; the listing is read again after 12 hours, and nothing is downloaded.
+        clock.advance(hours: 13)
+        let later = FakeSmogon(["2026-08": [Self.mb, "gen9championsbssregmb-1760.json"], "2026-09": [Self.mb]])
+        let store = Self.store(later, clock: clock, directory: dir)
+        let offer = try #require(try await store.offer(Self.teamSearchMB))
+        #expect(offer.month == "2026-09")
+        #expect(await store.isDownloaded(offer) == false)
+        #expect(await store.cached(Self.teamSearchMB) == august)
+        #expect(await later.chaosRequested.isEmpty)
+        // Only the same ladder's: nothing for singles, another rating, or a later regulation's request.
+        #expect(await store.cached(LadderRequest(regulation: .mB, mode: .singles)) == nil)
+        #expect(await store.cached(LadderRequest(regulation: .mB, rating: 1500)) == nil)
+        #expect(await store.cached(.teamSearch(.mC)) == nil)
+        #expect(await store.cached(.teamSearch(.mC), fallBack: true) == august, "Team Search takes an earlier regulation's")
+        #expect(await store.cached(.teamSearch(.mA), fallBack: true) == nil)
+
+        let september = try await store.stats(Self.teamSearchMB)
+        #expect(september?.month == "2026-09")
+        #expect(await store.cached(Self.teamSearchMB) == september)
+    }
+
     @Test("Offline, the last choice is used; with none cached it throws")
     func offline() async throws {
         let dir = Self.tempDirectory()

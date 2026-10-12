@@ -55,6 +55,12 @@ enum AppSettings {
                                               defaultValue: MetaServerSettings.defaultAddress)
     /// The Meta tab's window: the last 14 days, 30 days, or the regulation.
     static let metaWindow = SettingKey(name: "metaWindow", defaultValue: MetaAPI.Window.days30)
+    /// What the Meta tab shows: tournament teams, or the doubles or singles ladder.
+    static let metaView = SettingKey(name: "metaView", defaultValue: MetaView.tournaments)
+    /// The ladder's rating band, one of Smogon's cutoffs: 0 is every player.
+    static let metaLadderRating = SettingKey(name: "metaLadderRating", defaultValue: 1760)
+    /// The doubles ladder's best of 1 or 3.
+    static let metaLadderBestOf = SettingKey(name: "metaLadderBestOf", defaultValue: 1)
 }
 
 extension AppStorage {
@@ -63,6 +69,10 @@ extension AppStorage {
     }
 
     init(_ key: SettingKey<Value>, store: UserDefaults? = nil) where Value == Bool {
+        self.init(wrappedValue: key.defaultValue, key.name, store: store)
+    }
+
+    init(_ key: SettingKey<Value>, store: UserDefaults? = nil) where Value == Int {
         self.init(wrappedValue: key.defaultValue, key.name, store: store)
     }
 

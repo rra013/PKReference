@@ -76,9 +76,12 @@ actor SmogonLadderStore {
     /// The record for `request`, without touching the network: the last
     /// month chosen for it, if its stats are on the device. With
     /// `fallBack`, an earlier regulation's when that was the choice.
+    ///
+    /// When the month chosen isn't on the device (a newer one came out and
+    /// hasn't been downloaded), it's the newest month that is.
     func cached(_ request: LadderRequest, fallBack: Bool = false) -> MetaAPI.LadderStats? {
-        guard let offer = readChoice(request, fallBack)?.offer else { return nil }
-        return readStats(offer)
+        if let offer = readChoice(request, fallBack)?.offer, let stats = readStats(offer) { return stats }
+        return newestDownloaded(request, fallBack: fallBack)
     }
 
     /// The month and file `request`'s stats are in: the regulation's own
@@ -190,6 +193,30 @@ actor SmogonLadderStore {
         let (vocabulary, names) = lookups(format.regulation)
         return try SmogonLadder.reduce(chaos: chaos, leads: leads, format: format, month: month, rating: rating,
                                        vocabulary: vocabulary, names: names)
+    }
+
+    /// The newest record on the device for `request`, whatever the last
+    /// choice was: the regulation's own, or with `fallBack` an earlier one's.
+    private func newestDownloaded(_ request: LadderRequest, fallBack: Bool) -> MetaAPI.LadderStats? {
+        let prefix = "r\(SmogonLadder.reduction)-"
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.appending(path: "stats").path())) ?? []
+        let requestedStart = request.regulation.validFrom ?? .distantFuture
+        var best: (offer: Offer, own: Bool, start: Date)?
+        for name in names where name.hasPrefix(prefix) {
+            // "r1-2026-09-gen9championsvgc2026regmc-1760.json"
+            let rest = name.dropFirst(prefix.count)
+            guard rest.count > 8, let hit = SmogonLadderFormat.file(String(rest.dropFirst(8))),
+                  hit.rating == request.rating, hit.format.matches(request) else { continue }
+            let month = String(rest.prefix(7))
+            let own = hit.format.regulation == request.regulation
+            let start = hit.format.regulation.validFrom ?? .distantPast
+            guard own || (fallBack && start <= requestedStart) else { continue }
+            // The regulation's own before another's, then the newest month, then the newest regulation.
+            if let current = best,
+               (current.own ? 1 : 0, current.offer.month, current.start) >= (own ? 1 : 0, month, start) { continue }
+            best = (Offer(month: month, file: String(rest.dropFirst(8)), bytes: nil), own, start)
+        }
+        return best.flatMap { readStats($0.offer) }
     }
 
     // MARK: Disk

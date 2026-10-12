@@ -80,18 +80,39 @@ nonisolated enum MetaDefinition: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    var info: MetaInfo { MetaInfo(title: title, text: text, note: deviceNote) }
+
     /// The top-cut and win-rate definitions for a source: the device's stand
     /// in for them.
     static func topCut(_ source: MetaModel.Source) -> MetaDefinition { source == .server ? .topCut : .topEight }
     static func record(_ source: MetaModel.Source) -> MetaDefinition { source == .server ? .winRate : .teamRecord }
 }
 
+/// A definition as its sheet shows it: the tournament numbers'
+/// (MetaDefinition) or the ladder's (LadderDefinition).
+nonisolated struct MetaInfo: Equatable, Sendable {
+    let title: String
+    let text: String
+    /// Said under the definition, in small print.
+    var note: String?
+}
+
 /// An ⓘ that opens a definition; with `titled`, the definition's name
 /// beside it, where several sit together.
 struct MetaInfoButton: View {
-    let definition: MetaDefinition
+    let definition: MetaInfo
     var titled = false
     @State private var showing = false
+
+    init(definition: MetaDefinition, titled: Bool = false) {
+        self.definition = definition.info
+        self.titled = titled
+    }
+
+    init(info: MetaInfo, titled: Bool = false) {
+        definition = info
+        self.titled = titled
+    }
 
     var body: some View {
         Button {
@@ -113,15 +134,23 @@ struct MetaInfoButton: View {
 }
 
 struct MetaInfoSheet: View {
-    let definition: MetaDefinition
+    let definition: MetaInfo
     @Environment(\.dismiss) private var dismiss
+
+    init(definition: MetaDefinition) {
+        self.definition = definition.info
+    }
+
+    init(definition: MetaInfo) {
+        self.definition = definition
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(definition.text)
-                    if let note = definition.deviceNote {
+                    if let note = definition.note {
                         Text(note)
                             .font(.footnote)
                             .foregroundStyle(.secondary)

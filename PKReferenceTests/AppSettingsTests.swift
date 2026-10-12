@@ -26,7 +26,8 @@ struct AppSettingsTests {
          AppSettings.championsRegulation.name, AppSettings.instantSetDelete.name,
          AppSettings.warnBeforeLeavingTab.name, AppSettings.matchupColors.name,
          AppSettings.metaServerEnabled.name, AppSettings.metaServerAddress.name,
-         AppSettings.metaWindow.name]
+         AppSettings.metaWindow.name, AppSettings.metaView.name,
+         AppSettings.metaLadderRating.name, AppSettings.metaLadderBestOf.name]
     }
 
     @Test("Key names match what earlier versions stored")
@@ -39,7 +40,7 @@ struct AppSettingsTests {
                           "championsRegulationRaw", "instantSetDelete",
                           "warnBeforeLeavingTab", "matchupColors",
                           "metaServerEnabled", "metaServerAddress",
-                          "metaWindow"])
+                          "metaWindow", "metaView", "metaLadderRating", "metaLadderBestOf"])
     }
 
     @Test("No two settings share a key")
@@ -62,6 +63,10 @@ struct AppSettingsTests {
         #expect(AppSettings.metaServerEnabled.defaultValue == false)
         #expect(AppSettings.metaServerAddress.defaultValue == "http://localhost:8080")
         #expect(AppSettings.metaWindow.defaultValue == .days30)
+        // Nothing changes until the switch is touched; then the plan's defaults.
+        #expect(AppSettings.metaView.defaultValue == .tournaments)
+        #expect(AppSettings.metaLadderRating.defaultValue == 1760)
+        #expect(AppSettings.metaLadderBestOf.defaultValue == 1)
     }
 
     /// A throwaway defaults suite, removed when `body` returns.
