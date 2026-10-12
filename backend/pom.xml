@@ -21,6 +21,7 @@
     <!-- 1.20, Spring Boot 3.4's, asks Docker for an API version Docker 29 no longer serves. -->
     <testcontainers.version>1.21.4</testcontainers.version>
     <springdoc.version>2.8.6</springdoc.version>
+    <nimbus-jose-jwt.version>10.10</nimbus-jose-jwt.version>
   </properties>
 
   <dependencies>
@@ -44,6 +45,12 @@
       <groupId>org.springdoc</groupId>
       <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
       <version>${springdoc.version}</version>
+    </dependency>
+    <!-- Signs and verifies the API's access tokens (JWTs): the library Spring Security uses. -->
+    <dependency>
+      <groupId>com.nimbusds</groupId>
+      <artifactId>nimbus-jose-jwt</artifactId>
+      <version>${nimbus-jose-jwt.version}</version>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>

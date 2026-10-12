@@ -25,13 +25,15 @@ nonisolated enum MetaServerSettings {
     static let defaultAddress = "http://localhost:8080"
 
     /// The API key, from the Keychain, or nil when none is saved. Only a
-    /// server with keys configured needs one.
+    /// server with keys configured needs one. It's traded for an access
+    /// token (MetaServerTokens), which is what requests carry.
     static func apiKey() -> String? {
         MetaServerKeychain.read()
     }
 
-    /// Whether the key may go to `url`: over HTTPS, or to this machine. Over
-    /// plain HTTP anywhere else, anyone on the way could read it.
+    /// Whether the key, or a token it was traded for, may go to `url`: over
+    /// HTTPS, or to this machine. Over plain HTTP anywhere else, anyone on
+    /// the way could read it.
     static func canSendKey(to url: URL) -> Bool {
         if url.scheme?.lowercased() == "https" { return true }
         let host = url.host()?.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
@@ -85,8 +87,11 @@ nonisolated enum MetaServerError: LocalizedError, Equatable {
 nonisolated struct MetaServerClient: Sendable {
     let baseURL: URL
     var session: URLSession = MetaServerClient.session
-    /// Sent as `Authorization: Bearer`, only where `canSendKey(to:)` allows.
+    /// Traded for an access token, which requests carry as `Authorization:
+    /// Bearer`; both only where `canSendKey(to:)` allows. nil: nothing is
+    /// sent, as an open server needs.
     var apiKey: String? = MetaServerSettings.apiKey()
+    var tokens: MetaServerTokens = .shared
 
     /// No URL cache. The server says its answers may be reused for 15
     /// minutes, and URLSession's cache did, so Settings' connection test and
@@ -119,14 +124,28 @@ nonisolated struct MetaServerClient: Sendable {
     }
 
     /// GETs `url`, sending `etag` as If-None-Match, so an unchanged answer
-    /// comes back as `.notModified` with no body.
+    /// comes back as `.notModified` with no body. With an API key, the
+    /// request carries an access token; if the server refuses it (it ran out
+    /// early, or the server restarted), the key is traded once more and the
+    /// request sent once more.
     func fetch(_ url: URL, etag: String?) async throws -> Fetched {
         var request = URLRequest(url: url)
         if let etag { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
-        if let apiKey {
-            guard MetaServerSettings.canSendKey(to: url) else { throw MetaServerError.insecureKey }
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        guard let apiKey else { return try await send(request, etag: etag) }
+        guard MetaServerSettings.canSendKey(to: url) else { throw MetaServerError.insecureKey }
+        let token = try await tokens.token(server: baseURL, apiKey: apiKey, session: session)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        do {
+            return try await send(request, etag: etag)
+        } catch MetaServerError.http(status: 401) {
+            await tokens.forget(server: baseURL, apiKey: apiKey)
+            let fresh = try await tokens.token(server: baseURL, apiKey: apiKey, session: session)
+            request.setValue("Bearer \(fresh)", forHTTPHeaderField: "Authorization")
+            return try await send(request, etag: etag)
         }
+    }
+
+    private func send(_ request: URLRequest, etag: String?) async throws -> Fetched {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw MetaServerError.notHTTP }
         if http.statusCode == 304, etag != nil { return .notModified }
