@@ -78,11 +78,11 @@ def architecture():
     s.box(20, 392, 170, 62, "source", "Smogon stats", ["monthly chaos + leads files", "one request every 2 s"])
 
     # Ingest
-    s.box(240, 56, 250, 72, "ingest", "EventDiscovery", ["@Scheduled: every 30 minutes", "FetchPolicy decides what to ask for"])
-    s.box(240, 142, 250, 58, "ingest", "LimitlessClient", ["RequestThrottle keeps to 40 / 5 min"])
-    s.box(240, 214, 250, 72, "ingest", "EventFetcher", ["@KafkaListener  (group standings-fetcher)", "3 requests an event, then publishes"])
-    s.box(240, 370, 250, 58, "ingest", "LadderDiscovery", ["@Scheduled: every 12 hours"])
-    s.box(240, 442, 250, 58, "ingest", "SmogonClient → LadderReducer", ["streams a 7 MB file down to about 1 MB"])
+    s.box(240, 56, 250, 64, "ingest", "EventDiscovery", ["@Scheduled: every 30 minutes", "FetchPolicy decides what to ask for"])
+    s.box(240, 146, 250, 50, "ingest", "LimitlessClient", ["RequestThrottle keeps to 40 / 5 min"])
+    s.box(240, 222, 250, 64, "ingest", "EventFetcher", ["@KafkaListener  (group standings-fetcher)", "3 requests an event, then publishes"])
+    s.box(240, 366, 250, 52, "ingest", "LadderDiscovery", ["@Scheduled: every 12 hours"])
+    s.box(240, 446, 250, 54, "ingest", "SmogonClient → LadderReducer", ["streams a 7 MB file down to about 1 MB"])
 
     # Kafka
     s.frame(545, 44, 235, 480, "kafka", "Kafka: one broker (KRaft)")
@@ -125,6 +125,11 @@ def architecture():
     s.box(285, 636, 205, 104, "security", "ApiAuthFilter", ["runs first, on every path", "API key at the token path,", "access token everywhere else", "otherwise 401 with a reason"])
     s.box(285, 766, 205, 62, "read", "ETag filter", ["ShallowEtagHeaderFilter on /v1/*", "304 when the client's copy is current"], title_size=12)
     s.box(20, 676, 200, 92, "app", "PK Reference app", ["iPhone · iPad · Mac", "reads /v1 through its own cache;", "trades its API key for tokens"])
+
+    # Calls: the classes that publish are the ones that call the clients; the clients never touch Kafka.
+    s.arrow([(330, 120), (330, 146)], "calls", both=True, label_at=(338, 137), anchor="start")
+    s.arrow([(330, 222), (330, 196)], "calls", both=True, label_at=(338, 213), anchor="start")
+    s.arrow([(330, 418), (330, 446)], "calls", both=True, label_at=(338, 436), anchor="start")
 
     # Arrows: write path
     s.arrow([(190, 158), (240, 170)], "JSON", label_at=(214, 152))
@@ -170,7 +175,7 @@ def architecture():
         y = ly + 12 + (i // 2) * 22
         s.parts.append(f'<rect x="{x}" y="{y}" width="16" height="13" rx="3" fill="{fill}" stroke="{stroke}"/>')
         s.text(x + 23, y + 11, label, 11, "400", "#343a40")
-    s.text(lx, ly + 90, "Solid arrows show where data goes. Each box is a class in backend/src/main/java/com/pkreference/backend/.", 10, "400", "#868e96")
+    s.text(lx, ly + 90, "Arrows show where data goes; a two-headed arrow is a call and its answer. Each box is a class in backend/src/main/java/com/pkreference/backend/.", 10, "400", "#868e96")
     return s.render()
 
 
