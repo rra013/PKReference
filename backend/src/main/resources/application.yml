@@ -11,6 +11,11 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+  task:
+    scheduling:
+      # Two pollers, Limitless's and Smogon's: one waiting on its requests doesn't hold up the other.
+      pool:
+        size: 2
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     admin:
@@ -63,6 +68,18 @@ pkref:
     # which shares the address when it runs on the same machine.
     requests-per-window: 40
     window: 5m
+  # Smogon's monthly ladder stats (README, "The ladder").
+  smogon:
+    ingest-enabled: ${SMOGON_INGEST_ENABLED:true}
+    # A month's stats appear on the 1st of the next, and don't change.
+    poll-interval: 12h
+    # How many of the newest months each poll looks at. Set it higher once to backfill: a month
+    # is about 24 files and 50 MB, each fetched once.
+    lookback-months: ${SMOGON_LOOKBACK_MONTHS:2}
+    # Smogon's rating cutoffs: 0 is every player.
+    ratings: 0,1500,1630,1760
+    # Smogon's files are a courtesy, not an API: one request at a time, this far apart.
+    request-gap: 2s
   # Signing in (README, "Signing in to the API").
   api:
     # API keys, as SHA-256 hashes (backend/scripts/new-api-key.sh), comma-separated. None, and every

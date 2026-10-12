@@ -12,6 +12,7 @@ public class Topics {
     public static final String STANDINGS_FETCHED = "standings.fetched";
     public static final String PAIRINGS_FETCHED = "pairings.fetched";
     public static final String POKEMON_USAGE = "pokemon.usage";
+    public static final String LADDER_STATS = "ladder.stats";
 
     private static final int PARTITIONS = 3;
 
@@ -66,6 +67,27 @@ public class Topics {
     @Bean
     NewTopic standingsFetchedDlt() {
         return TopicBuilder.name(STANDINGS_FETCHED + ".DLT").partitions(PARTITIONS).replicas(1)
+                .config(TopicConfig.MAX_MESSAGE_BYTES_CONFIG, MAX_MESSAGE_BYTES)
+                .build();
+    }
+
+    /**
+     * Smogon's monthly ladder stats, reduced (Ladder.Stats, about 1 MB at most), kept for good: the
+     * latest per format, month and rating. Smogon's own files, up to 7 MB, aren't kept; Smogon
+     * keeps every month.
+     */
+    @Bean
+    NewTopic ladderStats() {
+        return TopicBuilder.name(LADDER_STATS).partitions(PARTITIONS).replicas(1)
+                .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_COMPACT)
+                .config(TopicConfig.RETENTION_MS_CONFIG, "-1")
+                .config(TopicConfig.MAX_MESSAGE_BYTES_CONFIG, MAX_MESSAGE_BYTES)
+                .build();
+    }
+
+    @Bean
+    NewTopic ladderStatsDlt() {
+        return TopicBuilder.name(LADDER_STATS + ".DLT").partitions(PARTITIONS).replicas(1)
                 .config(TopicConfig.MAX_MESSAGE_BYTES_CONFIG, MAX_MESSAGE_BYTES)
                 .build();
     }

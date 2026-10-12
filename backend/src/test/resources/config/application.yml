@@ -1,0 +1,5 @@
+# For every test that starts the application: never poll Smogon. Tests read the fixture under
+# smogon/ instead. (Spring reads this beside the main application.yml; it doesn't replace it.)
+pkref:
+  smogon:
+    ingest-enabled: false
