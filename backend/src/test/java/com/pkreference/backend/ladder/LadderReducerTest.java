@@ -98,7 +98,7 @@ class LadderReducerTest {
                  | 3    | Broken             |  lots     | 4      |  0.000% |
                 """);
         assertThat(shares).containsOnlyKeys("Sneasler", "Mr. Rime");
-        assertThat(shares.get("Sneasler")).isEqualTo(6.59479 / 100);
+        assertThat(shares.get("Sneasler")).isEqualTo(0.0659479);
         assertThat(LadderReducer.leadShares(null)).isEmpty();
     }
 
@@ -157,6 +157,9 @@ class LadderReducerTest {
         assertThat(p.items()).containsExactly(new Share("Life Orb", 0.66667), new Share("Leftovers", 0.33333));
         assertThat(LadderReducer.round(0.000005)).as("half to even").isEqualTo(0.0);
         assertThat(LadderReducer.round(0.000015)).isEqualTo(0.00002);
+        // As Smogon wrote Salamence's usage, and as Foundation's JSONSerialization reads it.
+        assertThat(LadderReducer.roundUsage(0.0032668000000000003)).isEqualTo(0.0032668);
+        assertThat(LadderReducer.roundUsage(0.0032668000000000016)).isEqualTo(0.0032668);
     }
 
     @Test

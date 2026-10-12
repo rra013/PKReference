@@ -31,7 +31,10 @@ import java.util.function.Function;
  * there, a new {@link #REDUCTION} and the golden file recorded again.
  *
  * <p>To get the same bits in Java and Swift: sums are taken in the order of the keys, as bytes;
- * equal counts are ordered by key, as bytes; shares are rounded half to even at five places.
+ * equal counts are ordered by key, as bytes; shares are rounded half to even at five places, and
+ * usage and lead shares at nine. Smogon writes some numbers to more digits than a double holds
+ * ("0.0032668000000000003"), and JSON parsers don't all read those to the same double (Foundation's
+ * JSONSerialization lands a few units in the last place away), so nothing goes out unrounded.
  */
 @Component
 public class LadderReducer {
@@ -105,7 +108,7 @@ public class LadderReducer {
     /** One Pokémon's entry, or null when it has no usage or no weight to take shares of. */
     private Pokemon pokemon(String name, JsonNode entry, LadderFormat format, SpeciesVocabulary vocabulary,
                             Double leadShare) {
-        double usage = entry.path("usage").asDouble(0);
+        double usage = roundUsage(entry.path("usage").asDouble(0));
         List<Count> abilities = counts(entry.path("Abilities"));
         // The Pokémon's own weight: what Smogon's moveset files divide by.
         double weight = sum(abilities);
@@ -211,7 +214,8 @@ public class LadderReducer {
             String percent = cells[3].trim();
             if (!percent.endsWith("%")) continue;
             try {
-                shares.put(cells[2].trim(), Double.parseDouble(percent.substring(0, percent.length() - 1)) / 100);
+                shares.put(cells[2].trim(),
+                        roundUsage(Double.parseDouble(percent.substring(0, percent.length() - 1)) / 100));
             } catch (NumberFormatException e) {
                 // A row that isn't a number is left out.
             }
@@ -222,5 +226,10 @@ public class LadderReducer {
     /** To five places, half to even: Swift's rounded(.toNearestOrEven). */
     static double round(double share) {
         return Math.rint(share * 100_000) / 100_000;
+    }
+
+    /** Usage and lead shares, which Smogon publishes to seven places: to nine, half to even. */
+    static double roundUsage(double usage) {
+        return Math.rint(usage * 1_000_000_000) / 1_000_000_000;
     }
 }

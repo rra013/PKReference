@@ -127,9 +127,12 @@ LadderStats (reduction 1)
   Pokémon with no usage or no weight are left out.
 - **Same bits on both sides.** Sums are taken in the order of the keys,
   sorted as UTF-8 bytes; equal counts are ordered by key the same way;
-  shares are rounded half to even at five places. So Java and Swift get
-  identical numbers and the golden file can compare exactly. `usage` and
-  `leadShare` are as Smogon publishes them.
+  shares are rounded half to even at five places, and `usage` and
+  `leadShare` at nine. So Java and Swift get identical numbers and the
+  golden file can compare exactly. Nothing goes out unrounded because JSON
+  parsers don't all read a long decimal to the same double: Smogon writes
+  one usage as `0.0032668000000000003`, and Foundation's JSONSerialization
+  reads that a few units in the last place away from where Java does.
 - **`reduction`** counts the rule's versions. When the rule changes, the
   server fetches the months it holds again; Smogon keeps every month.
 

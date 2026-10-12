@@ -35,7 +35,7 @@ class LadderGoldenFileTest {
                 LadderGoldenFileTest, which checks it; the app's SmogonLadder.reduce checks against it too, so \
                 both make the same record from Smogon's files. Shares are 0 to 1, of the Pokémon's own weight \
                 (the sum of its ability counts), rounded half to even at five places; usage and leadShare are \
-                as Smogon publishes them.""");
+                Smogon's, rounded the same way at nine places.""");
         golden.put("stats", LadderFixtures.stats());
 
         ObjectMapper json = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);

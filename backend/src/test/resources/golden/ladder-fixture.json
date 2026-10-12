@@ -1,5 +1,5 @@
 {
-  "about" : "Ladder stats reduced from the fixture under smogon/2026-09 (Smogon's real M-C doubles files at 1760, cut down to 27 Pokémon; LadderFixtures has the details). Recorded by the backend's LadderGoldenFileTest, which checks it; the app's SmogonLadder.reduce checks against it too, so both make the same record from Smogon's files. Shares are 0 to 1, of the Pokémon's own weight (the sum of its ability counts), rounded half to even at five places; usage and leadShare are as Smogon publishes them.",
+  "about" : "Ladder stats reduced from the fixture under smogon/2026-09 (Smogon's real M-C doubles files at 1760, cut down to 27 Pokémon; LadderFixtures has the details). Recorded by the backend's LadderGoldenFileTest, which checks it; the app's SmogonLadder.reduce checks against it too, so both make the same record from Smogon's files. Shares are 0 to 1, of the Pokémon's own weight (the sum of its ability counts), rounded half to even at five places; usage and leadShare are Smogon's, rounded the same way at nine places.",
   "stats" : {
     "reduction" : 1,
     "format" : "gen9championsvgc2026regmc",
@@ -403,7 +403,7 @@
       "name" : "Incineroar",
       "key" : "incineroar",
       "megaStone" : null,
-      "usage" : 0.31677859999999997,
+      "usage" : 0.3167786,
       "leadShare" : 0.0599099,
       "abilities" : [ {
         "value" : "Intimidate",
@@ -800,7 +800,7 @@
       "key" : "kingambit",
       "megaStone" : null,
       "usage" : 0.2526623,
-      "leadShare" : 0.038653400000000004,
+      "leadShare" : 0.0386534,
       "abilities" : [ {
         "value" : "Defiant",
         "share" : 0.994
@@ -962,7 +962,7 @@
       "key" : "basculegion",
       "megaStone" : null,
       "usage" : 0.2057357,
-      "leadShare" : 0.019164399999999998,
+      "leadShare" : 0.0191644,
       "abilities" : [ {
         "value" : "Adaptability",
         "share" : 0.92846
@@ -1145,7 +1145,7 @@
       "key" : "indeedee:female",
       "megaStone" : null,
       "usage" : 0.2026676,
-      "leadShare" : 0.045536700000000006,
+      "leadShare" : 0.0455367,
       "abilities" : [ {
         "value" : "Psychic Surge",
         "share" : 0.9882
@@ -1546,7 +1546,7 @@
       "name" : "Archaludon",
       "key" : "archaludon",
       "megaStone" : null,
-      "usage" : 0.17194310000000002,
+      "usage" : 0.1719431,
       "leadShare" : 0.0231996,
       "abilities" : [ {
         "value" : "Stamina",
@@ -2056,7 +2056,7 @@
       "name" : "Charizard-Mega-Y",
       "key" : "charizard",
       "megaStone" : "Charizardite Y",
-      "usage" : 0.12198460000000001,
+      "usage" : 0.1219846,
       "leadShare" : 0.0238634,
       "abilities" : [ {
         "value" : "Drought",
@@ -2377,7 +2377,7 @@
       "name" : "Garchomp",
       "key" : "garchomp",
       "megaStone" : null,
-      "usage" : 0.09487450000000001,
+      "usage" : 0.0948745,
       "leadShare" : 0.0128127,
       "abilities" : [ {
         "value" : "Rough Skin",
@@ -3119,7 +3119,7 @@
       "key" : "ninetales:alola",
       "megaStone" : null,
       "usage" : 0.0298887,
-      "leadShare" : 0.0036693999999999997,
+      "leadShare" : 0.0036694,
       "abilities" : [ {
         "value" : "Snow Warning",
         "share" : 0.98886
@@ -4150,7 +4150,7 @@
       "name" : "Salamence",
       "key" : "salamence",
       "megaStone" : null,
-      "usage" : 0.0032668000000000003,
+      "usage" : 0.0032668,
       "leadShare" : 4.575E-4,
       "abilities" : [ {
         "value" : "Intimidate",
@@ -4397,7 +4397,7 @@
       "key" : "lucario",
       "megaStone" : "Lucarionite",
       "usage" : 0.0013612,
-      "leadShare" : 2.5100000000000003E-4,
+      "leadShare" : 2.51E-4,
       "abilities" : [ {
         "value" : "Adaptability",
         "share" : 1.0
@@ -4606,8 +4606,8 @@
       "name" : "Tauros-Paldea-Aqua",
       "key" : "tauros:aqua-paldea",
       "megaStone" : null,
-      "usage" : 8.759999999999999E-4,
-      "leadShare" : 1.2550000000000001E-4,
+      "usage" : 8.76E-4,
+      "leadShare" : 1.255E-4,
       "abilities" : [ {
         "value" : "Intimidate",
         "share" : 0.93855
@@ -4825,7 +4825,7 @@
       "name" : "Floette-Eternal",
       "key" : "floette",
       "megaStone" : null,
-      "usage" : 6.818000000000001E-4,
+      "usage" : 6.818E-4,
       "leadShare" : 1.431E-4,
       "abilities" : [ {
         "value" : "Flower Veil",
