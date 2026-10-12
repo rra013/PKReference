@@ -91,6 +91,23 @@ public final class SpeciesVocabulary {
         return new Identity(SpeciesNames.toId(slug != null && !slug.isEmpty() ? slug : name == null ? "" : name), Set.of());
     }
 
+    /** A Smogon or Showdown entry: its species, and whether the entry is the Mega. */
+    public record ShowdownSpecies(Identity identity, boolean mega) {}
+
+    /**
+     * A Smogon or Showdown species name, as the app's TeamSearchVocabulary.term(showdownName:) reads
+     * it: "Charizard-Mega-Y" is Charizard's Mega, "Arcanine-Hisui" is arcanine:hisui, "Indeedee-F"
+     * is indeedee:female. Null for a species outside the regulation.
+     */
+    public ShowdownSpecies showdown(String name) {
+        // Showdown writes "Sirfetch'd"; the regulations' files, "Sirfetchd".
+        List<String> words = SpeciesNames.words(name.replace("'", "").replace("\u2019", ""));
+        int megaAt = words.indexOf("mega");
+        if (megaAt >= 0) words = words.subList(0, megaAt);
+        var identity = match(words, true);
+        return identity == null ? null : new ShowdownSpecies(identity, megaAt >= 0);
+    }
+
     /** The stone ID when the held item is one of the species' own Mega Stones, else null. */
     public String megaStone(String heldItem, String speciesId) {
         if (heldItem == null) return null;

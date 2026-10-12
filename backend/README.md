@@ -2,7 +2,8 @@
 
 Companion service for the PK Reference app. It pulls Limitless tournament data, streams it
 through Kafka, keeps every event's teams and matches in Postgres, and serves insights and Team
-Search's corpus at `/v1`. The app reads the corpus from it when Settings → PK Reference Server
+Search's corpus at `/v1`. It also fetches Smogon's monthly ladder stats and serves them reduced
+([the ladder](#the-ladder)). The app reads the corpus from it when Settings → PK Reference Server
 (Beta) is on ([below](#using-it-from-the-app)).
 [`BackendIntegration-PLAN.md`](../BackendIntegration-PLAN.md) is where it's going, and has the
 metrics' definitions (§4.2).
@@ -15,6 +16,9 @@ Limitless --poll--> EventDiscovery    --> tournaments.discovered
                     MetaController    --> GET /v1/formats/... (insights from the team store)
                     CorpusController  --> GET /v1/.../tournaments, standings (Team Search's corpus)
                     UsageController   --> GET /api/usage?format=... (the first version's all-time counts)
+Smogon --poll-->    LadderDiscovery   --> ladder.stats (each monthly file, reduced)
+                    LadderStoreConsumer --> Postgres: ladder_stats
+                    LadderController  --> GET /v1/ladder, /v1/ladder/{format}
 ```
 
 ## Run
@@ -85,6 +89,41 @@ Definitions are in [the plan](../BackendIntegration-PLAN.md) (§4.2).
 
 The older `GET /api/usage?format=…` and `/api/usage/{species}` still serve the first version's all-time
 counts. Nothing calls them; the plan drops them by Phase 7.
+
+### The ladder
+Pokémon Showdown's ladder, from [Smogon's monthly usage stats](https://www.smogon.com/stats/), for
+Champions doubles (best of 1 and best of 3) and singles (Battle Stadium Singles), at each of Smogon's
+rating cutoffs: 0 (every player), 1500, 1630 and 1760.
+[`BackendIntegration-PHASE5.md`](../BackendIntegration-PHASE5.md) has the design.
+```sh
+curl 'localhost:8080/v1/ladder'                                              # what's stored
+curl 'localhost:8080/v1/ladder/gen9championsvgc2026regmc?rating=1760'        # the newest month
+curl 'localhost:8080/v1/ladder/gen9championsbssregmc?rating=1500&month=2026-09'
+```
+- `/v1/ladder` lists each stored format, month and rating, with its regulation ("M-C"), `mode` (doubles
+  or singles), `bestOf` and how many battles it's from. The format ids are Smogon's; the doubles one has
+  the year in it, so take them from this list rather than building them.
+- `/v1/ladder/{format}` is one month at one rating (1760 and the newest month unless asked): every
+  Pokémon used, most used first, with its `usage` (share of teams with it on the team of six, weighted
+  for the rating as Smogon does), `leadShare` (its share of all leads), and its abilities, items, moves,
+  natures, `spreads` (nature and stat points, "Adamant:2/32/0/0/0/32") and teammates, each as a share
+  of the Pokémon's own teams. `trend` is its usage less the month before's, and `usageByRating` its
+  usage at each stored rating; both come from the other stored files.
+- A Pokémon holding its Mega Stone is its own entry, as Smogon counts it: `name` is Smogon's
+  ("Salamence-Mega") and is what's unique; `key` is the app's species key and `megaStone` the stone.
+
+Every 12 hours `LadderDiscovery` looks at Smogon's newest months (`SMOGON_LOOKBACK_MONTHS`, 2) and
+fetches each Champions doubles and singles file not stored yet: the `chaos/` JSON and its `leads/`
+table. A month's files appear on the 1st of the next month and never change, so each is fetched once:
+about 24 files and 50 MB a month, one request at a time, 2 seconds apart. `LadderReducer` cuts each file
+(up to 7 MB) down to what the app shows (about 1 MB at most, 0.15 MB gzipped), and that is what `ladder.stats` and the
+`ladder_stats` table keep; Smogon keeps the files themselves. To go further back, start once with
+`SMOGON_LOOKBACK_MONTHS=6`. `SMOGON_INGEST_ENABLED=false` turns the fetching off.
+
+`LadderReducer`'s rule is written down in the Phase 5 file (§3), because the app is to make the same
+record from the same files when it has no server; `golden/ladder-fixture.json` is what both sides are
+checked against. A change to the rule needs a new `LadderReducer.REDUCTION`, which makes the server fetch
+what it holds again, and the same change in the app.
 
 ### Using it from the app
 Settings → PK Reference Server (Beta) in the app, off by default, takes the server's address,
@@ -250,15 +289,16 @@ Events are stored before their standings are final (`standings_final`), so they 
 usage counters wait until they are.
 
 ### Rebuilding the counters and the store
-`standings.fetched` and `pairings.fetched` keep every event fetched, so anything built from them can be
+`standings.fetched` and `pairings.fetched` keep every event fetched, and `ladder.stats` every reduced
+month of the ladder, so anything built from them can be
 rebuilt, after a fix to `NameStandardizer` for example. With the backend stopped:
 ```sh
 # The usage counters
 docker compose exec postgres psql -U pkref -c 'truncate usage_counter, processed_tournament'
 docker compose exec kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka:19092 \
   --group usage-aggregator --reset-offsets --to-earliest --all-topics --execute
-# The team store (each fetch replaces its event, so no truncate is needed)
-for g in team-store-standings team-store-pairings; do
+# The team store and the ladder (each record replaces the one stored, so no truncate is needed)
+for g in team-store-standings team-store-pairings ladder-store; do
   docker compose exec kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka:19092 \
     --group $g --reset-offsets --to-earliest --all-topics --execute
 done
@@ -275,6 +315,10 @@ change to either side's naming fails a test until the other matches. `golden/met
 insights `MetaService` works out from the fixture event (usage, trends, sets, cores, archetypes), checked
 by `MetaGoldenFileTest`, for the app's version worked out on the device to match. After a deliberate
 change to the insights, record it again with `mvn test -Dtest=MetaGoldenFileTest -Dgolden.record=true`.
+`src/test/resources/smogon/` holds Smogon's real 2026-09 files for M-C doubles at 1760, cut down to 27
+Pokémon; `golden/ladder-fixture.json` is that fixture reduced, checked by `LadderGoldenFileTest` and by the
+app's reducer (record it again the same way). Tests never call Limitless or Smogon: every test that
+starts the application reads `src/test/resources/config/application.yml`, which turns the Smogon poll off.
 GitHub Actions runs it for changes to the backend (`.github/workflows/backend.yml`).
 
 ## Name standardization

@@ -25,6 +25,11 @@ final class NameDictionary {
         return sb.toString();
     }
 
+    /** The name whose key is {@code raw}'s, or null: no near-misses, for IDs that weren't typed by hand. */
+    String exact(String raw) {
+        return byKey.get(key(raw));
+    }
+
     /**
      * Exact match here, then exact in {@code fallback}, then a unique near-miss in this dictionary
      * and then in {@code fallback}; otherwise the input title-cased, so unknown names still merge

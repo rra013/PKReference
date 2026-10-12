@@ -33,6 +33,7 @@ services:
       PKREF_TOKEN_SECRET: ${PKREF_TOKEN_SECRET:-}       # empty: a random one each start
       LIMITLESS_FORMATS: ${LIMITLESS_FORMATS:-}
       LIMITLESS_LOOKBACK: ${LIMITLESS_LOOKBACK:-7d}
+      SMOGON_LOOKBACK_MONTHS: ${SMOGON_LOOKBACK_MONTHS:-2}
       JAVA_TOOL_OPTIONS: -Xmx768m
     mem_limit: 1g
 

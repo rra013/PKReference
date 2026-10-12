@@ -79,6 +79,23 @@ class NameStandardizerTest {
         assertThat(std.tera(null)).isNull();
     }
 
+    /** Smogon's stats name things by Showdown ID, which is never misspelled: no near-misses. */
+    @Test
+    void idsResolveExactlyOrNotAtAll() {
+        assertThat(std.itemById("M-C", "choicescarf")).isEqualTo("Choice Scarf");
+        assertThat(std.itemById("M-C", "nevermeltice")).isEqualTo("Never-Melt Ice");
+        assertThat(std.itemById("M-C", "nothing")).isEqualTo(NameStandardizer.NO_ITEM);
+        assertThat(std.moveById("M-C", "uturn")).isEqualTo("U-turn");
+        assertThat(std.moveById("M-C", "doubleedge")).isEqualTo("Double-Edge");
+        assertThat(std.abilityById("M-C", "goodasgold")).isEqualTo("Good as Gold");
+        // A regulation the files don't have still gets every regulation's names.
+        assertThat(std.itemById("M-Z", "lifeorb")).isEqualTo("Life Orb");
+        // As free text this is Staraptite; as an ID it's something the files don't know.
+        assertThat(std.item("M-C", "staraptorite")).isEqualTo("Staraptite");
+        assertThat(std.itemById("M-C", "staraptorite")).isEqualTo("staraptorite");
+        assertThat(std.moveById("M-C", "darkestlarient")).isEqualTo("darkestlarient");
+    }
+
     @Test
     void distinctShortNamesAreNotMerged() {
         // Under 5 letters, only exact matches count.

@@ -5,6 +5,9 @@ import com.pkreference.backend.insight.MetaController;
 import com.pkreference.backend.insight.MetaResponses.Formats;
 import com.pkreference.backend.insight.MetaService;
 import com.pkreference.backend.insight.MetaWebConfig;
+import com.pkreference.backend.ladder.LadderController;
+import com.pkreference.backend.ladder.LadderResponses;
+import com.pkreference.backend.ladder.LadderService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -103,11 +106,13 @@ class ApiAuthFilterTest {
     abstract static class WebLayer {
         @Autowired MockMvc mvc;
         @MockitoBean MetaService meta;
+        @MockitoBean LadderService ladder;
 
         @BeforeEach
         void answer() {
             Clocks.CLOCK.now = TokenServiceTest.NOW;
             when(meta.formats()).thenReturn(new Formats(Instant.parse("2026-10-06T12:00:00Z"), List.of()));
+            when(ladder.index()).thenReturn(new LadderResponses.Index(List.of()));
         }
 
         /** Trades `key` for a token. */
@@ -119,9 +124,11 @@ class ApiAuthFilterTest {
         }
     }
 
+    // This package's tests start from ApiAuthTomcatTest.Web, which imports its controllers by name,
+    // so the ladder's is imported here.
     @Nested
     @WebMvcTest({MetaController.class, AuthController.class})
-    @Import({MetaWebConfig.class, SecurityConfig.class, Clocks.class})
+    @Import({MetaWebConfig.class, SecurityConfig.class, Clocks.class, LadderController.class})
     @EnableConfigurationProperties(ApiAuthProperties.class)
     @TestPropertySource(properties = "pkref.api.key-hashes=" + HASH)
     class WithKeys extends WebLayer {
@@ -160,6 +167,9 @@ class ApiAuthFilterTest {
                     .andExpect(status().isOk())
                     .andExpect(header().string("Cache-Control", "max-age=900, private"))
                     .andExpect(header().exists("ETag"));
+            mvc.perform(get("/v1/ladder").header("Authorization", "Bearer " + token(KEY)))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Cache-Control", "max-age=900, private"));
         }
 
         @Test
@@ -179,6 +189,9 @@ class ApiAuthFilterTest {
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value("invalid_token"));
             mvc.perform(get("/api/usage?format=M-C")).andExpect(status().isUnauthorized());
+            mvc.perform(get("/v1/ladder")).andExpect(status().isUnauthorized());
+            mvc.perform(get("/v1/ladder/gen9championsvgc2026regmc").header("Authorization", "Bearer " + KEY))
+                    .andExpect(status().isUnauthorized());
             mvc.perform(get("/v1/../swagger-ui.html/../v1/formats")).andExpect(status().isUnauthorized());
         }
 
@@ -202,7 +215,7 @@ class ApiAuthFilterTest {
 
     @Nested
     @WebMvcTest({MetaController.class, AuthController.class})
-    @Import({MetaWebConfig.class, SecurityConfig.class})
+    @Import({MetaWebConfig.class, SecurityConfig.class, LadderController.class})
     @EnableConfigurationProperties(ApiAuthProperties.class)
     @TestPropertySource(properties = "pkref.api.key-hashes=")
     class WithoutKeys extends WebLayer {

@@ -116,6 +116,31 @@ public class NameStandardizer {
         return resolve(format, raw, Names::moves);
     }
 
+    /**
+     * A Showdown ID from Smogon's stats ("choicescarf") as the item's name ("Choice Scarf"); the ID
+     * itself when no item has it. Smogon's "nothing" is {@link #NO_ITEM}. Exact matches only: an
+     * ID is never misspelled, so a near-miss would be another item.
+     */
+    public String itemById(String format, String id) {
+        if (id.equals("nothing")) return NO_ITEM;
+        return byId(format, id, Names::items);
+    }
+
+    public String abilityById(String format, String id) {
+        return byId(format, id, Names::abilities);
+    }
+
+    public String moveById(String format, String id) {
+        return byId(format, id, Names::moves);
+    }
+
+    private String byId(String format, String id, java.util.function.Function<Names, NameDictionary> pick) {
+        Names reg = format == null ? null : byRegulation.get(format.toLowerCase(Locale.ROOT));
+        String hit = reg == null ? null : pick.apply(reg).exact(id);
+        if (hit == null) hit = pick.apply(union).exact(id);
+        return hit != null ? hit : id;
+    }
+
     public String nature(String raw) {
         return raw == null ? null : natures.resolve(raw, null);
     }

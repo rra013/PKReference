@@ -14,6 +14,7 @@ import java.io.UncheckedIOException;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Each bundled regulation's SpeciesVocabulary, by Limitless format ("M-C" is champions-m-c.json).
@@ -61,6 +62,16 @@ public class SpeciesVocabularies {
         }
         var identity = vocabulary.identity(name, slug);
         return new SpeciesKey(identity.key(), vocabulary.megaStone(item, identity.speciesId()));
+    }
+
+    /** The bundled regulations' Limitless format ids, lowercased: "m-c". */
+    public Set<String> formats() {
+        return Set.copyOf(byFormat.keySet());
+    }
+
+    /** A bundled regulation's vocabulary, or null. */
+    public SpeciesVocabulary vocabulary(String format) {
+        return format == null ? null : byFormat.get(format.toLowerCase(Locale.ROOT));
     }
 
     private static JsonNode read(ObjectMapper mapper, Resource resource) throws IOException {
