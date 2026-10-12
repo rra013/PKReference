@@ -41,6 +41,7 @@ public class LadderDiscovery {
     private final SmogonProperties props;
     private final Clock clock;
 
+    /** Constructor injection: each parameter is a bean Spring supplies. */
     public LadderDiscovery(SmogonClient client, LadderReducer reducer, LadderStore store,
                            SpeciesVocabularies vocabularies, KafkaTemplate<String, Object> kafka,
                            SmogonProperties props, Clock clock) {
@@ -53,6 +54,11 @@ public class LadderDiscovery {
         this.clock = clock;
     }
 
+    /**
+     * Run by Spring's scheduler 20 seconds after start-up, then 12 hours after each run ends. The
+     * scheduler has two threads (application.yml), so this and EventDiscovery's poll don't wait on
+     * each other.
+     */
     @Scheduled(initialDelayString = "${pkref.smogon.initial-delay:20s}",
                fixedDelayString = "${pkref.smogon.poll-interval:12h}")
     public void poll() {
@@ -91,9 +97,13 @@ public class LadderDiscovery {
                 }
                 if (!props.ratings().contains(rating)) continue;
                 found++;
+                // Already stored by the current rule: this is what makes each file a one-time
+                // fetch.
                 if (store.has(format.id(), month, rating, LadderReducer.REDUCTION)) continue;
                 try {
                     String leads = client.leads(month, format.id() + "-" + rating + ".txt");
+                    // The file is reduced as it downloads: the lambda is handed the response's
+                    // stream.
                     Stats stats = client.chaos(month, file, body -> reducer.reduce(body, leads, format, month, rating));
                     var fetched = new StatsFetched(stats, clock.instant());
                     KafkaSends.await(kafka.send(Topics.LADDER_STATS, fetched.key(), fetched));

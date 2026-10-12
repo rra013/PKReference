@@ -42,12 +42,20 @@ public class SmogonClient {
 
     private final RestClient http;
 
+    /**
+     * The constructor Spring uses. It gives the client timeouts, and a throttle of one request per
+     * {@code requestGap} (2 seconds) on the real clock.
+     */
     @Autowired
     public SmogonClient(RestClient.Builder builder, SmogonProperties props) {
         this(builder.requestFactory(timeouts()), props,
                 new RequestThrottle(1, props.requestGap(), Clock.systemUTC(), d -> Thread.sleep(d.toMillis())));
     }
 
+    /**
+     * For tests, which pass a throttle on a fake clock and a builder bound to a mock server. Every
+     * request waits for its turn in the throttle first, and names the project in its User-Agent.
+     */
     SmogonClient(RestClient.Builder builder, SmogonProperties props, RequestThrottle throttle) {
         ClientHttpRequestInterceptor throttled = (request, body, execution) -> {
             try {
@@ -118,10 +126,19 @@ public class SmogonClient {
         return links;
     }
 
+    /**
+     * A response's bytes as text. Read as bytes and decoded here, so the encoding is UTF-8 whatever
+     * the server's headers say.
+     */
     private static String text(byte[] body) {
         return body == null ? "" : new String(body, StandardCharsets.UTF_8);
     }
 
+    /**
+     * Returns {@code value} only when it matches {@code pattern}. Month and file names come from
+     * Smogon's own listing page and go into the next request's path, so anything that isn't plainly
+     * a month or a stats file's name ("../", a full URL) is refused here rather than requested.
+     */
     private static String checked(Pattern pattern, String value) {
         if (value == null || !pattern.matcher(value).matches()) {
             throw new IllegalArgumentException("Not a Smogon stats name: " + value);

@@ -13,11 +13,16 @@ public enum MetaWindow {
     private final String id;
     private final Duration length;
 
+    /**
+     * An enum constant's own fields: its spelling in the API and its length, null for the whole
+     * regulation.
+     */
     MetaWindow(String id, Duration length) {
         this.id = id;
         this.length = length;
     }
 
+    /** The window as the API spells it: "14d", "30d" or "regulation". */
     public String id() {
         return id;
     }

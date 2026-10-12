@@ -28,6 +28,11 @@ public record ApiAuthProperties(List<String> keyHashes, Duration tokenLifetime, 
     /** HS256 signs with a 256-bit key: a shorter secret is easier to guess than the signature is to forge. */
     static final int MIN_SECRET_BYTES = 32;
 
+    /**
+     * Checked when the record is built, which is at start-up: a mistake in the configuration (a key
+     * where a hash belongs, a secret that's too short) stops the server from starting, with a
+     * message saying what to fix, instead of leaving it running open or weak.
+     */
     public ApiAuthProperties {
         keyHashes = keyHashes == null ? List.of()
                 : keyHashes.stream().map(h -> h.trim().toLowerCase(Locale.ROOT)).filter(h -> !h.isEmpty()).toList();
@@ -53,6 +58,7 @@ public record ApiAuthProperties(List<String> keyHashes, Duration tokenLifetime, 
         return new ApiAuthProperties(keyHashes, null, null);
     }
 
+    /** Whether signing in is on: true once at least one key hash is configured. */
     public boolean required() {
         return !keyHashes.isEmpty();
     }

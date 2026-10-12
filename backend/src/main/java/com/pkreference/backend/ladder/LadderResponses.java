@@ -23,6 +23,7 @@ public final class LadderResponses {
 
     public record Index(@Schema(description = "By format, then newest month first, then rating.") List<Entry> stats) {}
 
+    /** One Pokémon's usage at one rating cutoff. */
     public record RatingUsage(int rating, double usage) {}
 
     @Schema(description = "One Pokémon's month, as Ladder.Pokemon has it, with what the other stored files add.")
@@ -47,6 +48,10 @@ public final class LadderResponses {
             @Schema(description = "Nature, then stat points for HP/Atk/Def/SpA/SpD/Spe.") List<Share> spreads,
             @Schema(description = "Other entries of the record, by their names.") List<Share> teammates) {}
 
+    /**
+     * GET /v1/ladder/{format}: a stored record's fields, when it was fetched, and what the other
+     * stored files add.
+     */
     public record Stats(
             @Schema(description = "The version of the rule that reduced Smogon's file.") int reduction,
             String format, String regulation, String mode, int bestOf, String month, int rating, long battles,

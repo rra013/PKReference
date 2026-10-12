@@ -19,6 +19,11 @@ import java.time.Clock;
  * pairings.fetched. Three Limitless requests an event, through the throttle. A failure throws, so
  * the record retries and then goes to the DLT. Same consumer group as the standings fetcher it
  * replaces, so a running backend carries on where it was.
+ *
+ * <p>This is the pipeline's slow worker. Under the throttle a request can wait minutes for its turn,
+ * which is why application.yml gives consumers few records a poll and a long
+ * {@code max.poll.interval.ms}: a consumer that goes too long between polls is assumed dead, and
+ * its records are handed out again.
  */
 @Component
 public class EventFetcher {
@@ -30,6 +35,7 @@ public class EventFetcher {
     private final LimitlessProperties props;
     private final Clock clock;
 
+    /** Constructor injection: Spring supplies each parameter from the beans it has made. */
     public EventFetcher(LimitlessClient client, EventFetchRepository fetches, KafkaTemplate<String, Object> kafka,
                         LimitlessProperties props, Clock clock) {
         this.client = client;
@@ -39,6 +45,20 @@ public class EventFetcher {
         this.clock = clock;
     }
 
+    /**
+     * Called by Spring Kafka for each record on tournaments.discovered. {@code @KafkaListener}
+     * makes Spring start a consumer thread that polls the topic, turns each record's JSON back into
+     * a {@code TournamentDiscovered} and calls this method with it.
+     *
+     * <p>{@code groupId} names the consumer group. Kafka remembers, per group, how far each partition
+     * has been read (the "offset"), so after a restart this listener resumes where it stopped. The
+     * offset moves on only when this method returns normally: if it throws, the record is retried
+     * (KafkaErrorHandling).
+     *
+     * <p>The order matters: publish both results, waiting for the broker to confirm each, and only
+     * then mark the event fetched. If anything fails part-way, nothing is marked, and the retry
+     * does the whole event again; the stores downstream accept a repeat.
+     */
     @KafkaListener(topics = Topics.TOURNAMENTS_DISCOVERED, groupId = "standings-fetcher")
     public void onDiscovered(TournamentDiscovered event) {
         var t = event.tournament();

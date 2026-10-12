@@ -11,6 +11,7 @@ import java.util.Map;
 final class NameDictionary {
     private final Map<String, String> byKey;
 
+    /** Indexes each name by its key; the first spelling given for a key is the one kept. */
     NameDictionary(Collection<String> names) {
         byKey = new LinkedHashMap<>();
         names.forEach(n -> byKey.putIfAbsent(key(n), n));
@@ -71,6 +72,10 @@ final class NameDictionary {
         return tie ? null : best;
     }
 
+    /**
+     * How many edits a near miss may be from a real name: none under 5 letters, 1 under 10,
+     * otherwise 2.
+     */
     private static int maxDistance(int length) {
         if (length < 5) return 0;
         return length < 10 ? 1 : 2;
@@ -112,17 +117,21 @@ final class NameDictionary {
         return sb.toString();
     }
 
+    /** Collects names from several files before the dictionary is made. */
     static final class Builder {
         private final List<String> names = new ArrayList<>();
 
+        /** Adds one name; blanks are ignored. */
         void add(String name) {
             if (name != null && !name.isBlank()) names.add(name.trim());
         }
 
+        /** Adds every name another builder holds. */
         void addAll(Builder other) {
             names.addAll(other.names);
         }
 
+        /** The dictionary of everything added. */
         NameDictionary build() {
             return new NameDictionary(names);
         }

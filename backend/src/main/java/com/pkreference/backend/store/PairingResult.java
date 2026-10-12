@@ -23,6 +23,12 @@ public enum PairingResult {
         return this == P1 || this == P2 || this == TIE || this == DOUBLE_LOSS;
     }
 
+    /**
+     * Reads Limitless's {@code winner} field, which holds a username, "0" (a tie) or "-1" (both
+     * lost). With no second player it's a bye when player 1 is the winner, otherwise a no-show.
+     * Storing the result as one word means every query can say {@code result in ('P1', 'P2', ...)}
+     * instead of repeating these rules in SQL.
+     */
     public static PairingResult of(Pairing p) {
         String winner = p.winner();
         boolean opponent = p.player2() != null && !p.player2().isBlank();

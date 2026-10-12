@@ -50,6 +50,10 @@ public class NameStandardizer {
     private final NameDictionary natures = new NameDictionary(NATURES);
     private final NameDictionary teraTypes = new NameDictionary(TERA_TYPES);
 
+    /**
+     * Loads every name list once, at start-up. {@code ObjectMapper} is Jackson's JSON reader, a
+     * bean Spring Boot provides.
+     */
     public NameStandardizer(ObjectMapper mapper) {
         var resolver = new PathMatchingResourcePatternResolver();
         var allItems = new NameDictionary.Builder();
@@ -108,10 +112,12 @@ public class NameStandardizer {
         return resolve(format, raw, Names::items);
     }
 
+    /** An ability's canonical name; null for null or blank. */
     public String ability(String format, String raw) {
         return resolve(format, raw, Names::abilities);
     }
 
+    /** A move's canonical name; null for null or blank. */
     public String move(String format, String raw) {
         return resolve(format, raw, Names::moves);
     }
@@ -126,14 +132,17 @@ public class NameStandardizer {
         return byId(format, id, Names::items);
     }
 
+    /** An ability's Showdown ID as its name; the ID itself when nothing has it. */
     public String abilityById(String format, String id) {
         return byId(format, id, Names::abilities);
     }
 
+    /** A move's Showdown ID as its name; the ID itself when nothing has it. */
     public String moveById(String format, String id) {
         return byId(format, id, Names::moves);
     }
 
+    /** An exact lookup in the format's own lists, then in every regulation's. */
     private String byId(String format, String id, java.util.function.Function<Names, NameDictionary> pick) {
         Names reg = format == null ? null : byRegulation.get(format.toLowerCase(Locale.ROOT));
         String hit = reg == null ? null : pick.apply(reg).exact(id);
@@ -141,20 +150,24 @@ public class NameStandardizer {
         return hit != null ? hit : id;
     }
 
+    /** A nature's canonical name. Natures and Tera types are the same in every regulation. */
     public String nature(String raw) {
         return raw == null ? null : natures.resolve(raw, null);
     }
 
+    /** A Tera type's canonical name. */
     public String tera(String raw) {
         return raw == null ? null : teraTypes.resolve(raw, null);
     }
 
+    /** Looks a name up in the format's own lists, then in every regulation's. */
     private String resolve(String format, String raw, java.util.function.Function<Names, NameDictionary> pick) {
         if (raw == null || raw.isBlank()) return null;
         Names reg = format == null ? null : byRegulation.get(format.toLowerCase(Locale.ROOT));
         return pick.apply(reg == null ? union : reg).resolve(raw, pick.apply(union));
     }
 
+    /** Parses one bundled JSON file, closing it afterwards. */
     private static JsonNode read(ObjectMapper mapper, Resource r) throws IOException {
         try (var in = r.getInputStream()) {
             return mapper.readTree(in);

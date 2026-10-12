@@ -1,3 +1,10 @@
+# The server's settings. Spring Boot reads this file at start-up and configures itself from it:
+# everything under `spring:` sets up a library (the database, Kafka), and everything under
+# `pkref:` is this project's own, bound into the records LimitlessProperties, SmogonProperties
+# and ApiAuthProperties.
+#
+# ${NAME:default} takes the environment variable NAME when it's set and the default otherwise,
+# so a deployment changes a setting without a rebuild (docker-compose.server.yml sets several).
 spring:
   application:
     name: pkreference-backend
@@ -9,7 +16,11 @@ spring:
     password: ${DATABASE_PASSWORD:pkref}
   jpa:
     hibernate:
+      # Hibernate never creates or alters tables: at start-up it only checks that the two @Entity
+      # classes match what Flyway made, and fails loudly if they don't.
       ddl-auto: validate
+    # Don't hold a database connection open for the whole of each web request: a transaction
+    # lasts only as long as the @Transactional method that needs it.
     open-in-view: false
   task:
     scheduling:
@@ -17,21 +28,32 @@ spring:
       pool:
         size: 2
   kafka:
+    # Where the broker is: the first address a client connects to, to learn about the cluster.
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     admin:
       # Topics.java's settings (retention, sizes) reach topics that already exist.
       modify-topic-configs: true
+    # The producer: what KafkaTemplate.send uses.
     producer:
+      # A send counts as done only when the broker has it safely stored (all in-sync replicas;
+      # with one broker, that one). The slowest setting, and the one that doesn't lose records.
       acks: all
       # Standings are about 1.2 KB of JSON a player; compressed, a big event stays well
       # under the topic's limit.
       compression-type: zstd
+      # Kafka stores bytes. Keys go in as plain text; values as JSON, with a header naming the
+      # Java type so the consumer knows which record class to rebuild.
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
+        # If a send is retried after a network hiccup, the broker recognizes the repeat and keeps
+        # one copy, in order.
         enable.idempotence: true
         max.request.size: 5242880        # full decklists for large events
+    # The consumers: what every @KafkaListener uses, each with its own groupId.
     consumer:
+      # A consumer group that has never read a topic starts from its first record, not from "now":
+      # a new listener, or a group whose offsets were reset, sees everything the topic holds.
       auto-offset-reset: earliest
       # The standings fetcher waits its turn under Limitless's limit, up to 5 minutes a request.
       # A consumer that goes longer than max.poll.interval.ms between polls is dropped and its
@@ -41,7 +63,9 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        max.poll.interval.ms: 900000
+        max.poll.interval.ms: 900000   # 15 minutes
+        # The JSON deserializer builds the class a record's type header names, and only if that
+        # class is in this package: a record can't ask the server to instantiate anything else.
         spring.json.trusted.packages: com.pkreference.backend.model
         max.partition.fetch.bytes: 5242880
         fetch.max.bytes: 52428800

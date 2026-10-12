@@ -1,0 +1,44 @@
+<h1 id="part10">Part 10. Running it</h1>
+<h2>10.1 Locally</h2>
+<pre>cd backend
+docker compose up -d          # Kafka (9092), Kafka UI (8081), Postgres (5432), all on 127.0.0.1
+mvn spring-boot:run           # the server, on 127.0.0.1:8080
+curl localhost:8080/v1/formats
+open http://localhost:8080/swagger-ui.html
+mvn verify                    # every test</pre>
+<p>On first start Flyway creates the tables, the topics are created, and within seconds discovery starts
+asking for the last 7 days' events and the ladder discovery fetches the two newest months.</p>
+
+<h2>10.2 The settings</h2>
+<table class="tight">
+<tr><th>Environment variable</th><th>Default</th><th>Meaning</th></tr>
+<tr><td><code>DATABASE_URL</code>, <code>DATABASE_USER</code>, <code>DATABASE_PASSWORD</code></td>
+<td>local Postgres, <code>pkref</code></td><td>Where the database is</td></tr>
+<tr><td><code>KAFKA_BOOTSTRAP_SERVERS</code></td><td><code>localhost:9092</code></td><td>Where the broker is</td></tr>
+<tr><td><code>SERVER_ADDRESS</code></td><td><code>127.0.0.1</code></td><td>Which network interface the API listens on</td></tr>
+<tr><td><code>LIMITLESS_FORMATS</code></td><td>(all of the game's)</td><td>Formats to follow, e.g. <code>M-C,M-B</code></td></tr>
+<tr><td><code>LIMITLESS_LOOKBACK</code></td><td><code>7d</code></td><td>How far back each poll walks; longer once to
+backfill</td></tr>
+<tr><td><code>SMOGON_LOOKBACK_MONTHS</code></td><td><code>2</code></td><td>How many recent months of ladder stats to keep
+up with</td></tr>
+<tr><td><code>SMOGON_INGEST_ENABLED</code></td><td><code>true</code></td><td>Turn the Smogon poll off</td></tr>
+<tr><td><code>PKREF_API_KEY_HASHES</code></td><td>(none: open)</td><td>SHA-256 hashes of accepted API keys</td></tr>
+<tr><td><code>PKREF_TOKEN_LIFETIME</code></td><td><code>15m</code></td><td>How long an access token lasts</td></tr>
+<tr><td><code>PKREF_TOKEN_SECRET</code></td><td>(random each start)</td><td>The token signing secret, 32 characters or
+more</td></tr>
+</table>
+
+<h2>10.3 On a server</h2>
+<p><code>docker-compose.server.yml</code> layers on top of the local file: it adds the API as a container built
+by the <code>Dockerfile</code> (two stages: build with Maven, run on a JRE as a non-root user), sets memory
+limits and restart policies, and requires a real Postgres password and at least one key hash. Everything
+still binds to <code>127.0.0.1</code>; other devices reach the API through Tailscale's HTTPS.
+<code>scripts/backup.sh</code> dumps Postgres daily; <code>scripts/new-api-key.sh</code> makes a key and its
+hash.</p>
+
+<h2>10.4 Rebuilding the tables from the topics</h2>
+<p>With the server stopped, reset a consumer group to the start of its topic and start the server again:</p>
+<pre>docker compose exec kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka:19092 \
+  --group team-store-standings --reset-offsets --to-earliest --all-topics --execute</pre>
+<p>The group re-reads every record, and because each write replaces what's there, the tables end up as if
+they had been filled for the first time with today's code.</p>

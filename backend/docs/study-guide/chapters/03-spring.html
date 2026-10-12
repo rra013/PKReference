@@ -1,0 +1,158 @@
+<h1 id="part3">Part 3. Spring, as this project uses it</h1>
+<p>Spring's job here is to build the objects and connect them. This part explains each mechanism once, with
+where the code uses it. If an interviewer points at an annotation, the answer is in this part.</p>
+
+<h2>3.1 Beans and dependency injection</h2>
+<p>A <b>bean</b> is an object that Spring creates and keeps, normally exactly one of each (a singleton). The
+set of all beans is the <b>application context</b>. Classes don't create their collaborators: they declare
+them as constructor parameters, and Spring passes them in. That is <b>dependency injection</b>.</p>
+<pre>@Component
+public class EventFetcher {
+    public EventFetcher(LimitlessClient client, EventFetchRepository fetches,
+                        KafkaTemplate&lt;String, Object&gt; kafka, LimitlessProperties props, Clock clock) { ... }
+}</pre>
+<p>Spring sees one constructor, finds a bean of each parameter's type, and calls it. No
+<code>@Autowired</code> is needed when a class has a single constructor. (<code>LimitlessClient</code> and
+<code>SmogonClient</code> have two, one for tests, so the one Spring should use is marked
+<code>@Autowired</code>.)</p>
+<p class="why"><b>Why bother.</b> A class that receives its collaborators can be given fakes. The tests build an
+<code>EventDiscovery</code> with a mock client, a mock Kafka template and a fake clock, and check exactly
+which events it asks for, with no network and no broker.</p>
+
+<h2>3.2 The two ways a class becomes a bean</h2>
+<table>
+<tr><th>How</th><th>Meaning</th><th>Used for</th></tr>
+<tr><td><b>Stereotype annotation on the class</b><br><code>@Component</code>, <code>@Service</code>,
+<code>@Repository</code>, <code>@RestController</code></td>
+<td>Component scanning finds the class and constructs it. The four differ mostly in what they tell the
+reader. <code>@Repository</code> also translates database exceptions into Spring's own;
+<code>@RestController</code> also makes the methods answer HTTP with JSON.</td>
+<td>Almost every class: <code>EventDiscovery</code>, <code>MetaService</code>, <code>TeamStore</code>,
+<code>MetaController</code> and so on.</td></tr>
+<tr><td><b><code>@Bean</code> method in a <code>@Configuration</code> class</b></td>
+<td>Spring calls the method once at start-up and keeps what it returns as a bean named after the method.
+The method's parameters are injected like a constructor's.</td>
+<td>Objects that need arguments or set-up, or whose class isn't ours to annotate: the <code>Clock</code>, the
+Kafka <code>NewTopic</code>s, the error handler, the two filter registrations, the
+<code>TokenService</code>, the <code>OpenAPI</code> description.</td></tr>
+</table>
+
+<h3>Every <code>@Bean</code> in the project</h3>
+<table>
+<tr><th>Where</th><th>Method</th><th>What the bean is, and who uses it</th></tr>
+<tr><td><code>BackendApplication</code></td><td><code>clock()</code></td><td>The system clock in UTC. Injected into discovery,
+the fetcher, the ladder discovery, <code>MetaService</code> and the token service, so tests can replace
+it.</td></tr>
+<tr><td><code>Topics</code></td><td><code>tournamentsDiscovered()</code>, <code>standingsFetched()</code>,
+<code>pairingsFetched()</code>, <code>pokemonUsage()</code>, <code>ladderStats()</code> and four
+<code>...Dlt()</code></td><td>Nine <code>NewTopic</code> descriptions. Nothing injects them:
+<code>KafkaAdmin</code> collects every <code>NewTopic</code> bean and creates the topics on the broker at
+start-up.</td></tr>
+<tr><td><code>KafkaErrorHandling</code></td><td><code>kafkaErrorHandler(template)</code></td><td>The retry-then-dead-letter
+policy. Spring Boot applies the one <code>CommonErrorHandler</code> bean to every listener.</td></tr>
+<tr><td><code>MetaWebConfig</code></td><td><code>v1Etags()</code></td><td>Registers the ETag filter on
+<code>/v1/*</code>.</td></tr>
+<tr><td><code>SecurityConfig</code></td><td><code>tokenService(properties, clock)</code></td><td>The one
+<code>TokenService</code>, holding the signing secret. Used by the filter and <code>AuthController</code>.</td></tr>
+<tr><td><code>SecurityConfig</code></td><td><code>apiAuth(properties, tokens)</code></td><td>Registers
+<code>ApiAuthFilter</code> on every path, first in order.</td></tr>
+<tr><td><code>SecurityConfig</code></td><td><code>openApi(properties)</code></td><td>Tells Swagger UI about the two credentials
+when signing in is on.</td></tr>
+</table>
+
+<h2>3.3 The annotations on <code>BackendApplication</code></h2>
+<ul>
+<li><code>@SpringBootApplication</code> combines three: <code>@Configuration</code> (may hold <code>@Bean</code>
+methods), <code>@ComponentScan</code> (find annotated classes in this package and below) and
+<code>@EnableAutoConfiguration</code> (configure whatever libraries are on the classpath from
+<code>application.yml</code>: the data source, Flyway, the Kafka producer and listener factory, Jackson,
+Tomcat).</li>
+<li><code>@ConfigurationPropertiesScan</code> finds the settings records (next section).</li>
+<li><code>@EnableScheduling</code> turns on <code>@Scheduled</code>.</li>
+</ul>
+
+<h2>3.4 Settings: <code>@ConfigurationProperties</code></h2>
+<p>Three records hold the project's own settings: <code>LimitlessProperties</code>
+(<code>pkref.limitless</code>), <code>SmogonProperties</code> (<code>pkref.smogon</code>) and
+<code>ApiAuthProperties</code> (<code>pkref.api</code>). Spring builds each from the matching block of
+<code>application.yml</code>, converting text to the field's type: <code>30m</code> to a
+<code>Duration</code>, <code>M-C,M-B</code> to a <code>List&lt;String&gt;</code>. Kebab-case in YAML
+(<code>poll-interval</code>) matches camelCase in Java (<code>pollInterval</code>).</p>
+<p>In the YAML, <code>${LIMITLESS_LOOKBACK:7d}</code> means "the environment variable
+<code>LIMITLESS_LOOKBACK</code> if set, otherwise 7d". Each record's compact constructor fills in defaults
+and, for <code>ApiAuthProperties</code>, refuses bad values, so a misconfigured server fails at start-up
+with a clear message.</p>
+
+<h2>3.5 Timers: <code>@Scheduled</code></h2>
+<p><code>EventDiscovery.poll()</code> and <code>LadderDiscovery.poll()</code> are called by Spring's scheduler.
+<code>fixedDelay</code> measures from the end of one run to the start of the next, so a slow run can't
+overlap itself. The scheduler's thread pool is set to 2 in <code>application.yml</code> so the two polls
+don't wait for each other.</p>
+<p><code>@ConditionalOnProperty(name = "pkref.limitless.ingest-enabled", ...)</code> on the class means the bean
+is only created when that setting is true. Tests switch both polls off that way.</p>
+
+<h2>3.6 Kafka: <code>KafkaTemplate</code> and <code>@KafkaListener</code></h2>
+<p><b>Producing.</b> <code>KafkaTemplate&lt;String, Object&gt;</code> is auto-configured from
+<code>spring.kafka.producer</code>. <code>kafka.send(topic, key, value)</code> serializes the value to JSON
+and returns a future; the project always passes that future to <code>KafkaSends.await</code>, so a failed
+send throws where it happened instead of being logged and forgotten.</p>
+<p><b>Consuming.</b> A method annotated <code>@KafkaListener(topics = ..., groupId = ...)</code> gets a
+consumer thread of its own. Spring polls the topic, rebuilds each record's value from JSON into the
+parameter's type, and calls the method. Returning normally means "done"; throwing means "failed", which
+hands the record to the error handler. There are five listener methods:</p>
+<table>
+<tr><th>Method</th><th>Topic</th><th>Group</th></tr>
+<tr><td><code>EventFetcher.onDiscovered</code></td><td>tournaments.discovered</td><td>standings-fetcher</td></tr>
+<tr><td><code>TeamStoreConsumer.onStandings</code></td><td>standings.fetched</td><td>team-store-standings</td></tr>
+<tr><td><code>TeamStoreConsumer.onPairings</code></td><td>pairings.fetched</td><td>team-store-pairings</td></tr>
+<tr><td><code>UsageConsumer.onStandings</code></td><td>standings.fetched</td><td>usage-aggregator</td></tr>
+<tr><td><code>LadderStoreConsumer.onStats</code></td><td>ladder.stats</td><td>ladder-store</td></tr>
+</table>
+
+<h2>3.7 The web layer</h2>
+<ul>
+<li><code>@RestController</code>: a bean whose methods handle HTTP requests; return values become JSON.</li>
+<li><code>@RequestMapping("/v1")</code> on the class: the path prefix for all its methods.</li>
+<li><code>@GetMapping("/formats/{format}/pokemon")</code>, <code>@PostMapping("/token")</code>: the verb and
+path of one method.</li>
+<li><code>@PathVariable</code>: an argument taken from a <code>{...}</code> part of the path.
+<code>@RequestParam</code>: one taken from the query string, required unless it has
+<code>required = false</code> or a <code>defaultValue</code>.</li>
+<li><code>ResponseEntity&lt;T&gt;</code>: a response whose status and headers the method sets, used here to add
+<code>Cache-Control</code>.</li>
+<li><code>@ExceptionHandler(X.class)</code>: a method of the same controller that Spring calls when a handler
+throws <code>X</code>. The project maps <code>IllegalArgumentException</code> to 400 and
+<code>NoSuchElementException</code> to 404, so services can signal "bad input" and "not there" with
+ordinary exceptions.</li>
+<li><b>Filters</b> (<code>FilterRegistrationBean</code>): code that runs around every matching request, before
+any controller. Two here: <code>ApiAuthFilter</code> on <code>/*</code>, first, and
+<code>ShallowEtagHeaderFilter</code> on <code>/v1/*</code>.</li>
+<li><code>@Tag</code>, <code>@Operation</code>, <code>@Parameter</code>, <code>@Schema</code>: springdoc's. They
+describe the API for Swagger UI and have no effect on behavior.</li>
+</ul>
+
+<h2>3.8 The database layer</h2>
+<ul>
+<li><code>JdbcTemplate</code> (and <code>NamedParameterJdbcTemplate</code>): run SQL with parameters and map
+rows with a lambda. Used by <code>TeamStore</code>, <code>MetaRepository</code>,
+<code>CorpusRepository</code>, <code>EventFetchRepository</code>, <code>LadderStore</code>.</li>
+<li><b>JPA</b>: <code>@Entity</code> classes mapped to tables by Hibernate, with repositories Spring Data
+generates from interfaces (<code>UsageCounterRepository</code>). Used only by the original usage
+counters.</li>
+<li><code>@Transactional</code>: the method runs in one database transaction, committed when it returns and
+rolled back if it throws. On <code>TeamStore.putStandings</code>, <code>putPairings</code>,
+<code>LadderStore.put</code> and <code>UsageAggregationService.apply</code>. It works through a proxy Spring
+puts around the bean, so it applies to calls coming from another bean, which all of these are.</li>
+</ul>
+
+<h2>3.9 Java features worth being able to explain</h2>
+<ul>
+<li><b>Records</b> (<code>public record Share(String value, double share) {}</code>): immutable data classes.
+All wire types, responses, settings and query rows are records. A <b>compact constructor</b>
+(<code>public LimitlessProperties { ... }</code>) validates or defaults the fields.</li>
+<li><b>Text blocks</b> (<code>"""..."""</code>): multi-line strings, used for SQL.</li>
+<li><b><code>var</code></b>: a local variable whose type the compiler infers.</li>
+<li><b>Switch expressions</b>: <code>return switch (result) { case "P1" -&gt; ...; default -&gt; 1; };</code></li>
+<li><b>Streams and lambdas</b>: most of <code>MetaService</code>'s counting and sorting.</li>
+<li><b><code>Optional</code></b>: a return type that says "there may be none" (<code>LadderStore.find</code>).</li>
+</ul>

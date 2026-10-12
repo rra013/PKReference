@@ -39,11 +39,17 @@ public class AuthController {
     private final TokenService tokens;
     private final ApiAuthProperties properties;
 
+    /** Spring passes in the token service SecurityConfig made, and the settings. */
     public AuthController(TokenService tokens, ApiAuthProperties properties) {
         this.tokens = tokens;
         this.properties = properties;
     }
 
+    /**
+     * POST /v1/auth/token. Takes no body: the API key is in the Authorization header, and
+     * ApiAuthFilter has already checked it and left the key's id in a request attribute. Answers
+     * with the token, its lifetime in seconds and its expiry time.
+     */
     @PostMapping("/token")
     @Operation(summary = "Trade an API key for an access token",
             description = "Send the API key as Authorization: Bearer <key>. 401 with code invalid_key when "

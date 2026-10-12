@@ -21,6 +21,14 @@ import java.util.List;
 /**
  * Walks each format's tournament list back through the lookback and asks for the events to fetch
  * (FetchPolicy) on tournaments.discovered. A long lookback, set once, is the backfill.
+ *
+ * <p>This is where the pipeline starts, and the only class that runs on a timer rather than in answer
+ * to a request or a record. It doesn't fetch events itself: it publishes one small "fetch this
+ * event" record for each, and EventFetcher does the slow part. Splitting the two means a poll
+ * finishes in seconds, a failed fetch retries on its own, and the queue survives a restart.
+ *
+ * <p>{@code @ConditionalOnProperty}: the bean exists only when {@code pkref.limitless.ingest-enabled}
+ * is true (or unset). Tests set it to false, so no test polls Limitless.
  */
 @Component
 @ConditionalOnProperty(name = "pkref.limitless.ingest-enabled", havingValue = "true", matchIfMissing = true)
@@ -33,6 +41,11 @@ public class EventDiscovery {
     private final LimitlessProperties props;
     private final Clock clock;
 
+    /**
+     * Constructor injection: Spring sees one constructor and supplies each parameter from the
+     * context. {@code KafkaTemplate<String, Object>} is Spring Boot's ready-made producer, with
+     * String keys and values serialized to JSON (application.yml).
+     */
     public EventDiscovery(LimitlessClient client, EventFetchRepository fetches, KafkaTemplate<String, Object> kafka,
                           LimitlessProperties props, Clock clock) {
         this.client = client;
@@ -42,6 +55,12 @@ public class EventDiscovery {
         this.clock = clock;
     }
 
+    /**
+     * Run by Spring's scheduler: first 5 seconds after start-up, then again 30 minutes after each
+     * run ends ({@code fixedDelay} counts from the end of a run, so runs never overlap). The
+     * {@code ...String} forms take a property placeholder, {@code ${name:default}}, so both delays
+     * are settings.
+     */
     @Scheduled(initialDelayString = "${pkref.limitless.initial-delay:5s}",
                fixedDelayString = "${pkref.limitless.poll-interval:30m}")
     public void poll() {
@@ -69,6 +88,7 @@ public class EventDiscovery {
             }
             if (list == null || list.isEmpty()) break;
             listed += list.size();
+            // One query for the whole page: what's already been asked for or fetched.
             var states = fetches.find(list.stream().map(Tournament::id).toList());
             for (Tournament t : list) {
                 if (!FetchPolicy.shouldRequest(t, states.get(t.id()), now, props)) continue;
@@ -95,6 +115,7 @@ public class EventDiscovery {
         return requested;
     }
 
+    /** The format's name for the logs. */
     private static String label(String format) {
         return format == null ? "all formats" : format;
     }

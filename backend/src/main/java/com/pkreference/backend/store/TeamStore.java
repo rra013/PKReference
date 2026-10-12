@@ -21,21 +21,42 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Every event's teams and matches, as fetched: the tables Phase 2's insights read. Each member
- * gets its species key the app's way (SpeciesVocabularies). Each fetch of
- * an event replaces its rows, so reading the topics again from the start rebuilds them, and a
- * fetch older than the one stored is ignored.
+ * Every event's teams and matches, as fetched: the tables Phase 2's insights read. Each member gets
+ * its species key the app's way (SpeciesVocabularies). Each fetch of an event replaces its rows, so
+ * reading the topics again from the start rebuilds them, and a fetch older than the one stored is
+ * ignored.
+ *
+ * <p>The tables (db/migration/V2 to V4): {@code event} and its {@code event_phase}s, each player's
+ * {@code team} with its {@code team_member}s and their {@code team_member_move}s, every match in
+ * {@code pairing}, and {@code store_version}, a single counter.
+ *
+ * <p>Why "replace, don't update": a Kafka consumer can be given the same record twice (after a crash,
+ * a rebalance, or on purpose when the group's offsets are reset to rebuild the tables). Writing so
+ * that a repeat ends in the same rows, called idempotence, makes all of those safe.
+ *
+ * <p>{@code JdbcTemplate} is Spring's plain-SQL helper: {@code update} for one statement,
+ * {@code batchUpdate} for the same statement over many rows in one round trip, {@code query} to
+ * read. Values go in as {@code ?} parameters, never into the SQL text.
  */
 @Repository
 public class TeamStore {
     private final JdbcTemplate jdbc;
     private final SpeciesVocabularies species;
 
+    /** Constructor injection: Spring supplies each parameter from the beans it has made. */
     public TeamStore(JdbcTemplate jdbc, SpeciesVocabularies species) {
         this.jdbc = jdbc;
         this.species = species;
     }
 
+    /**
+     * Stores one event's standings and teams, replacing what was stored for it.
+     *
+     * <p>{@code @Transactional}: Spring opens a database transaction before the method and commits it
+     * when the method returns; if it throws, everything it did is rolled back. So a reader never
+     * sees an event with its old rows deleted and its new ones half written, and a failure part-way
+     * leaves the previous copy in place for the retry.
+     */
     @Transactional
     public void putStandings(StandingsFetched fetched) {
         var t = fetched.tournament();
@@ -96,6 +117,11 @@ public class TeamStore {
                 moves);
     }
 
+    /**
+     * Stores one event's matches, replacing what was stored for it, with each match's result worked
+     * out once (PairingResult). In its own transaction, as putStandings is. {@code pairing_fetch}
+     * remembers when the event's pairings were fetched, since an event can have none.
+     */
     @Transactional
     public void putPairings(PairingsFetched fetched) {
         String id = fetched.tournament().id();
@@ -129,6 +155,7 @@ public class TeamStore {
         return !stored.isEmpty() && stored.get(0) != null && stored.get(0).toInstant().isAfter(fetchedAt);
     }
 
+    /** Limitless's date text as an Instant, or null when it's missing or doesn't read. */
     static Instant parseDate(String date) {
         if (date == null || date.isBlank()) return null;
         try {
@@ -138,6 +165,7 @@ public class TeamStore {
         }
     }
 
+    /** An Instant as the type the JDBC drivers store in a {@code timestamp with time zone} column. */
     private static OffsetDateTime timestamp(Instant instant) {
         return instant == null ? null : OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
     }

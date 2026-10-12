@@ -5,7 +5,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import java.time.Duration;
 import java.util.List;
 
-/** Smogon's monthly ladder stats and how they're fetched. */
+/**
+ * Smogon's monthly ladder stats and how they're fetched: the settings under {@code pkref.smogon} in
+ * application.yml, bound into this record by Spring as LimitlessProperties is.
+ */
 @ConfigurationProperties(prefix = "pkref.smogon")
 public record SmogonProperties(
         String baseUrl,
@@ -19,10 +22,12 @@ public record SmogonProperties(
         Duration requestGap,
         String userAgent) {
 
+    /** Every default, with fetching on: what tests build a client or a discovery with. */
     public static SmogonProperties defaults() {
         return new SmogonProperties(null, true, null, 0, null, null, null);
     }
 
+    /** Fills in a default for anything left out, as LimitlessProperties' compact constructor does. */
     public SmogonProperties {
         if (baseUrl == null) baseUrl = "https://www.smogon.com/stats";
         if (pollInterval == null) pollInterval = Duration.ofHours(12);

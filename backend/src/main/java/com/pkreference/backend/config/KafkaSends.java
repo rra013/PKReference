@@ -15,6 +15,13 @@ public final class KafkaSends {
 
     private KafkaSends() {}
 
+    /**
+     * Blocks until the broker has acknowledged the send, and returns its result; throws
+     * {@code IllegalStateException} if it failed or took over 30 seconds. Called as
+     * {@code KafkaSends.await(kafka.send(topic, key, value))}. Throwing matters inside a
+     * {@code @KafkaListener}: the exception makes Spring retry the record being handled instead of
+     * committing past it.
+     */
     public static <T> T await(CompletableFuture<T> send) {
         try {
             return send.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);

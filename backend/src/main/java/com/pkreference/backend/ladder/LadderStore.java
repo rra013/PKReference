@@ -22,6 +22,10 @@ import java.util.TreeMap;
 /**
  * The ladder_stats table: each reduced month of Smogon's stats, as ladder.stats delivered it. A
  * newer record of a format, month and rating replaces the stored one.
+ *
+ * <p>The record is kept whole, as JSON text in one column, rather than spread over tables: it's
+ * written once, read whole, and never queried inside. A second column holds just each Pokémon's
+ * usage, so the service can compare months and ratings without parsing megabytes.
  */
 @Repository
 public class LadderStore {
@@ -32,11 +36,13 @@ public class LadderStore {
     /** A stored record, and when it was fetched. */
     public record Stored(Stats stats, Instant fetchedAt) {}
 
+    /** Names the generic type the usage column's JSON is read into: a map from Pokémon to usage. */
     private static final TypeReference<LinkedHashMap<String, Double>> USAGE = new TypeReference<>() {};
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
 
+    /** Spring passes in its JdbcTemplate and JSON mapper. */
     public LadderStore(JdbcTemplate jdbc, ObjectMapper mapper) {
         this.jdbc = jdbc;
         this.mapper = mapper;
@@ -95,6 +101,10 @@ public class LadderStore {
                 String.class, format, rating).stream().filter(m -> m != null).findFirst();
     }
 
+    /**
+     * One stored record, parsed back from its JSON, or empty when that month isn't stored at that
+     * rating.
+     */
     public Optional<Stored> find(String format, String month, int rating) {
         return jdbc.query("""
                 select stats, fetched_at from ladder_stats where format = ? and stats_month = ? and rating = ?""",
@@ -116,6 +126,10 @@ public class LadderStore {
         return byRating;
     }
 
+    /**
+     * A value as JSON text. A failure here would be a bug, not bad input, so it's rethrown
+     * unchecked.
+     */
     private String write(Object value) {
         try {
             return mapper.writeValueAsString(value);
@@ -124,6 +138,7 @@ public class LadderStore {
         }
     }
 
+    /** JSON text from the table back into a record. */
     private <T> T read(String json, Class<T> type) {
         try {
             return mapper.readValue(json, type);

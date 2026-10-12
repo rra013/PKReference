@@ -11,6 +11,10 @@ import java.time.format.DateTimeParseException;
  * Which listed events to fetch: the app's rules (TeamCorpusStore). Events of at least minPlayers
  * that have started, within the lookback. Each is fetched once its standings are final (fetched
  * settleAfter after it started) and again every refetchAfter until then.
+ *
+ * <p>Pure functions of their arguments: no Spring, no database, no clock of their own ("now" is passed
+ * in). That's deliberate: the rules are the part most worth testing, and FetchPolicyTest can check
+ * every branch with plain values.
  */
 public final class FetchPolicy {
     private FetchPolicy() {}
@@ -23,6 +27,12 @@ public final class FetchPolicy {
         }
     }
 
+    /**
+     * Whether discovery should ask for this event now. {@code state} is what event_fetch says of
+     * it, null when it has never been asked for. In order: too small, not started or too old: no.
+     * Never asked: yes. Already final: no. Asked and still waiting: only if the request looks lost.
+     * Fetched but not final: only once refetchAfter has passed.
+     */
     public static boolean shouldRequest(Tournament t, EventFetch state, Instant now, LimitlessProperties p) {
         if (t.players() < p.minPlayers()) return false;
         Instant date = startOf(t);

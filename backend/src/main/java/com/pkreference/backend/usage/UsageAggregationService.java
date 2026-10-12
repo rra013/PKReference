@@ -17,12 +17,21 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * Turns one event's standings into counter changes: how many teams ran each Pokémon, and for each
+ * Pokémon how many ran each item, ability, move, Tera type and nature.
+ *
+ * <p>{@code @Service} is {@code @Component} under another name: it makes the class a bean, and says to
+ * the reader that it holds business logic rather than talking to the web or the database. The
+ * database work goes through the two repositories it's given.
+ */
 @Service
 public class UsageAggregationService {
     private final UsageCounterRepository counters;
     private final ProcessedTournamentRepository processed;
     private final NameStandardizer names;
 
+    /** Constructor injection: Spring supplies each parameter from the beans it has made. */
     public UsageAggregationService(UsageCounterRepository counters, ProcessedTournamentRepository processed,
                                    NameStandardizer names) {
         this.counters = counters;
@@ -44,6 +53,8 @@ public class UsageAggregationService {
         String format = tournament.format() == null || tournament.format().isBlank()
                 ? "unknown" : tournament.format();
 
+        // Every counter this event changes, by its key, and by how much: built in memory first,
+        // written once.
         Map<String, Long> deltas = new LinkedHashMap<>();
         Set<String> touchedSpecies = new HashSet<>();
         long teams = 0;
@@ -75,6 +86,7 @@ public class UsageAggregationService {
             deltas.merge(UsageCounter.key(format, UsageCounter.TEAMS, UsageCounter.TOTAL_SPECIES, ""), teams, Long::sum);
         }
 
+        // Load the counters that exist, create the ones that don't, add the changes, save them all.
         Map<String, UsageCounter> existing = counters.findAllById(deltas.keySet()).stream()
                 .collect(Collectors.toMap(UsageCounter::getId, Function.identity()));
         for (var e : deltas.entrySet()) {
@@ -94,22 +106,32 @@ public class UsageAggregationService {
         return updates;
     }
 
+    /**
+     * A zeroed counter for a key, "format|category|species|value"; the value may itself contain
+     * "|", hence the limit of 4.
+     */
     private static UsageCounter newCounter(String key) {
         String[] p = key.split("\\|", 4);
         return new UsageCounter(p[0], p[1], p[2], p.length > 3 ? p[3] : "");
     }
 
+    /** Adds one to a counter's pending change. Nothing to count when the value is missing. */
     private static void bump(Map<String, Long> deltas, String format, String category, String species, String value) {
         if (value == null) return;
         if (!UsageCounter.SPECIES.equals(category) && value.isBlank()) return;
         deltas.merge(UsageCounter.key(format, category, species, value), 1L, Long::sum);
     }
 
+    /**
+     * The Pokémon's key for these counters: Limitless's slug, or its name lowercased. (The team
+     * store uses the app's species key instead.)
+     */
     private static String speciesKey(TeamMember m) {
         if (m.limitlessId() != null && !m.limitlessId().isBlank()) return m.limitlessId();
         return m.name() == null || m.name().isBlank() ? null : lower(m.name());
     }
 
+    /** Lowercased the same way in every locale. */
     private static String lower(String s) {
         return s == null ? null : s.toLowerCase(Locale.ROOT);
     }

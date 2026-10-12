@@ -7,8 +7,12 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * The /v1 responses. Shares are 0 to 1, as the app's are. Every response says what it's from:
- * the window it covers, when it was worked out, and how many events and teams.
+ * The /v1 responses. Shares are 0 to 1, as the app's are. Every response says what it's from: the
+ * window it covers, when it was worked out, and how many events and teams.
+ *
+ * <p>Records, written to JSON by Jackson field for field: these declarations are the API's contract
+ * with the app, whose MetaAPI.swift mirrors them. A boxed type ({@code Double}, {@code Integer})
+ * marks a field that can be null in the JSON. {@code @Schema} only feeds Swagger UI's descriptions.
  */
 public final class MetaResponses {
     private MetaResponses() {}
@@ -19,11 +23,13 @@ public final class MetaResponses {
             @Schema(description = "Teams with a published team list.") int teams,
             @Schema(description = "Of those, teams that played in a top cut (a bracket phase).") int topCutTeams) {}
 
+    /** One stored format, in GET /v1/formats. */
     public record Format(
             @Schema(description = "Limitless format id.", example = "M-C") String format,
             int events, int teams, Instant firstEvent, Instant lastEvent,
             @Schema(description = "When the newest data was fetched.") Instant lastFetched) {}
 
+    /** GET /v1/formats. */
     public record Formats(Instant generatedAt, List<Format> formats) {}
 
     @Schema(description = """
@@ -45,6 +51,7 @@ public final class MetaResponses {
             Double trend,
             WinRecord record) {}
 
+    /** GET /v1/formats/{f}/pokemon. */
     public record PokemonList(String format, String window, Instant from, Instant to, Instant generatedAt,
                               Sample sample, List<PokemonUsage> pokemon) {}
 
@@ -58,6 +65,7 @@ public final class MetaResponses {
     @Schema(description = "Usage in one week (Monday to Sunday, UTC) of the window.")
     public record WeekUsage(LocalDate week, int teams, int withPokemon, double usage) {}
 
+    /** GET /v1/formats/{f}/pokemon/{key}. */
     public record PokemonDetail(String format, String key, String window, Instant from, Instant to,
                                 Instant generatedAt, Sample sample, PokemonUsage usage, List<Share> items,
                                 List<Share> abilities, List<Share> natures, List<Share> moves,
@@ -72,6 +80,7 @@ public final class MetaResponses {
             @Schema(description = "share over what chance would give (the product of their usages): above 1, "
                     + "they're chosen together.") double lift) {}
 
+    /** GET /v1/formats/{f}/cores. */
     public record Cores(String format, String window, Instant from, Instant to, Instant generatedAt,
                         Sample sample, List<Core> pairs, List<Core> trios) {}
 
@@ -91,6 +100,7 @@ public final class MetaResponses {
             int teams, double usage, int topCutTeams, Double topCutUsage, WinRecord record,
             @Schema(description = "Against each other archetype it has played.") List<Matchup> matchups) {}
 
+    /** GET /v1/formats/{f}/archetypes. */
     public record Archetypes(String format, String window, Instant from, Instant to, Instant generatedAt,
                              Sample sample, @Schema(description = "Teams in no archetype.") int other,
                              List<Archetype> archetypes) {}
@@ -107,6 +117,7 @@ public final class MetaResponses {
                               @Schema(description = "The player's name, as Limitless shows it.") String player,
                               Integer placing, int wins, int losses, int ties, List<ExampleMember> members) {}
 
+    /** GET /v1/formats/{f}/archetypes/{id}. */
     public record ArchetypeDetail(String format, String window, Instant from, Instant to, Instant generatedAt,
                                   Sample sample, Archetype archetype,
                                   @Schema(description = """
@@ -120,6 +131,7 @@ public final class MetaResponses {
                               @Schema(description = "The team's species keys, in its order; empty when it has no "
                                       + "published team.") List<String> team) {}
 
+    /** One event, in GET /v1/formats/{f}/events. */
     public record EventSummary(String id, String name, Instant date, int players,
                                @Schema(description = "False while it may still change: until 48 hours after the start.")
                                boolean standingsFinal,
@@ -127,6 +139,7 @@ public final class MetaResponses {
                                Integer topCutPlayers,
                                @Schema(description = "Null until someone has placed first.") EventWinner winner) {}
 
+    /** GET /v1/formats/{f}/events. */
     public record Events(String format, Instant generatedAt,
                          @Schema(description = "Newest first.") List<EventSummary> events) {}
 }

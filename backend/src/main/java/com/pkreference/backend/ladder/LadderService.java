@@ -24,10 +24,12 @@ public class LadderService {
 
     private final LadderStore store;
 
+    /** Spring passes in the store. */
     public LadderService(LadderStore store) {
         this.store = store;
     }
 
+    /** GET /v1/ladder: every stored format, month and rating, without the Pokémon. */
     public Index index() {
         return new Index(store.index().stream().map(e -> new Entry(e.format(), e.regulation(), e.mode(), e.bestOf(),
                 e.month(), e.rating(), e.battles(), e.fetchedAt())).toList());
@@ -43,6 +45,7 @@ public class LadderService {
         var s = stored.stats();
 
         Map<Integer, Map<String, Double>> byRating = store.usage(format, chosen);
+        // "2026-09" less a month is "2026-08"; January's is the December before.
         String previous = YearMonth.parse(chosen).minusMonths(1).toString();
         Map<String, Double> before = store.usage(format, previous).get(cutoff);
 

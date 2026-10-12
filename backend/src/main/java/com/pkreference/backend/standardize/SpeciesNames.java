@@ -95,6 +95,7 @@ public final class SpeciesNames {
         return Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}+", "").toLowerCase(Locale.ROOT);
     }
 
+    /** a to z and 0 to 9 only: the text has been lowercased and had its accents removed by now. */
     private static boolean isAsciiLetterOrDigit(char c) {
         return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
     }
