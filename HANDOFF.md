@@ -39,7 +39,7 @@ not yet in `main`.
 Before that, #23–#56 were the UI pass, game data into JSON, iPad fixes, the
 Mac app, Siri Phase 1 and the rename to PK Reference.
 
-Full suite on 2026-10-12, on `backend-integration` with the ladder's data layer: 1,352 tests,
+Full suite on 2026-10-12, on `backend-integration` with the Meta tab's ladder: 1,364 tests,
 all passing on the iPhone 17 Pro Max simulator. The iOS and Mac builds had no warnings.
 
 ---
@@ -136,7 +136,12 @@ the same rule (the Phase 5 file, §3) and must both produce
 a change to the other, with a new reduction number on both. `LadderStore.load`
 never downloads from Smogon and `fetch` does: Team Search's "often paired
 with" uses `fetch` (`SmogonUsage` is its view of a record), and the Meta
-tab's ladder screens, still to come, will use `load` and offer the download.
+tab's ladder uses `load` and offers the download. The tab's switch
+(`MetaView`, in `AppSettings.metaView`) chooses tournaments or a ladder;
+`LadderModel` (`MetaLadderModel.swift`) holds the ladder's state, with its
+sentences in `LadderText`, its names in `LadderNamer` and its ⓘ texts in
+`LadderDefinition`, which are the Phase 5 file's §6.4 word for word
+(`MetaLadderModelTests` checks). The screens are in `MetaLadderViews.swift`.
 
 **RNG tools** (`RNGToolsView.swift` and the files beside it): PokéFinder's
 C++ core is called through `PFBridge.h`/`.mm`, with `PFBridgeSwift.swift` as
@@ -652,8 +657,10 @@ is in [Recent work](#recent-work) and the README.
    ([`BackendIntegration-PHASE4.md`](BackendIntegration-PHASE4.md)). Phase
    5, the ladder and singles from Smogon's stats, is under way
    ([`BackendIntegration-PHASE5.md`](BackendIntegration-PHASE5.md) §7 says
-   what's built): the server's `/v1/ladder` and the app's data layer are
-   in, and the Meta tab's ladder screens come next. Then 6 and 7
+   what's built): the server's `/v1/ladder`, the app's data layer and the
+   Meta tab's ladder screens are in; Save Set and Calc Against This from
+   the ladder, with its real stat points, and Mon Index's ladder line come
+   next (5e). Then 6 and 7
    (the planning flows, launch), all in
    [`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md). Not yet
    checked: VoiceOver read aloud over the Meta tab, on a device. The server

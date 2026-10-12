@@ -56,7 +56,7 @@ commits use.
 | **Problem Solver** | Pick the set you need to beat and see every Champions Pokémon, move and investment that knocks it out in one hit (or two), guaranteed, in doubles, grouped by whether it moves first. |
 | **Battle Sim** | Singles and doubles battle engine using your saved teams, with Mega Evolution and an on-device AI that can play either side. |
 | **RNG Tools** | Timer, seed finder, wild and static encounters, eggs, TID/SID, GameCube (Colosseum/XD), IV calculator, IV→PID and Hidden Power, for Gen 3–5, plus Sword/Shield raid dens. |
-| **Meta** | What's used in the current regulation's tournaments, and Events: tournaments, standings and team sheets from Limitless, with one-tap import of any team. |
+| **Meta** | What's used in the current regulation's tournaments and on the doubles and singles ladders, and Events: tournaments, standings and team sheets from Limitless, with one-tap import of any team. |
 | **Team Search** | Describe a team idea in plain words and see the popular tournament teams that match it, grouped into compositions. |
 | **Settings** | Appearance, accent color, type badge style, density, type-colored backgrounds, tab order and visibility, default tab and generation, active Champions regulation, data management, and acknowledgements and licenses. |
 
@@ -252,6 +252,8 @@ The tournament meta for the Champions regulation chosen in Settings, over
 the last 14 days, 30 days or the whole regulation: how many events and teams
 the numbers rest on, where they come from and how old they are, and the
 newest events with their winners' teams. It replaced the Tournaments tab.
+A switch at the top shows the **Doubles Ladder** or the **Singles Ladder**
+instead (below).
 
 - **What's Winning:** the most-used Pokémon, led by a sentence ("Rillaboom
   is on 52% of teams and 51% of top-cut teams"), with each one's top-cut
@@ -280,6 +282,30 @@ newest events with their winners' teams. It replaced the Tournaments tab.
   who played whom.
 - **When there's nothing to show** for the regulation or the window, it
   says why, and how to change it.
+
+**The ladders.** Doubles Ladder and Singles Ladder show Pokémon Showdown's
+ladder for the same regulation, from Smogon's monthly usage stats: doubles
+as best of 1 or best of 3, singles as Battle Stadium Singles, each at one of
+Smogon's four rating bands (all players, 1500+, 1630+, 1760+). The header
+says the month and how many battles it's from.
+
+- **Most Used**, led by a sentence, and **All Pokémon**, searchable and
+  sortable by usage, leads or trend. A Mega is its own row, as Smogon counts
+  it: "Mega Salamence" apart from "Salamence".
+- **Common Leads:** each Pokémon's share of all leads.
+- **Rising and Falling** since last month, and **By Rating:** what stronger
+  players use more, and less. Both need the PK Reference server, which keeps
+  the other months and ratings.
+- **A Pokémon's ladder page:** its usage, its lead share and how often a
+  team with it leads with it, its usage at each rating band, its items,
+  abilities, moves and natures, its commonest **stat-point spreads** (which
+  tournaments don't publish) with how much of its teams they cover, and its
+  teammates.
+- **Where the numbers come from:** the PK Reference server when it's on.
+  Otherwise the app offers to download Smogon's file for the ladder being
+  shown, says how big it is, and waits to be asked; it's read once and kept.
+  Smogon publishes a month on the 1st of the next, so a new regulation has
+  no ladder for its first weeks, and the tab says so.
 
 **Events** (All Events, from the Meta tab) browses Limitless's tournaments
 live by game and format, including Champions regulations M-A, M-B and M-C,
@@ -523,7 +549,7 @@ project has no Swift package dependencies.
    later launches work offline, except for Events and Team Search's new
    events. The Mac app is sandboxed, with outgoing network access.
 
-**Tests:** 1,352 tests written with Swift Testing. They cover the damage engines
+**Tests:** 1,364 tests written with Swift Testing. They cover the damage engines
 and the port, the battle engine by mechanic tier, the EV and two-hit solvers,
 speed tiers, paste parsing and import, Champions filters and legality, RNG
 tools, ML parity, the tournament import and data store, Team Search's parser,

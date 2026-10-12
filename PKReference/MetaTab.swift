@@ -7,83 +7,71 @@
 //  the events Team Search downloaded (MetaModel). The Tournaments list lives
 //  on inside it as Events. BackendIntegration-PHASE4.md has the design.
 //
+//  Its switch also shows the doubles or singles ladder, from Smogon's
+//  monthly stats (LadderModel, MetaLadderViews.swift;
+//  BackendIntegration-PHASE5.md §6).
+//
 
 import SwiftUI
 
 struct MetaTab: View {
     @AppStorage(AppSettings.championsRegulation) private var regulationRaw: String
     @AppStorage(AppSettings.metaWindow) private var window: MetaAPI.Window
+    @AppStorage(AppSettings.metaView) private var view: MetaView
+    @AppStorage(AppSettings.metaLadderRating) private var storedRating: Int
+    @AppStorage(AppSettings.metaLadderBestOf) private var storedBestOf: Int
     @AppStorage(AppSettings.metaServerEnabled) private var serverEnabled: Bool
     @AppStorage(AppSettings.metaServerAddress) private var serverAddress: String
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var model = MetaModel()
+    @State private var ladder = LadderModel()
     @State private var showingEvents = false
     /// `-debugOpenSheet metaInfo`: the usage info sheet, for snapshots.
     @State private var showingInfo = false
     /// `-debugOpenSheet metaPokemon`: a page opened in code, for snapshots.
     @State private var debugRoute: MetaRoute?
+    @State private var debugLadderRoute: LadderRoute?
 
     private var regulation: ChampionsRegulation {
         ChampionsRegulation(rawValue: regulationRaw) ?? .current
     }
 
+    /// The ladder the switch and its pickers choose; nil on Tournaments.
+    /// Smogon has best of three for doubles only.
+    private var ladderRequest: LadderRequest? {
+        guard let mode = view.mode else { return nil }
+        return LadderRequest(regulation: regulation, mode: mode,
+                             bestOf: mode == .doubles && storedBestOf == 3 ? 3 : 1,
+                             rating: LadderRequest.ratings.contains(storedRating) ? storedRating : 1760)
+    }
+
     /// Anything that changes what's shown reloads it.
     private var loadKey: String {
-        "\(regulation.rawValue)|\(window.rawValue)|\(serverEnabled)|\(serverAddress)"
+        "\(regulation.rawValue)|\(window.rawValue)|\(serverEnabled)|\(serverAddress)|\(view.rawValue)|"
+            + "\(storedRating)|\(storedBestOf)"
+    }
+
+    private func load(force: Bool = false) async {
+        if let ladderRequest {
+            await ladder.load(ladderRequest, force: force)
+        } else if force {
+            await model.refresh(regulation, window: window)
+        } else {
+            await model.load(regulation, window: window)
+        }
     }
 
     var body: some View {
         TabNavigationStack {
             ScrollView {
                 CardStack {
-                    MetaHeaderCard(regulation: regulation, window: $window, snapshot: model.snapshot)
-                    if let problem = model.serverProblem {
-                        MetaNoticeCard(icon: "exclamationmark.triangle.fill", tint: .orange,
-                                       text: MetaText.serverProblem(problem, showing: model.snapshot?.source,
-                                                                    updated: model.snapshot?.updated, now: .now)) {
-                            Button("Try Again") { Task { await model.load(regulation, window: window, force: true) } }
-                        }
-                    }
-                    if let warning = model.warning {
-                        MetaNoticeCard(icon: "info.circle.fill", tint: .secondary, text: warning) {
-                            OpenSettingsButton(title: "Change in Settings")
-                        }
-                    }
-                    statusCard
-                    if model.snapshot?.source == .device && !serverEnabled {
-                        MetaNoticeCard(icon: "server.rack", tint: .secondary,
-                                       text: "More from a PK Reference server (beta): win rates without mirror "
-                                           + "matches, top cuts, and how archetypes do against each other.") {
-                            OpenSettingsButton(title: "Open Settings")
-                        }
-                    }
-                    let namer = MetaNamer(regulation)
-                    let recent = MetaRecentEventsCard(regulation: regulation, snapshot: model.snapshot,
-                                                      limitlessEvents: model.limitlessEvents) { showingEvents = true }
-                    if let snapshot = model.snapshot, !snapshot.list.pokemon.isEmpty {
-                        // Two columns where there's room: iPad and the Mac.
-                        if horizontalSizeClass == .regular {
-                            HStack(alignment: .top, spacing: 16) {
-                                CardStack {
-                                    MetaWhatsWinningCard(snapshot: snapshot, namer: namer)
-                                    MetaTeamsToBeatCard(snapshot: snapshot, namer: namer)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .top)
-                                CardStack {
-                                    MetaRisingCard(snapshot: snapshot, namer: namer)
-                                    recent
-                                }
-                                .frame(maxWidth: .infinity, alignment: .top)
-                            }
-                        } else {
-                            MetaWhatsWinningCard(snapshot: snapshot, namer: namer)
-                            MetaRisingCard(snapshot: snapshot, namer: namer)
-                            MetaTeamsToBeatCard(snapshot: snapshot, namer: namer)
-                            recent
-                        }
+                    MetaHeaderCard(regulation: regulation, view: $view, window: $window, rating: $storedRating,
+                                   bestOf: $storedBestOf, snapshot: model.snapshot, ladder: ladder.answer)
+                    if let ladderRequest {
+                        MetaLadderHome(request: ladderRequest, model: ladder, serverEnabled: serverEnabled)
                     } else {
-                        recent
+                        tournaments
                     }
                 }
                 .frame(maxWidth: horizontalSizeClass == .regular ? 1100 : 760)
@@ -92,11 +80,11 @@ struct MetaTab: View {
             }
             .navigationTitle("Meta")
             .cardPage()
-            .refreshable { await model.refresh(regulation, window: window) }
+            .refreshable { await load(force: true) }
             #if os(macOS)
             .toolbar {
                 ToolbarItem {
-                    Button { Task { await model.refresh(regulation, window: window) } } label: {
+                    Button { Task { await load(force: true) } } label: {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
                     .keyboardShortcut("r", modifiers: .command)
@@ -107,12 +95,14 @@ struct MetaTab: View {
                 EventsView(format: regulation.limitlessFormat)
             }
             .navigationDestination(for: MetaRoute.self) { destination($0) }
+            .navigationDestination(for: LadderRoute.self) { destination($0) }
             #if DEBUG && os(macOS)
             .navigationDestination(item: $debugRoute) { destination($0) }
+            .navigationDestination(item: $debugLadderRoute) { destination($0) }
             #endif
-            .task(id: loadKey) { await model.load(regulation, window: window) }
+            .task(id: loadKey) { await load() }
             .onChange(of: scenePhase) {
-                if scenePhase == .active { Task { await model.load(regulation, window: window) } }
+                if scenePhase == .active { Task { await load() } }
             }
             #if DEBUG && os(macOS)
             .task { await DebugSnapshot.openSheet("metaEvents") { showingEvents = true } }
@@ -131,8 +121,85 @@ struct MetaTab: View {
                 for _ in 0..<20 where model.snapshot == nil { try? await Task.sleep(for: .milliseconds(250)) }
                 if let id = model.snapshot.flatMap(MetaTeamsToBeatCard.teams)?.first?.id { debugRoute = .archetype(id) }
             }
+            .task {
+                // `-debugOpenSheet metaLadderPokemon` (with `-metaView doublesLadder`): the
+                // most-used Pokémon's ladder page; `metaLadderList`, the full list.
+                let sheet = UserDefaults.standard.string(forKey: "debugOpenSheet")
+                guard sheet == "metaLadderPokemon" || sheet == "metaLadderList" else { return }
+                for _ in 0..<40 where ladder.answer == nil { try? await Task.sleep(for: .milliseconds(250)) }
+                if sheet == "metaLadderList" {
+                    debugLadderRoute = .allPokemon
+                } else if let name = ladder.answer?.stats.pokemon.first?.name {
+                    debugLadderRoute = .pokemon(name)
+                }
+            }
             .sheet(isPresented: $showingInfo) { MetaInfoSheet(definition: .usage) }
             #endif
+        }
+    }
+
+    /// Tournament teams: what the tab has shown since Phase 4.
+    @ViewBuilder
+    private var tournaments: some View {
+        if let problem = model.serverProblem {
+            MetaNoticeCard(icon: "exclamationmark.triangle.fill", tint: .orange,
+                           text: MetaText.serverProblem(problem, showing: model.snapshot?.source,
+                                                        updated: model.snapshot?.updated, now: .now)) {
+                Button("Try Again") { Task { await model.load(regulation, window: window, force: true) } }
+            }
+        }
+        if let warning = model.warning {
+            MetaNoticeCard(icon: "info.circle.fill", tint: .secondary, text: warning) {
+                OpenSettingsButton(title: "Change in Settings")
+            }
+        }
+        statusCard
+        if model.snapshot?.source == .device && !serverEnabled {
+            MetaNoticeCard(icon: "server.rack", tint: .secondary,
+                           text: "More from a PK Reference server (beta): win rates without mirror "
+                               + "matches, top cuts, and how archetypes do against each other.") {
+                OpenSettingsButton(title: "Open Settings")
+            }
+        }
+        let namer = MetaNamer(regulation)
+        let recent = MetaRecentEventsCard(regulation: regulation, snapshot: model.snapshot,
+                                          limitlessEvents: model.limitlessEvents) { showingEvents = true }
+        if let snapshot = model.snapshot, !snapshot.list.pokemon.isEmpty {
+            // Two columns where there's room: iPad and the Mac.
+            if horizontalSizeClass == .regular {
+                HStack(alignment: .top, spacing: 16) {
+                    CardStack {
+                        MetaWhatsWinningCard(snapshot: snapshot, namer: namer)
+                        MetaTeamsToBeatCard(snapshot: snapshot, namer: namer)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .top)
+                    CardStack {
+                        MetaRisingCard(snapshot: snapshot, namer: namer)
+                        recent
+                    }
+                    .frame(maxWidth: .infinity, alignment: .top)
+                }
+            } else {
+                MetaWhatsWinningCard(snapshot: snapshot, namer: namer)
+                MetaRisingCard(snapshot: snapshot, namer: namer)
+                MetaTeamsToBeatCard(snapshot: snapshot, namer: namer)
+                recent
+            }
+        } else {
+            recent
+        }
+    }
+
+    @ViewBuilder
+    private func destination(_ route: LadderRoute) -> some View {
+        if let answer = ladder.answer {
+            let namer = LadderNamer(answer.stats, regulation: regulation)
+            switch route {
+            case .pokemon(let name):
+                LadderPokemonPage(name: name, answer: answer, namer: namer)
+            case .allPokemon:
+                LadderPokemonListView(stats: answer.stats, namer: namer)
+            }
         }
     }
 
@@ -200,12 +267,17 @@ struct MetaTab: View {
 
 // MARK: - Header
 
-/// The regulation, what the numbers rest on and where they're from, and the
-/// window.
+/// The regulation, the switch between tournaments and the ladders, what the
+/// numbers rest on and where they're from, and the window or the ladder's
+/// pickers.
 private struct MetaHeaderCard: View {
     let regulation: ChampionsRegulation
+    @Binding var view: MetaView
     @Binding var window: MetaAPI.Window
+    @Binding var rating: Int
+    @Binding var bestOf: Int
     let snapshot: MetaModel.Snapshot?
+    let ladder: LadderStore.Answer?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -217,26 +289,38 @@ private struct MetaHeaderCard: View {
                 OpenSettingsButton(title: "Change in Settings")
                     .font(.subheadline)
             }
-            if let snapshot {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(MetaText.sample(snapshot.list.sample, source: snapshot.source))
-                        .font(.subheadline)
-                    TimelineView(.periodic(from: .now, by: 60)) { context in
-                        Text(MetaText.source(snapshot.source, updated: snapshot.updated, now: context.date))
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .accessibilityElement(children: .combine)
-            }
-            Picker("Window", selection: $window) {
-                ForEach(MetaAPI.Window.allCases, id: \.self) { window in
-                    Text(MetaText.window(window)).tag(window)
+            Picker("Show", selection: $view) {
+                ForEach(MetaView.allCases) { view in
+                    Text(view.title).tag(view)
                 }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .accessibilityLabel("Window")
+            .accessibilityLabel("Show")
+            if let mode = view.mode {
+                MetaLadderHeader(mode: mode, rating: $rating, bestOf: $bestOf, answer: ladder)
+            } else {
+                if let snapshot {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(MetaText.sample(snapshot.list.sample, source: snapshot.source))
+                            .font(.subheadline)
+                        TimelineView(.periodic(from: .now, by: 60)) { context in
+                            Text(MetaText.source(snapshot.source, updated: snapshot.updated, now: context.date))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+                Picker("Window", selection: $window) {
+                    ForEach(MetaAPI.Window.allCases, id: \.self) { window in
+                        Text(MetaText.window(window)).tag(window)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .accessibilityLabel("Window")
+            }
         }
         .card()
     }
@@ -244,7 +328,7 @@ private struct MetaHeaderCard: View {
 
 /// A short notice with an action: the server couldn't answer, nothing in
 /// the window, and so on.
-private struct MetaNoticeCard<Action: View>: View {
+struct MetaNoticeCard<Action: View>: View {
     let icon: String
     let tint: Color
     let text: String

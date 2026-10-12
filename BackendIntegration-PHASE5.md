@@ -290,7 +290,8 @@ One ⓘ each, in `MetaDefinition`, with the words below.
   All players counts every team once. A Pokémon holding its Mega Stone
   counts as the Mega, apart from its plain form.
 - **Rating band:** Smogon publishes four: every player, and players rated
-  about 1500, 1630 and 1760 or higher. Higher bands rest on fewer battles.
+  about 1500, 1630 and 1760 or higher. The battle count is the same at each:
+  a higher band weighs most of them less, so it rests on fewer players.
 - **Lead share:** its share of all the Pokémon sent out first. In doubles
   each team leads two, so a Pokémon led by one team in ten has 5%.
 - **Trend:** usage this month less last month's, in percentage points.
@@ -310,9 +311,9 @@ from Smogon.
 |---|---|
 | 5a, #112 | This file, and the plan's updates |
 | 5b, #113 | Backend: `SmogonClient`, `LadderDiscovery`, `LadderReducer`, `ladder.stats`, `ladder_stats`, `/v1/ladder`, the golden file, README |
-| 5c | App data: the shapes (`MetaLadderAPI.swift`), `SmogonLadder.reduce` against the golden file, `SmogonLadderStore` and `LadderStore`, Team Search reading through them, Settings' storage row |
-| 5d | App screens: the switch, ladder home, the list, the Pokémon's ladder page, info sheets |
-| 5e | Save Set and Calc Against This with real stat points; Mon Index's ladder line; HANDOFF and README brought up to date |
+| 5c, #114 | App data: the shapes (`MetaLadderAPI.swift`), `SmogonLadder.reduce` against the golden file, `SmogonLadderStore` and `LadderStore`, Team Search reading through them, Settings' storage row |
+| 5d | App screens: the switch, ladder home, the list, the Pokémon's ladder page, info sheets (`MetaLadderModel.swift`, `MetaLadderViews.swift`) |
+| 5e | The page's most common choices, with Save Set and Calc Against This using real stat points; links between a Pokémon's ladder and tournament pages; Mon Index's ladder line |
 
 Each is checked on its own before it's opened. A later one sits on the
 ones before it until they merge.
