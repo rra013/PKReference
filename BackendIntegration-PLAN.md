@@ -209,7 +209,8 @@ it (Phase 7 at the latest).
 - **Remote access** (the owner's phone): the server and its containers
   listen on `127.0.0.1` only; the phone reaches the API, and nothing else,
   through Tailscale's HTTPS address on the owner's tailnet, with an API key
-  (`Authorization: Bearer`, kept in the Keychain, sent only over HTTPS or to
+  that's traded for 15-minute access tokens (JWTs) at `POST /v1/auth/token`
+  (the key kept in the Keychain; key and tokens sent only over HTTPS or to
   the same machine; the server holds only its SHA-256 hash). The setup is
   in [`backend/README.md`](backend/README.md#reaching-it-from-your-phone).
   A key inside a shipped app isn't secret, so a public release needs more

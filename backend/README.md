@@ -94,6 +94,41 @@ uses the Tailscale address (below). Test Connection lists the formats
 `/v1/.../tournaments` and `/standings`, and from Limitless whenever the server can't answer
 (`PKReference/MetaServer.swift`).
 
+### Signing in to the API
+With no API keys configured, the API answers anyone who can reach it. With one or more
+(`PKREF_API_KEY_HASHES`), a client signs in in two steps:
+
+1. **Trade the key for an access token.** `POST /v1/auth/token` with `Authorization: Bearer <key>`
+   answers `{"token": "…", "tokenType": "Bearer", "expiresIn": 900, "expiresAt": "…"}`.
+2. **Send the token with everything else:** `Authorization: Bearer <token>`. After 15 minutes
+   (`PKREF_TOKEN_LIFETIME`) the server answers 401 with `"code": "token_expired"`, and the client
+   trades the key again.
+
+```sh
+KEY=pkr_…                             # from scripts/new-api-key.sh
+TOKEN=$(curl -s -X POST -H "Authorization: Bearer $KEY" localhost:8080/v1/auth/token | jq -r .token)
+curl -H "Authorization: Bearer $TOKEN" 'localhost:8080/v1/formats'
+```
+
+So the long-lived key crosses the network once every few minutes rather than with every request, and a
+token that leaks stops working by itself. The data endpoints don't take the key at all.
+
+- **The token is a JWT** (`TokenService`): a header, claims and a signature. The claims say who made it
+  (`iss`), what for (`aud`), which key it was traded for (`sub`, the first 8 digits of the key's hash)
+  and when it runs out (`exp`). They're only base64, readable by anyone, so nothing secret is in them;
+  the signature (HMAC-SHA256, with a secret only the server has) is what stops anyone changing them.
+- **The server refuses** a token that's run out, changed, signed with another secret or another
+  algorithm (including "none"), made for something else, or traded for a key whose hash has since
+  been removed: removing a hash retires its key and its tokens together.
+- **The signing secret** is random each time the server starts, unless `PKREF_TOKEN_SECRET` (32
+  characters or more; `openssl rand -base64 48`) is set. A restart then ends the tokens from before
+  it, and clients trade their keys again, which the app does without being asked.
+- **A 401 says why** in `code`: `missing_credentials`, `invalid_key`, `invalid_token` or
+  `token_expired`. Neither credential is read from a URL or logged, answers say
+  `Cache-Control: private`, and the token answer says `no-store`.
+- **Swagger UI** still opens. Authorize with the key (`apiKey`), run `POST /v1/auth/token`, then
+  Authorize with the token it returns (`accessToken`).
+
 ### Reaching it from your phone
 Everything listens on this machine only (`127.0.0.1`): Kafka UI has no login, Kafka and Postgres take
 anyone who reaches them, and the API answers anyone. A phone reaches the API, and nothing else, through
@@ -106,10 +141,9 @@ the router, and nothing on the public internet. An API key is the second lock.
    echo 'PKREF_API_KEY_HASHES=<hash>' >> .env
    set -a; . ./.env; set +a; mvn spring-boot:run
    ```
-   With a hash set, every request needs `Authorization: Bearer <key>`, or gets a 401; answers say
-   `Cache-Control: private`. Several keys are comma-separated hashes; remove a hash to retire its key.
-   Swagger UI still opens, and its Authorize button takes the key. Keep the key out of the repository,
-   chats and screenshots: the server only ever has its hash.
+   With a hash set, clients sign in with the key ([above](#signing-in-to-the-api)). Several keys are
+   comma-separated hashes; remove a hash to retire its key. Keep the key out of the repository, chats
+   and screenshots: the server only ever has its hash.
 2. **Tailscale.** Install it on this Mac and the phone, signed in to the same account, then give the
    API an HTTPS address on your tailnet:
    ```sh
@@ -118,8 +152,8 @@ the router, and nothing on the public internet. An API key is the second lock.
    It prints the address, such as `https://your-mac.your-tailnet.ts.net`. Only your devices can reach
    it. Don't use `tailscale funnel`, which puts it on the public internet.
 3. **The app.** Settings → PK Reference Server (Beta): that address, and the key under API Key, which
-   the app keeps in the Keychain and sends only over HTTPS (or to this machine). Test Connection says if
-   the key is wrong.
+   the app keeps in the Keychain. It trades the key for tokens by itself, and sends either only over
+   HTTPS (or to this machine). Test Connection says if the key is wrong.
 
 Without Tailscale, `SERVER_ADDRESS=0.0.0.0` opens the API to every network this machine is on, over
 plain HTTP, where the key can be read: keep it to a network you trust. The ports `docker compose`

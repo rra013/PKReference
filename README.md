@@ -367,8 +367,9 @@ back to Limitless whenever the server can't be reached.
   (`backend/`) at the address given, `http://localhost:8080` by default, and
   from Limitless whenever it can't be reached. Test Connection says how many
   events and teams the server has. A server that needs an API key gets it from
-  the API Key field, which keeps it in the Keychain and sends it only over
-  HTTPS or to the same device ([reaching the server from a phone](backend/README.md#reaching-it-from-your-phone)).
+  the API Key field, which keeps it in the Keychain. The app trades it for
+  short-lived access tokens, and sends either only over HTTPS or to the same
+  device ([reaching the server from a phone](backend/README.md#reaching-it-from-your-phone)).
 - **Acknowledgements & Licenses:** the data sources and open-source
   components the app uses, with each license's full text.
 
@@ -520,7 +521,7 @@ project has no Swift package dependencies.
    later launches work offline, except for Events and Team Search's new
    events. The Mac app is sandboxed, with outgoing network access.
 
-**Tests:** 1,331 tests written with Swift Testing. They cover the damage engines
+**Tests:** 1,335 tests written with Swift Testing. They cover the damage engines
 and the port, the battle engine by mechanic tier, the EV and two-hit solvers,
 speed tiers, paste parsing and import, Champions filters and legality, RNG
 tools, ML parity, the tournament import and data store, Team Search's parser,
