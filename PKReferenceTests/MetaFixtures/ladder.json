@@ -1,0 +1,364 @@
+{
+ "stats": [
+  {
+   "format": "gen9championsbssregmb",
+   "regulation": "M-B",
+   "mode": "singles",
+   "bestOf": 1,
+   "month": "2026-09",
+   "rating": 0,
+   "battles": 14242,
+   "fetchedAt": "2026-10-12T16:46:41.254486Z"
+  },
+  {
+   "format": "gen9championsbssregmb",
+   "regulation": "M-B",
+   "mode": "singles",
+   "bestOf": 1,
+   "month": "2026-09",
+   "rating": 1500,
+   "battles": 14242,
+   "fetchedAt": "2026-10-12T16:46:45.288396Z"
+  },
+  {
+   "format": "gen9championsbssregmb",
+   "regulation": "M-B",
+   "mode": "singles",
+   "bestOf": 1,
+   "month": "2026-09",
+   "rating": 1630,
+   "battles": 14242,
+   "fetchedAt": "2026-10-12T16:46:49.273841Z"
+  },
+  {
+   "format": "gen9championsbssregmb",
+   "regulation": "M-B",
+   "mode": "singles",
+   "bestOf": 1,
+   "month": "2026-09",
+   "rating": 1760,
+   "battles": 14242,
+   "fetchedAt": "2026-10-12T16:46:53.279118Z"
+  },
+  {
+   "format": "gen9championsbssregmb",
+   "regulation": "M-B",
+   "mode": "singles",
+   "bestOf": 1,
+   "month": "2026-08",
+   "rating": 0,
+   "battles": 66884,
+   "fetchedAt": "2026-10-12T16:48:19.437549Z"
+  },
+  {
+   "format": "gen9championsbssregmb",
+   "regulation": "M-B",
+   "mode": "singles",
+   "bestOf": 1,
+   "month": "2026-08",
+   "rating": 1500,
+   "battles": 66884,
+   "fetchedAt": "2026-10-12T16:48:23.629661Z"
+  },
+  {
+   "format": "gen9championsbssregmb",
+   "regulation": "M-B",
+   "mode": "singles",
+   "bestOf": 1,
+   "month": "2026-08",
+   "rating": 1630,
+   "battles": 66884,
+   "fetchedAt": "2026-10-12T16:48:27.468316Z"
+  },
+  {
+   "format": "gen9championsbssregmb",
+   "regulation": "M-B",
+   "mode": "singles",
+   "bestOf": 1,
+   "month": "2026-08",
+   "rating": 1760,
+   "battles": 66884,
+   "fetchedAt": "2026-10-12T16:48:31.455990Z"
+  },
+  {
+   "format": "gen9championsbssregmc",
+   "regulation": "M-C",
+   "mode": "singles",
+   "bestOf": 1,
+   "month": "2026-09",
+   "rating": 0,
+   "battles": 69462,
+   "fetchedAt": "2026-10-12T16:46:57.329206Z"
+  },
+  {
+   "format": "gen9championsbssregmc",
+   "regulation": "M-C",
+   "mode": "singles",
+   "bestOf": 1,
+   "month": "2026-09",
+   "rating": 1500,
+   "battles": 69462,
+   "fetchedAt": "2026-10-12T16:47:01.371794Z"
+  },
+  {
+   "format": "gen9championsbssregmc",
+   "regulation": "M-C",
+   "mode": "singles",
+   "bestOf": 1,
+   "month": "2026-09",
+   "rating": 1630,
+   "battles": 69462,
+   "fetchedAt": "2026-10-12T16:47:05.353996Z"
+  },
+  {
+   "format": "gen9championsbssregmc",
+   "regulation": "M-C",
+   "mode": "singles",
+   "bestOf": 1,
+   "month": "2026-09",
+   "rating": 1760,
+   "battles": 69462,
+   "fetchedAt": "2026-10-12T16:47:09.360321Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmb",
+   "regulation": "M-B",
+   "mode": "doubles",
+   "bestOf": 1,
+   "month": "2026-09",
+   "rating": 0,
+   "battles": 326464,
+   "fetchedAt": "2026-10-12T16:47:13.412092Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmb",
+   "regulation": "M-B",
+   "mode": "doubles",
+   "bestOf": 1,
+   "month": "2026-09",
+   "rating": 1500,
+   "battles": 326464,
+   "fetchedAt": "2026-10-12T16:47:17.457465Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmb",
+   "regulation": "M-B",
+   "mode": "doubles",
+   "bestOf": 1,
+   "month": "2026-09",
+   "rating": 1630,
+   "battles": 326464,
+   "fetchedAt": "2026-10-12T16:47:21.457748Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmb",
+   "regulation": "M-B",
+   "mode": "doubles",
+   "bestOf": 1,
+   "month": "2026-09",
+   "rating": 1760,
+   "battles": 326464,
+   "fetchedAt": "2026-10-12T16:47:25.461616Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmb",
+   "regulation": "M-B",
+   "mode": "doubles",
+   "bestOf": 1,
+   "month": "2026-08",
+   "rating": 0,
+   "battles": 1269250,
+   "fetchedAt": "2026-10-12T16:48:35.682732Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmb",
+   "regulation": "M-B",
+   "mode": "doubles",
+   "bestOf": 1,
+   "month": "2026-08",
+   "rating": 1500,
+   "battles": 1269250,
+   "fetchedAt": "2026-10-12T16:48:39.718228Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmb",
+   "regulation": "M-B",
+   "mode": "doubles",
+   "bestOf": 1,
+   "month": "2026-08",
+   "rating": 1630,
+   "battles": 1269250,
+   "fetchedAt": "2026-10-12T16:48:43.733636Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmb",
+   "regulation": "M-B",
+   "mode": "doubles",
+   "bestOf": 1,
+   "month": "2026-08",
+   "rating": 1760,
+   "battles": 1269250,
+   "fetchedAt": "2026-10-12T16:48:47.691176Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmbbo3",
+   "regulation": "M-B",
+   "mode": "doubles",
+   "bestOf": 3,
+   "month": "2026-09",
+   "rating": 0,
+   "battles": 38449,
+   "fetchedAt": "2026-10-12T16:47:29.402816Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmbbo3",
+   "regulation": "M-B",
+   "mode": "doubles",
+   "bestOf": 3,
+   "month": "2026-09",
+   "rating": 1500,
+   "battles": 38449,
+   "fetchedAt": "2026-10-12T16:47:33.507662Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmbbo3",
+   "regulation": "M-B",
+   "mode": "doubles",
+   "bestOf": 3,
+   "month": "2026-09",
+   "rating": 1630,
+   "battles": 38449,
+   "fetchedAt": "2026-10-12T16:47:37.411936Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmbbo3",
+   "regulation": "M-B",
+   "mode": "doubles",
+   "bestOf": 3,
+   "month": "2026-09",
+   "rating": 1760,
+   "battles": 38449,
+   "fetchedAt": "2026-10-12T16:47:41.399180Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmbbo3",
+   "regulation": "M-B",
+   "mode": "doubles",
+   "bestOf": 3,
+   "month": "2026-08",
+   "rating": 0,
+   "battles": 179434,
+   "fetchedAt": "2026-10-12T16:48:51.520914Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmbbo3",
+   "regulation": "M-B",
+   "mode": "doubles",
+   "bestOf": 3,
+   "month": "2026-08",
+   "rating": 1500,
+   "battles": 179434,
+   "fetchedAt": "2026-10-12T16:48:55.546794Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmbbo3",
+   "regulation": "M-B",
+   "mode": "doubles",
+   "bestOf": 3,
+   "month": "2026-08",
+   "rating": 1630,
+   "battles": 179434,
+   "fetchedAt": "2026-10-12T16:48:59.542604Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmbbo3",
+   "regulation": "M-B",
+   "mode": "doubles",
+   "bestOf": 3,
+   "month": "2026-08",
+   "rating": 1760,
+   "battles": 179434,
+   "fetchedAt": "2026-10-12T16:49:03.528699Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmc",
+   "regulation": "M-C",
+   "mode": "doubles",
+   "bestOf": 1,
+   "month": "2026-09",
+   "rating": 0,
+   "battles": 1631943,
+   "fetchedAt": "2026-10-12T16:47:45.710826Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmc",
+   "regulation": "M-C",
+   "mode": "doubles",
+   "bestOf": 1,
+   "month": "2026-09",
+   "rating": 1500,
+   "battles": 1631943,
+   "fetchedAt": "2026-10-12T16:47:49.768236Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmc",
+   "regulation": "M-C",
+   "mode": "doubles",
+   "bestOf": 1,
+   "month": "2026-09",
+   "rating": 1630,
+   "battles": 1631943,
+   "fetchedAt": "2026-10-12T16:47:53.750091Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmc",
+   "regulation": "M-C",
+   "mode": "doubles",
+   "bestOf": 1,
+   "month": "2026-09",
+   "rating": 1760,
+   "battles": 1631943,
+   "fetchedAt": "2026-10-12T16:47:57.760880Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmcbo3",
+   "regulation": "M-C",
+   "mode": "doubles",
+   "bestOf": 3,
+   "month": "2026-09",
+   "rating": 0,
+   "battles": 223477,
+   "fetchedAt": "2026-10-12T16:48:01.498318Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmcbo3",
+   "regulation": "M-C",
+   "mode": "doubles",
+   "bestOf": 3,
+   "month": "2026-09",
+   "rating": 1500,
+   "battles": 223477,
+   "fetchedAt": "2026-10-12T16:48:05.542861Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmcbo3",
+   "regulation": "M-C",
+   "mode": "doubles",
+   "bestOf": 3,
+   "month": "2026-09",
+   "rating": 1630,
+   "battles": 223477,
+   "fetchedAt": "2026-10-12T16:48:09.511553Z"
+  },
+  {
+   "format": "gen9championsvgc2026regmcbo3",
+   "regulation": "M-C",
+   "mode": "doubles",
+   "bestOf": 3,
+   "month": "2026-09",
+   "rating": 1760,
+   "battles": 223477,
+   "fetchedAt": "2026-10-12T16:48:13.503823Z"
+  }
+ ]
+}

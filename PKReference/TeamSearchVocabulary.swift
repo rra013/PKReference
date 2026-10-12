@@ -227,7 +227,9 @@ nonisolated struct TeamSearchVocabulary: Sendable {
     /// → Mega Charizard Y, "Floette-Mega" → Mega Floette, "Arcanine-Hisui" →
     /// Arcanine (Hisui). nil for a species outside the regulation.
     func term(showdownName name: String) -> SpeciesTerm? {
-        var words = LimitlessSpeciesResolver.words(name)
+        // Showdown writes "Sirfetch'd"; the regulations' files, "Sirfetchd".
+        var words = LimitlessSpeciesResolver.words(
+            name.replacingOccurrences(of: "'", with: "").replacingOccurrences(of: "\u{2019}", with: ""))
         var mega: SpeciesTerm.Mega?
         if let megaIndex = words.firstIndex(of: "mega") {
             let variant = words.dropFirst(megaIndex + 1).first

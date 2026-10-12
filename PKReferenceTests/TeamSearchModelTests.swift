@@ -49,13 +49,15 @@ private struct CannedSmogon: SmogonFetching {
         }
     }
 
-    func chaosFiles(month: String) async throws -> [String] {
-        ["gen9championsvgc2026regmb-1760.json"]
+    func chaosFiles(month: String) async throws -> [SmogonFile] {
+        [SmogonFile(name: "gen9championsvgc2026regmb-1760.json", bytes: nil)]
     }
 
     func chaos(month: String, file: String) async throws -> Data {
         Data(TeamSearchFixtures.smogonChaosJSON.utf8)
     }
+
+    func leads(month: String, file: String) async throws -> String? { nil }
 }
 
 /// Holds an answer back until opened.
@@ -118,9 +120,11 @@ struct TeamSearchModelTests {
             regulation: regulation,
             store: TeamCorpusStore(fetcher: fetcher, directory: directory,
                                    now: { F.now }, sleep: { _ in }),
-            smogonStore: SmogonUsageStore(fetcher: CannedSmogon(mode: smogon),
-                                          directory: directory.appending(path: "smogon"),
-                                          now: { F.now }),
+            // No server: the ladder's record is made from Smogon's files.
+            ladderStore: LadderStore(serverURL: { nil },
+                                     device: SmogonLadderStore(fetcher: CannedSmogon(mode: smogon),
+                                                               directory: directory.appending(path: "smogon"),
+                                                               now: { F.now })),
             loadVocabulary: { _ in F.vocabulary },
             interpreter: interpreter,
             now: { F.now })

@@ -39,7 +39,7 @@ not yet in `main`.
 Before that, #23–#56 were the UI pass, game data into JSON, iPad fixes, the
 Mac app, Siri Phase 1 and the rename to PK Reference.
 
-Full suite on 2026-10-11, on `backend-integration` with access tokens: 1,335 tests,
+Full suite on 2026-10-12, on `backend-integration` with the ladder's data layer: 1,352 tests,
 all passing on the iPhone 17 Pro Max simulator. The iOS and Mac builds had no warnings.
 
 ---
@@ -124,6 +124,19 @@ with `MetaNames.swift` (a port of the backend's `NameStandardizer`) for the
 names. It counts as the backend's `MetaService` does, so a change to how
 either side counts must keep `MetaDeviceInsightsTests` and the backend's
 `MetaGoldenFileTest` passing against `golden/meta-fixture.json`.
+
+**The ladder** (Smogon's monthly usage stats): one record,
+`MetaAPI.LadderStats` in `MetaLadderAPI.swift`, from two sources.
+`LadderStore.swift` asks the server's `/v1/ladder` first and otherwise uses
+`SmogonLadderStore.swift`, which downloads Smogon's own files
+(`SmogonFetching` in `SmogonUsage.swift`) and cuts them down with
+`SmogonLadder.reduce`. That reducer and the backend's `LadderReducer` are
+the same rule (the Phase 5 file, §3) and must both produce
+`backend/src/test/resources/golden/ladder-fixture.json`; a change to one is
+a change to the other, with a new reduction number on both. `LadderStore.load`
+never downloads from Smogon and `fetch` does: Team Search's "often paired
+with" uses `fetch` (`SmogonUsage` is its view of a record), and the Meta
+tab's ladder screens, still to come, will use `load` and offer the download.
 
 **RNG tools** (`RNGToolsView.swift` and the files beside it): PokéFinder's
 C++ core is called through `PFBridge.h`/`.mm`, with `PFBridgeSwift.swift` as
@@ -636,8 +649,11 @@ is in [Recent work](#recent-work) and the README.
      but saving a team reports them; a log of them would show the gaps.
 6. **The backend integration**, on `backend-integration` (PRs go there,
    not to `main`). Phases 0–4 are done, the Meta tab included
-   ([`BackendIntegration-PHASE4.md`](BackendIntegration-PHASE4.md)). Next
-   is Phase 5, the ladder and singles from Smogon's stats; then 6 and 7
+   ([`BackendIntegration-PHASE4.md`](BackendIntegration-PHASE4.md)). Phase
+   5, the ladder and singles from Smogon's stats, is under way
+   ([`BackendIntegration-PHASE5.md`](BackendIntegration-PHASE5.md) §7 says
+   what's built): the server's `/v1/ladder` and the app's data layer are
+   in, and the Meta tab's ladder screens come next. Then 6 and 7
    (the planning flows, launch), all in
    [`BackendIntegration-PLAN.md`](BackendIntegration-PLAN.md). Not yet
    checked: VoiceOver read aloud over the Meta tab, on a device. The server

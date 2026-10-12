@@ -121,6 +121,26 @@ nonisolated struct MetaNames: Sendable {
         raw.map { natures.resolve($0, fallback: nil) }
     }
 
+    // MARK: Showdown IDs
+
+    /// A Showdown ID from Smogon's stats ("choicescarf") as the item's name
+    /// ("Choice Scarf"); the ID itself when no item has it. Smogon's
+    /// "nothing" is "No Item". Exact matches only, as the backend's
+    /// `itemById`: an ID is never misspelled, so a near miss would be
+    /// another item.
+    func itemName(id: String) -> String {
+        if id == "nothing" { return Self.noItem }
+        return items.exact(id) ?? allItems.exact(id) ?? id
+    }
+
+    func abilityName(id: String) -> String {
+        abilities.exact(id) ?? allAbilities.exact(id) ?? id
+    }
+
+    func moveName(id: String) -> String {
+        moves.exact(id) ?? allMoves.exact(id) ?? id
+    }
+
     // MARK: The dictionary
 
     /// Lowercase ASCII letters and digits only: "Fake-out", "FAKE OUT" and
@@ -153,6 +173,11 @@ nonisolated struct MetaNames: Sendable {
             }
             self.byKey = byKey
             self.keys = keys
+        }
+
+        /// The name whose key is `raw`'s, or nil: no near misses.
+        func exact(_ raw: String) -> String? {
+            byKey[MetaNames.key(raw)]
         }
 
         /// An exact match here, then in `fallback`, then a single near miss
