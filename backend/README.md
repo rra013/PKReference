@@ -25,7 +25,10 @@ Smogon --poll-->    LadderDiscovery   --> ladder.stats (each monthly file, reduc
 
 **New to the code?** [`docs/PKReference-backend-guide.pdf`](docs/PKReference-backend-guide.pdf) is a study
 guide: how the data flows, the Spring and Kafka ideas the project uses and where, every table and
-endpoint, and every class and method, taken from the comments in the source.
+endpoint, and every class and method, which it reads from the comments in the source. After
+changing the code or its comments, `python3 docs/study-guide/build_study_guide.py` builds it again
+(the PDF step needs macOS; elsewhere it writes HTML to print). The chapters and the diagram are
+written by hand, in `docs/study-guide/`: a new topic, table or endpoint needs a line there too.
 
 ## Run
 ```sh

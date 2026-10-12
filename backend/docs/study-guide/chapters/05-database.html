@@ -1,0 +1,61 @@
+<h1 id="part5">Part 5. The database</h1>
+
+<h2>5.1 Tables</h2>
+<table class="tight">
+<tr><th>Table</th><th>One row is</th><th>Written by</th><th>Read by</th><th>Migration</th></tr>
+<tr><td><code>event_fetch</code></td><td>what was asked for and fetched of one event</td>
+<td><code>EventFetchRepository</code></td><td><code>EventDiscovery</code> (through the repository)</td><td>V2</td></tr>
+<tr><td><code>event</code></td><td>one stored tournament</td><td rowspan="6"><code>TeamStore</code></td>
+<td rowspan="6"><code>MetaRepository</code>, <code>CorpusRepository</code></td><td>V2</td></tr>
+<tr><td><code>event_phase</code></td><td>one phase of an event (Swiss, top cut)</td><td>V2</td></tr>
+<tr><td><code>team</code></td><td>one player's entry: placing and record</td><td>V2</td></tr>
+<tr><td><code>team_member</code></td><td>one Pokémon on a team, with its species key and Mega Stone</td><td>V2, V3</td></tr>
+<tr><td><code>team_member_move</code></td><td>one move of one member</td><td>V2</td></tr>
+<tr><td><code>pairing</code></td><td>one match, with its result</td><td>V2</td></tr>
+<tr><td><code>pairing_fetch</code></td><td>when an event's pairings were fetched</td><td><code>TeamStore</code></td>
+<td><code>TeamStore</code></td><td>V2</td></tr>
+<tr><td><code>store_version</code></td><td>the single counter every write bumps</td><td><code>TeamStore</code></td>
+<td><code>MetaRepository.version</code></td><td>V4</td></tr>
+<tr><td><code>usage_counter</code></td><td>one all-time count</td><td rowspan="2"><code>UsageAggregationService</code>
+(JPA)</td><td><code>UsageController</code></td><td>V1</td></tr>
+<tr><td><code>processed_tournament</code></td><td>an event already counted</td>
+<td><code>UsageAggregationService</code></td><td>V1</td></tr>
+<tr><td><code>ladder_stats</code></td><td>one reduced month of a format at a rating, as JSON text</td>
+<td><code>LadderStore</code></td><td><code>LadderStore</code>, for <code>LadderService</code></td><td>V5</td></tr>
+</table>
+<p>Keys worth knowing: a team is <code>(event_id, player)</code>; a member adds <code>slot</code>; a move adds
+<code>move_slot</code>. Deleting an <code>event</code> cascades to its phases, teams, members and moves
+(<code>on delete cascade</code>). <code>pairing</code> has no foreign key to <code>event</code>, because an
+event's pairings can arrive before its standings.</p>
+
+<h2>5.2 Flyway</h2>
+<p>The schema lives in <code>src/main/resources/db/migration</code> as <code>V1__...sql</code> to
+<code>V5__...sql</code>. At start-up Flyway runs any file that hasn't run on this database, in number
+order, and records each in its own table, <code>flyway_schema_history</code>, with a checksum.</p>
+<ul>
+<li>To change the schema, <b>add a new file</b> with the next number. Never edit one that has been applied:
+Flyway compares checksums at start-up and refuses to start on a mismatch. (This is why the comment pass
+that produced this guide left the SQL files alone.)</li>
+<li>Hibernate is set to <code>ddl-auto: validate</code>: it creates nothing, and only checks that the two
+entity classes match their tables.</li>
+<li>Tests run the same migrations on H2 (in memory) and, where Docker is available, on real Postgres 17
+through Testcontainers, because H2 accepts some SQL that Postgres rejects.</li>
+</ul>
+
+<h2>5.3 Two styles of data access, and why</h2>
+<p>The first version of the backend used <b>JPA</b>: annotate a class as an <code>@Entity</code>, declare a
+repository interface, and let Spring Data generate the queries. It's concise for "load a few objects, change
+them, save them", which is what the counters do.</p>
+<p>Everything since uses <b><code>JdbcTemplate</code> and plain SQL</b>. The team store's work is "delete an
+event's rows and bulk-insert a few thousand", and the insights' work is reporting queries over joins. Both
+read more plainly as SQL, batch well, and behave the same on H2 and Postgres. The counting itself is done in
+Java, not SQL, so definitions live in one tested place (<code>MetaService</code>).</p>
+
+<h2>5.4 Transactions and the version counter</h2>
+<p><code>TeamStore.putStandings</code> is <code>@Transactional</code>: delete, bump
+<code>store_version</code>, insert, all or nothing. A reader on another connection sees either the old
+event or the new one, never half.</p>
+<p><code>MetaService</code> caches each computed answer under a key that includes
+<code>store_version</code>. Because the bump commits in the same transaction as the rows, a reader sees a new
+version exactly when it can see the new rows, so a cached answer is never served for data it wasn't
+computed from.</p>

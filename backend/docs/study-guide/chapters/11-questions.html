@@ -1,0 +1,183 @@
+<h1 id="part11">Part 11. Design decisions, and questions to expect</h1>
+<p>Short answers you can say aloud, each with the code that backs it up. Where the honest answer is "it's a
+limitation", that's what is written: an interviewer hears a trade-off understood, which is better than a
+defence.</p>
+
+<h2>Architecture</h2>
+<div class="qa">
+<p class="q">Why Kafka for a few hundred events a month?</p>
+<p>For replay, not throughput. The fetched data stays in compacted topics for good, so any table can be rebuilt,
+with new rules, without crawling Limitless again. It also gives independent consumers and isolates the slow,
+rate-limited fetching from everything else. The cost is running a broker, kept to one KRaft node. A queue
+table in Postgres would handle the volume; it wouldn't give replay as naturally. (Part 4.3)</p>
+
+<p class="q">Why are the insights computed on request instead of stored in tables?</p>
+<p>At a few thousand teams a format, counting in memory takes milliseconds, and the result is cached until the
+data changes. Storing aggregates would mean migrations and backfills every time a definition changed. If a
+format grew to where this was slow, the plan is to move that insight to its own consumer with its own
+tables, rebuilt from the topics. (<code>MetaService</code>)</p>
+
+<p class="q">How do you know a cached answer isn't stale?</p>
+<p>The cache key includes <code>store_version</code>, a counter that <code>TeamStore</code> increments inside
+the same transaction as every write. A reader sees the new version exactly when it can see the new rows.
+The key also includes the hour, because windows like "the last 14 days" move even when nothing is written.
+(<code>MetaService.memoize</code>)</p>
+
+<p class="q">What are the write path and read path, and why separate them?</p>
+<p>Writes are driven by timers and Kafka records; reads by HTTP requests. They share only Postgres. So an
+outage of Limitless, Smogon or Kafka costs freshness, not availability, and a slow backfill never slows a
+request.</p>
+
+<p class="q">Why split discovery from fetching?</p>
+<p>Discovery is one cheap list call per page; fetching is three throttled calls per event and can run for
+hours. With a topic between them, a poll finishes quickly, a failed fetch retries alone, and pending work
+survives a restart. (<code>EventDiscovery</code>, <code>EventFetcher</code>)</p>
+</div>
+
+<h2>Kafka</h2>
+<div class="qa">
+<p class="q">What delivery guarantee do you have?</p>
+<p>At-least-once consumption, with idempotent handlers, which gives exactly-once results. Producers use
+<code>acks=all</code> with idempotence and every send is awaited. I don't use Kafka transactions: the
+handlers write to Postgres, so the idempotence has to live there anyway. (Part 4.4)</p>
+
+<p class="q">How is each consumer idempotent?</p>
+<p>The team store deletes and re-inserts an event in one transaction and ignores a fetch older than the stored
+one. The ladder store replaces a row unless the stored one is newer. The counters, which can't be
+"replaced", record each processed event id in the same transaction as the counts.</p>
+
+<p class="q">What happens to a record that keeps failing?</p>
+<p>Three retries two seconds apart, then it's published to <code>&lt;topic&gt;.DLT</code> with the exception in
+its headers, and the consumer moves on. (<code>KafkaErrorHandling</code>)</p>
+
+<p class="q">What is compaction and why use it here?</p>
+<p>The broker keeps at least the latest record per key instead of deleting by age. Keyed by event id, the
+topic holds the latest standings of every event ever fetched: a durable table I can re-read. An event
+fetched five times before its standings settled takes the space of one.</p>
+
+<p class="q">Why <code>max-poll-records: 10</code> and a 15-minute <code>max.poll.interval.ms</code>?</p>
+<p>The fetcher makes three requests per record under a 40-per-5-minutes throttle, so one batch can take many
+minutes. If a consumer doesn't poll within the interval, Kafka assumes it died and reassigns its records,
+which would fetch events twice and spend the rate limit. Small batches and a long interval prevent that.</p>
+
+<p class="q">Why three partitions with one consumer each?</p>
+<p>Three leaves room to run more consumers in a group later without repartitioning. Today each listener is one
+thread reading all three. Records with the same key share a partition, so an event's updates stay in
+order.</p>
+
+<p class="q">Why JSON and not Avro or Protobuf with a schema registry?</p>
+<p>Simplicity at this size: the records are Java records, readable in Kafka UI, and tolerant of added fields
+(<code>ignoreUnknown</code>). The trade-off is no enforced schema evolution. With more producers or teams I
+would add a registry.</p>
+</div>
+
+<h2>Spring and Java</h2>
+<div class="qa">
+<p class="q">What does <code>@Bean</code> do, and when do you use it instead of <code>@Component</code>?</p>
+<p><code>@Bean</code> goes on a method of a <code>@Configuration</code> class; Spring calls it once and registers
+the result. I use it when the object needs construction logic or isn't my class: the <code>Clock</code>, the
+<code>NewTopic</code>s, the error handler, the filter registrations, the <code>TokenService</code>.
+<code>@Component</code> and its relatives go on my own classes that Spring can construct directly.
+(Part 3.2)</p>
+
+<p class="q">Why constructor injection?</p>
+<p>Dependencies are explicit and final, the class can't exist half-wired, and tests construct it with fakes
+without starting Spring.</p>
+
+<p class="q">Why inject a <code>Clock</code>?</p>
+<p>So time is an input. Tests check "is this event final 48 hours after it started?" or "does this token expire
+at 15 minutes?" at exact instants.</p>
+
+<p class="q">How does <code>@Transactional</code> work, and what's the catch?</p>
+<p>Spring wraps the bean in a proxy that opens a transaction before the method and commits or rolls back
+after. The catch: it only applies to calls that come through the proxy, so a method calling another
+<code>@Transactional</code> method on <code>this</code> gets no new transaction. Here each transactional
+method is called from another bean.</p>
+
+<p class="q">Why <code>JdbcTemplate</code> in most places and JPA in one?</p>
+<p>JPA came with the first version and suits its small load-modify-save counters. The rest is bulk replaces
+and reporting joins, which are clearer and faster as SQL. (Part 5.3)</p>
+
+<p class="q">Why records?</p>
+<p>Wire types, responses, settings and query rows are all plain immutable data. A record is that in one line,
+and Jackson maps it to JSON by field name.</p>
+</div>
+
+<h2>The sources</h2>
+<div class="qa">
+<p class="q">How do you stay under Limitless's rate limit?</p>
+<p><code>RequestThrottle</code> keeps a sliding window of the requests sent (40 in 5 minutes, under the 50
+allowed) and also reads Limitless's own <code>ratelimit</code> header, because the app on the same machine
+shares the address. Every request passes through it via a <code>RestClient</code> interceptor. On a 429 the
+client honors <code>Retry-After</code>.</p>
+
+<p class="q">How do you decide when an event's standings are final?</p>
+<p>By the app's rule: a fetch made 48 hours or more after the event started is final. Until then the event is
+stored, so it can be seen, and fetched again every 6 hours. The all-time counters wait for the final
+fetch. (<code>FetchPolicy</code>)</p>
+
+<p class="q">Player-typed names are messy. How do you count them?</p>
+<p><code>NameStandardizer</code> maps each item, ability and move to a canonical spelling using the game's own
+lists: exact match after normalizing, then a single near miss by edit distance, otherwise kept as typed.
+Species use the app's own vocabulary (<code>SpeciesVocabulary</code>), and a golden file checked by both
+test suites keeps server and app in agreement.</p>
+
+<p class="q">Why reduce Smogon's files instead of storing them?</p>
+<p>A file is up to 7 MB, over the topic's limit and far more than the app shows. The reducer streams it one
+Pokémon at a time and keeps about 1 MB. Smogon keeps every month, so the raw file can always be fetched
+again; a version number on the rule makes the server do that when the rule changes.
+(<code>LadderReducer</code>)</p>
+</div>
+
+<h2>Security</h2>
+<div class="qa">
+<p class="q">Why trade a key for a JWT instead of sending the key every time?</p>
+<p>The long-lived secret is exposed once every 15 minutes rather than on every request, and a leaked token
+expires by itself. The server stores only the key's SHA-256 hash.</p>
+
+<p class="q">What JWT attacks does <code>verify</code> guard against?</p>
+<p>It pins the algorithm to HS256 before checking the signature (no <code>alg: none</code>, no algorithm
+switching), checks expiry, issuer and audience, and checks that the key the token was issued for is still
+configured. (Part 6.4)</p>
+
+<p class="q">Why constant-time comparison?</p>
+<p>A normal comparison returns at the first differing byte, so response time leaks how much of a guess was
+right. <code>MessageDigest.isEqual</code> takes the same time regardless, and every configured hash is
+compared.</p>
+
+<p class="q">Why not Spring Security?</p>
+<p>The need is one check on every request and one token endpoint. A servlet filter and a small service do that
+in a few hundred lines that can be read end to end. With users, roles or OAuth I would switch.</p>
+</div>
+
+<h2>Limits, and what I would change</h2>
+<div class="qa">
+<p class="q">What are this system's weak points?</p>
+<ul>
+<li><b>One of everything.</b> One broker with replication factor 1, one Postgres, one server instance. A disk
+loss is recovered from the daily backup and by fetching again, not by failover.</li>
+<li><b>Scheduling assumes one instance.</b> Two instances would both poll. The <code>event_fetch</code> table
+and idempotent stores make that wasteful rather than wrong, but a lock (ShedLock, or a leader) would be the
+fix. The throttle and the cache are also per instance.</li>
+<li><b>Short retries.</b> Six seconds of retrying doesn't outlast a database restart; those records go to the
+DLT and need a replay. A longer exponential back-off, or pausing the listener, would be better.</li>
+<li><b>Nobody watches the DLTs.</b> There's no alert on dead letters or on ingest lag yet; it's in the plan's
+launch phase.</li>
+<li><b>The cache is crude.</b> A map cleared when it passes 500 entries. Fine for one user; a real cache with
+size and time limits (Caffeine) is the obvious upgrade.</li>
+<li><b>ETags save bytes, not work.</b> The filter hashes a body the server has already produced.</li>
+<li><b>Test isolation.</b> The database slice tests commit rather than roll back, so some tests clear their
+tables first. Found while writing the ladder tests; noted for a fix.</li>
+</ul>
+
+<p class="q">How would this scale to many users?</p>
+<p>Reads scale first and easily: the API is stateless apart from its cache, so more instances behind a load
+balancer and a CDN in front (the answers are identical for everyone and already carry caching headers).
+Writes barely grow with users, since the sources are the same. For more sources or volume: more partitions
+and consumers per group, a replicated Kafka cluster, and precomputed projections for the heaviest
+insights.</p>
+
+<p class="q">What would you build next?</p>
+<p>Monitoring (lag, newest event's age, dead letters), a webhook from Limitless in place of polling, and a
+replay test that rebuilds a table from its topic and checks it is identical.</p>
+</div>

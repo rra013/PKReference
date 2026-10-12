@@ -1,0 +1,123 @@
+<h1 id="part2">Part 2. Follow the data</h1>
+<p>Three walks through the code. Each step names the class and method that does it; Part 8 has every one of
+them in detail.</p>
+
+<h2>2.1 The life of a tournament event</h2>
+<ol class="steps">
+<li><b>The timer fires.</b> Every 30 minutes Spring's scheduler calls <code>EventDiscovery.poll()</code>
+(<code>@Scheduled</code>). For each configured format it calls <code>discover(format)</code>.</li>
+<li><b>List.</b> <code>discover</code> asks <code>LimitlessClient.tournaments(format, page)</code> for the newest
+events, a page of 50 at a time, walking back until a whole page is older than the lookback (7 days). Every
+request first waits its turn in <code>RequestThrottle.acquire()</code>.</li>
+<li><b>Decide.</b> For each listed event, <code>FetchPolicy.shouldRequest(...)</code> answers "ask for it now?"
+from the event itself and from what the <code>event_fetch</code> table remembers
+(<code>EventFetchRepository.find</code>): at least 16 players, already started, not already final, not
+already waiting in the queue, and if fetched before, not within the last 6 hours.</li>
+<li><b>Ask.</b> For each "yes", discovery publishes a <code>TournamentDiscovered</code> record to the topic
+<code>tournaments.discovered</code>, keyed by the event's id, waits for the broker to confirm
+(<code>KafkaSends.await</code>), and notes it in <code>event_fetch</code>
+(<code>markRequested</code>).</li>
+<li><b>Fetch.</b> <code>EventFetcher.onDiscovered(...)</code> (<code>@KafkaListener</code>, group
+<code>standings-fetcher</code>) receives the record and makes three throttled requests: the event's details,
+standings and pairings. It works out whether the standings are final
+(<code>FetchPolicy.isFinal</code>: fetched 48 hours or more after the start).</li>
+<li><b>Publish.</b> The fetcher sends a <code>StandingsFetched</code> record to <code>standings.fetched</code>
+and a <code>PairingsFetched</code> record to <code>pairings.fetched</code>, both keyed by the event's id,
+waits for both, then calls <code>markFetched</code>. Only then does the method return and the offset move
+on.</li>
+<li><b>Store.</b> Two independent consumer groups read <code>standings.fetched</code>:
+  <ul>
+  <li><code>TeamStoreConsumer.onStandings</code> (group <code>team-store-standings</code>) calls
+  <code>TeamStore.putStandings</code>, which in one transaction deletes the event's old rows and inserts
+  its event, phases, teams, members and moves. Each member gets its species key from
+  <code>SpeciesVocabularies.identify</code>. The store's version counter goes up by one.</li>
+  <li><code>UsageConsumer.onStandings</code> (group <code>usage-aggregator</code>) calls
+  <code>UsageAggregationService.apply</code>, which adds the event to the all-time counters once it is
+  final, and marks it processed in the same transaction.</li>
+  </ul>
+  <code>TeamStoreConsumer.onPairings</code> (group <code>team-store-pairings</code>) stores the matches
+  through <code>TeamStore.putPairings</code>.</li>
+<li><b>Serve.</b> The next request to <code>/v1/formats/M-C/pokemon</code> finds a new store version, so
+<code>MetaService</code> recomputes from the tables, and the new event is in the numbers.</li>
+<li><b>Again, until final.</b> An event fetched before its standings settled is asked for again every 6 hours
+(step 3) until a fetch comes 48 hours after its start. Each later fetch replaces the earlier rows.</li>
+</ol>
+
+<h2>2.2 The life of a ladder month</h2>
+<ol class="steps">
+<li><b>The timer fires.</b> Every 12 hours <code>LadderDiscovery.poll()</code> calls <code>discover()</code>.</li>
+<li><b>List.</b> <code>SmogonClient.months()</code> reads Smogon's index page; for each of the two newest
+months, <code>chaosFiles(month)</code> reads that month's listing. The client waits 2 seconds between
+requests.</li>
+<li><b>Choose.</b> Each file name is split into a format and a rating. <code>LadderFormat.parse</code>
+recognizes Champions doubles and singles formats of a known regulation; everything else is skipped.
+<code>LadderStore.has(...)</code> skips files already stored by the current rule.</li>
+<li><b>Fetch and reduce.</b> For each file left, discovery gets the small leads table
+(<code>SmogonClient.leads</code>) and then streams the big statistics file
+(<code>SmogonClient.chaos</code>) straight into <code>LadderReducer.reduce</code>, which reads one Pokémon
+at a time and keeps only what the app shows. Up to 7 MB becomes about 1 MB.</li>
+<li><b>Publish.</b> The reduced <code>Ladder.Stats</code>, wrapped in <code>StatsFetched</code> with the time,
+goes to the topic <code>ladder.stats</code>, keyed <code>format|month|rating</code>.</li>
+<li><b>Store.</b> <code>LadderStoreConsumer.onStats</code> (group <code>ladder-store</code>) calls
+<code>LadderStore.put</code>, which keeps the record as JSON text in <code>ladder_stats</code> unless a
+newer one is already there.</li>
+<li><b>Serve.</b> <code>GET /v1/ladder/{format}</code> reaches <code>LadderService.stats</code>, which reads
+the row and adds each Pokémon's change since the previous month and its usage at the other ratings.</li>
+</ol>
+<p>A published month never changes, so each file is fetched exactly once. After the first run a poll is three
+small listing requests and nothing else, until a new month appears.</p>
+
+<h2>2.3 The life of an API request</h2>
+<p>Take <code>GET /v1/formats/M-C/pokemon?window=30d</code> with an access token.</p>
+<ol class="steps">
+<li><b>Tomcat</b> accepts the connection and runs the servlet filters in order.</li>
+<li><b><code>ApiAuthFilter</code></b> runs first. With keys configured it reads the
+<code>Authorization: Bearer ...</code> header and has <code>TokenService.verify</code> check the token's
+algorithm, signature, expiry and claims. A bad or missing credential ends here with a 401. With no keys
+configured the filter lets everything through.</li>
+<li><b>The ETag filter</b> (registered in <code>MetaWebConfig</code> for <code>/v1/*</code>) wraps the response so
+it can hash the body later.</li>
+<li><b>Spring MVC</b> matches the path to <code>MetaController.pokemon(format, window)</code>, converting
+<code>{format}</code> and <code>?window=</code> into its arguments.</li>
+<li><b>The controller</b> turns "30d" into a <code>MetaWindow</code> (anything else is a 400) and calls
+<code>MetaService.pokemon</code>.</li>
+<li><b>The service</b> builds a cache key from the request, the store's version and the hour. On a hit it
+returns the remembered answer. On a miss it reads rows through <code>MetaRepository</code>, counts in
+memory, and remembers the result.</li>
+<li><b>Jackson</b> writes the returned record as JSON. The controller added
+<code>Cache-Control: max-age=900</code>.</li>
+<li><b>On the way out</b> the ETag filter hashes the body: if the request's <code>If-None-Match</code> has the
+same hash, the client gets <code>304 Not Modified</code> and no body. The auth filter's wrapper has turned
+<code>public</code> into <code>private</code> in the caching header. Tomcat gzips bodies over 2 KB.</li>
+</ol>
+
+<h2>2.4 When things go wrong</h2>
+<table>
+<tr><th>What happens</th><th>What the system does</th></tr>
+<tr><td>Limitless is down or answers an error while an event is being fetched</td>
+<td><code>EventFetcher.onDiscovered</code> throws. The error handler retries the record 3 times, 2 seconds apart,
+then parks it on <code>tournaments.discovered.DLT</code>. Nothing was marked fetched, so after 24 hours
+discovery treats the request as lost and asks again.</td></tr>
+<tr><td>Limitless answers 429 (too many requests)</td>
+<td><code>LimitlessClient.withRetry</code> waits for the time its <code>Retry-After</code> header gives (at most
+30 seconds) and tries again, up to 3 attempts. The throttle also reads Limitless's own count of what is
+left and stops sending before the limit.</td></tr>
+<tr><td>The broker is down when discovery publishes</td>
+<td><code>KafkaSends.await</code> throws after 30 seconds. Discovery logs it and does not mark the event
+requested, so the next poll asks again.</td></tr>
+<tr><td>The server stops between publishing standings and committing the offset</td>
+<td>On restart the fetcher gets the same record again and fetches the event again. The stores replace the
+event's rows, and the counters skip an event already marked processed, so the repeat changes nothing.</td></tr>
+<tr><td>A record can't be stored (a bug, a constraint)</td>
+<td>The transaction rolls back, the record is retried, then goes to its DLT. Other records carry on.</td></tr>
+<tr><td>Kafka and both sources are down</td>
+<td>The API keeps answering from Postgres. Nothing new arrives until they are back.</td></tr>
+<tr><td>Postgres is down</td>
+<td>Requests fail with a 500. A listener fails, retries 3 times over 6 seconds, and the record goes to its
+DLT. Nothing is lost, because <code>standings.fetched</code>, <code>pairings.fetched</code> and
+<code>ladder.stats</code> keep every record: once the database is back, resetting the stores' consumer
+groups reads them in again. (A longer back-off would ride out a short outage by itself; see Part 11.)</td></tr>
+<tr><td>The tables are lost or a counting rule changes</td>
+<td>Reset the consumer groups' offsets to the start and the tables are rebuilt from the topics (README,
+"Rebuilding the counters and the store").</td></tr>
+</table>

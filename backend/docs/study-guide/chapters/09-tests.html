@@ -1,0 +1,56 @@
+<h1 id="part9">Part 9. The tests</h1>
+<p><code>mvn verify</code> runs {{TESTS_TOTAL}} tests in {{TEST_CLASSES}} classes. No test calls Limitless or Smogon:
+they read fixtures saved once from the real services (<code>src/test/resources/limitless</code>, with players'
+names replaced, and <code>src/test/resources/smogon</code>). GitHub Actions runs the suite on every change to
+the backend.</p>
+
+<h2>9.1 Five kinds of test</h2>
+<table>
+<tr><th>Kind</th><th>How it's built</th><th>What it proves</th><th>Examples</th></tr>
+<tr><td><b>Plain unit tests</b></td><td>Just <code>new</code> the class. No Spring.</td><td>Rules and arithmetic.</td>
+<td><code>FetchPolicyTest</code>, <code>RequestThrottleTest</code>, <code>LadderReducerTest</code>,
+<code>TokenServiceTest</code>, <code>PairingResultTest</code></td></tr>
+<tr><td><b>Database slice</b></td><td><code>@JdbcTest</code>: only the data source, Flyway's migrations and the
+repositories named in <code>@Import</code>, on in-memory H2.</td><td>The SQL and the counting, on the real
+schema.</td><td><code>TeamStoreTest</code>, <code>MetaServiceTest</code>, <code>LadderStoreTest</code>,
+<code>EventDiscoveryTest</code></td></tr>
+<tr><td><b>The same on Postgres</b></td><td>The same test class body, with Testcontainers starting Postgres 17 in
+Docker. Skipped where there's no Docker.</td><td>That the SQL is valid Postgres, which H2 doesn't
+guarantee.</td><td><code>TeamStorePostgresTest</code>, <code>MetaServicePostgresTest</code>,
+<code>LadderStorePostgresTest</code>, <code>CorpusRepositoryPostgresTest</code></td></tr>
+<tr><td><b>Web slice</b></td><td><code>@WebMvcTest</code>: the controllers and filters with a mocked service,
+driven through <code>MockMvc</code>.</td><td>Paths, parameters, status codes, headers, JSON shape,
+signing in.</td><td><code>MetaControllerTest</code>, <code>LadderControllerTest</code>,
+<code>ApiAuthFilterTest</code></td></tr>
+<tr><td><b>Pipeline</b></td><td><code>@SpringBootTest</code> with <code>@EmbeddedKafka</code>: the whole
+application and a real broker inside the test's JVM, with only the HTTP client mocked.</td><td>That a
+record published at one end arrives, stored, at the other.</td><td><code>EventPipelineTest</code>,
+<code>UsagePipelineTest</code>, <code>LadderPipelineTest</code></td></tr>
+</table>
+
+<h2>9.2 Golden files</h2>
+<p>The app repeats three of the server's computations on the device, for when there is no server. To keep the
+two from drifting, both test suites check the same recorded files under
+<code>src/test/resources/golden</code>:</p>
+<ul>
+<li><code>species-identity.json</code>: how team members' names become species keys
+(<code>SpeciesVocabularyGoldenTest</code>).</li>
+<li><code>meta-fixture.json</code>: the insights for the fixture event (<code>MetaGoldenFileTest</code>).</li>
+<li><code>ladder-fixture.json</code>: the ladder fixture reduced (<code>LadderGoldenFileTest</code>).</li>
+</ul>
+<p>A change on either side fails a test until the other side matches.</p>
+
+<h2>9.3 Techniques worth naming</h2>
+<ul>
+<li><b>Injected clocks.</b> Time-dependent code takes a <code>Clock</code>; tests pass a fixed or movable one
+(<code>RequestThrottleTest.FakeClock</code>, <code>TokenServiceTest.TestClock</code>).</li>
+<li><b>Mocking the edge only.</b> <code>LimitlessClient</code> and <code>SmogonClient</code> are mocked;
+everything between them and the database is real in the pipeline tests.</li>
+<li><b>A real server for path tricks.</b> <code>ApiAuthTomcatTest</code> starts Tomcat and sends raw requests
+over a socket, because <code>MockMvc</code> doesn't normalize paths the way a server does.</li>
+<li><b>Awaitility.</b> Pipeline tests wait for an asynchronous result with
+<code>await().untilAsserted(...)</code> instead of sleeping.</li>
+</ul>
+
+<h2>9.4 Every test class</h2>
+{{TESTS_TABLE}}

@@ -1,0 +1,75 @@
+<h1 id="part6">Part 6. Signing in</h1>
+<p>The server is meant for one owner's devices, reached over a private network (Tailscale). By default it
+listens on <code>127.0.0.1</code> only and lets every request in. When API keys are configured, every
+request must be signed in. The whole mechanism is five classes in <code>security/</code>; Spring Security
+isn't used.</p>
+
+<h2>6.1 Two credentials</h2>
+<table>
+<tr><th></th><th>API key</th><th>Access token</th></tr>
+<tr><td>What it is</td><td><code>pkr_</code> plus 32 random bytes, base64url. Made by
+<code>scripts/new-api-key.sh</code>.</td><td>A JWT signed with HMAC-SHA256.</td></tr>
+<tr><td>Lives</td><td>Until its hash is removed from the server's settings</td><td>15 minutes</td></tr>
+<tr><td>Accepted at</td><td>Only <code>POST /v1/auth/token</code></td><td>Everything else</td></tr>
+<tr><td>What the server stores</td><td>Only its SHA-256 hash (<code>PKREF_API_KEY_HASHES</code>)</td>
+<td>Nothing: it verifies the signature</td></tr>
+</table>
+<p class="why"><b>Why two.</b> The long-lived secret travels once every 15 minutes instead of with every request,
+and a token that leaks stops working by itself. Storing only the key's hash means the server's
+configuration, backups and logs never contain a usable key.</p>
+
+<h2>6.2 The flow</h2>
+<ol class="steps">
+<li>The app sends <code>POST /v1/auth/token</code> with <code>Authorization: Bearer &lt;key&gt;</code>.</li>
+<li><code>ApiAuthFilter</code> hashes the key and compares it with every configured hash, each in constant time
+(<code>MessageDigest.isEqual</code>). On a match it stores the key's short id (the first 8 hex digits of
+its hash) on the request and lets it through.</li>
+<li><code>AuthController.token</code> asks <code>TokenService.issue(keyId)</code> for a token and returns it
+with <code>Cache-Control: no-store</code>.</li>
+<li>For every other request the app sends <code>Authorization: Bearer &lt;token&gt;</code>, and the filter calls
+<code>TokenService.verify</code>.</li>
+<li>When a token is refused with <code>token_expired</code> or <code>invalid_token</code>, the app trades its
+key again and repeats the request once.</li>
+</ol>
+
+<h2>6.3 What a token contains</h2>
+<p>Three base64url parts joined by dots: header, claims, signature. The first two are readable by anyone;
+the signature is what makes them trustworthy.</p>
+<table>
+<tr><th>Claim</th><th>Value</th><th>Checked on verify</th></tr>
+<tr><td><code>alg</code> (header)</td><td><code>HS256</code></td><td>Must be exactly HS256, checked before the signature</td></tr>
+<tr><td><code>iss</code></td><td><code>pkreference-backend</code></td><td>Must match</td></tr>
+<tr><td><code>aud</code></td><td><code>pkreference-api</code></td><td>Must contain it</td></tr>
+<tr><td><code>sub</code></td><td>the key's id</td><td>Must be a key that is still configured</td></tr>
+<tr><td><code>iat</code>, <code>exp</code></td><td>issued at, expires at</td><td><code>exp</code> must be in the future</td></tr>
+<tr><td><code>jti</code></td><td>a random id</td><td>Not checked; makes each token unique</td></tr>
+</table>
+
+<h2>6.4 The order of checks in <code>TokenService.verify</code>, and why</h2>
+<ol>
+<li><b>Parse.</b> Not three dot-separated parts: <code>MALFORMED</code>.</li>
+<li><b>Algorithm.</b> The header is written by whoever sent the token, so the server decides the algorithm.
+This closes the classic JWT attacks: <code>alg: none</code> (no signature) and algorithm switching.</li>
+<li><b>Signature.</b> HMAC-SHA256 with the server's secret. Only after this are the claims the server's own
+words.</li>
+<li><b>Expiry.</b></li>
+<li><b>Issuer, audience, subject.</b> A token signed by this server for something else is not accepted.</li>
+<li><b>Key still configured.</b> Removing a key's hash from the settings ends its tokens too.</li>
+</ol>
+
+<h2>6.5 Details an interviewer may probe</h2>
+<ul>
+<li><b>The signing secret</b> is 32 random bytes generated at start-up unless <code>PKREF_TOKEN_SECRET</code> is
+set. A restart therefore ends all tokens; clients just trade their key again.</li>
+<li><b>Credentials are never read from the URL</b> (where proxies and logs keep them) and never logged. The
+refusal log line names the path and the reason only.</li>
+<li><b>Swagger UI's paths are open</b>, but a path that the server would rewrite (containing <code>..</code>,
+<code>%</code>, <code>;</code> or <code>//</code>) never counts as documentation.</li>
+<li><b>A token can't be traded for a token.</b> The token path only accepts a key, and
+<code>AuthController</code> checks again that the filter matched one.</li>
+<li><b>Caching.</b> Signed-in answers have <code>Cache-Control: public</code> rewritten to
+<code>private</code>, so a shared cache can't serve them to someone else.</li>
+<li><b>What this is not.</b> No users, roles or sessions; no refresh tokens (the key plays that part); no
+token revocation list (a 15-minute life and key removal stand in for it). A public deployment would need
+more, as the plan says.</li>
+</ul>

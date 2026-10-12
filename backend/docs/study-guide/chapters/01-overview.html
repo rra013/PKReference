@@ -1,0 +1,50 @@
+<h1 id="part1">Part 1. The system in ten minutes</h1>
+
+<h2>What it is</h2>
+<p>The PK Reference backend is a small data pipeline and read-only API for a Pokémon reference app.
+It does three things:</p>
+<ol>
+<li><b>Collects.</b> It polls two public sources: <b>Limitless</b>, for tournament events (who played, their
+teams, who beat whom), and <b>Smogon</b>, for monthly statistics of the Pokémon Showdown ladder.</li>
+<li><b>Keeps.</b> Everything fetched goes through <b>Kafka</b> topics that are never emptied, and from there into
+<b>PostgreSQL</b> tables. The topics are the record of what was fetched; the tables are a view of it that
+can be rebuilt by reading the topics again.</li>
+<li><b>Answers.</b> A JSON API at <code>/v1</code> serves insights worked out from the tables: how often each
+Pokémon is used, how it does in top cuts, win rates from match results, trends, common sets, cores and
+archetypes, and the ladder's numbers.</li>
+</ol>
+
+<p class="why"><b>Why it exists.</b> Before it, every copy of the app crawled Limitless by itself, which is slow, repeats the
+same work on every device and runs into Limitless's rate limit (50 requests in 5 minutes). One server
+crawling once for everyone is lighter on the source, and it can keep match results, which lets it compute
+things a device can't, such as win rates that leave out mirror matches.</p>
+
+<h2>The stack</h2>
+<table>
+<tr><th>Piece</th><th>Version</th><th>What it does here</th></tr>
+<tr><td>Java</td><td>21</td><td>Records, text blocks, <code>var</code>, switch expressions are used throughout.</td></tr>
+<tr><td>Spring Boot</td><td>3.4.5</td><td>Wires the application together, runs the web server (embedded Tomcat), the scheduler and the Kafka listeners.</td></tr>
+<tr><td>Apache Kafka</td><td>3.9 broker, one node in KRaft mode</td><td>The log between "fetched" and "stored". Five topics, three of them kept for good.</td></tr>
+<tr><td>PostgreSQL</td><td>17</td><td>The tables the API reads. Twelve of them.</td></tr>
+<tr><td>Flyway</td><td></td><td>Creates and changes the tables from numbered SQL files.</td></tr>
+<tr><td>springdoc</td><td>2.8.6</td><td>Swagger UI and the OpenAPI document, generated from the controllers' annotations.</td></tr>
+<tr><td>Nimbus JOSE + JWT</td><td>10.10</td><td>Signs and verifies access tokens.</td></tr>
+<tr><td>JUnit 5, Mockito, Testcontainers, embedded Kafka</td><td></td><td>{{TESTS_TOTAL}} tests in {{TEST_CLASSES}} classes.</td></tr>
+<tr><td>Docker Compose</td><td></td><td>Runs Kafka and Postgres locally; on a server, the API too.</td></tr>
+</table>
+
+<h2>Size</h2>
+<p>{{MAIN_FILES}} Java source files ({{MAIN_LINES}} lines with comments) in eleven packages, five SQL migrations, and
+{{TEST_CLASSES}} test classes. Small enough to know completely, which is the aim of this guide.</p>
+
+<h2>The one idea to hold on to</h2>
+<p>The system is split at Kafka into a <b>write path</b> and a <b>read path</b>.</p>
+<ul>
+<li>The <b>write path</b> runs on timers and on Kafka records, never on a user's request: discover what to fetch,
+fetch it, publish it, store it. It is slow on purpose (rate limits) and built to be repeated safely.</li>
+<li>The <b>read path</b> runs on HTTP requests: a filter checks the caller, a controller calls a service, the
+service reads the tables and computes the answer, and the answer is cached. It never calls Limitless,
+Smogon or Kafka.</li>
+</ul>
+<p>The two paths share only the database. If the sources or Kafka are down, the API keeps answering from what
+is stored.</p>

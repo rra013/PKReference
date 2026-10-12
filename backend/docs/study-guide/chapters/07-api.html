@@ -1,0 +1,37 @@
+<h1 id="part7">Part 7. The API</h1>
+<p>All read-only except the token request. JSON, cached for 15 minutes, with weak ETags on
+<code>/v1</code>. With the server running, Swagger UI at <code>/swagger-ui.html</code> documents every
+field.</p>
+<table class="tight">
+<tr><th>Request</th><th>Controller method</th><th>Returns</th></tr>
+<tr><td><code>GET /v1/formats</code></td><td><code>MetaController.formats</code></td><td>Each stored format's events, teams
+and dates</td></tr>
+<tr><td><code>GET /v1/formats/{f}/pokemon?window=</code></td><td><code>MetaController.pokemon</code></td><td>Every Pokémon's
+usage, top-cut usage, trend and win record</td></tr>
+<tr><td><code>GET /v1/formats/{f}/pokemon/{key}</code></td><td><code>MetaController.pokemon</code></td><td>One Pokémon's items,
+abilities, natures, moves, Mega Stones, teammates, sets, weekly usage</td></tr>
+<tr><td><code>GET /v1/formats/{f}/cores</code></td><td><code>MetaController.cores</code></td><td>Pairs and trios chosen
+together, with lift</td></tr>
+<tr><td><code>GET /v1/formats/{f}/archetypes</code></td><td><code>MetaController.archetypes</code></td><td>Archetypes and
+their records against each other</td></tr>
+<tr><td><code>GET /v1/formats/{f}/archetypes/{id}</code></td><td><code>MetaController.archetype</code></td><td>One archetype's
+best-placed teams</td></tr>
+<tr><td><code>GET /v1/formats/{f}/events?limit=</code></td><td><code>MetaController.events</code></td><td>The newest events and
+their winners</td></tr>
+<tr><td><code>GET /v1/formats/{f}/tournaments?page=&amp;limit=</code></td><td><code>CorpusController.tournaments</code></td>
+<td>Stored events in Limitless's shape</td></tr>
+<tr><td><code>GET /v1/tournaments/{id}/standings</code></td><td><code>CorpusController.standings</code></td><td>One event's
+standings and teams in Limitless's shape</td></tr>
+<tr><td><code>GET /v1/ladder</code></td><td><code>LadderController.index</code></td><td>Which ladder months are stored</td></tr>
+<tr><td><code>GET /v1/ladder/{format}?rating=&amp;month=</code></td><td><code>LadderController.stats</code></td><td>One month of
+ladder stats, with trends and usage by rating</td></tr>
+<tr><td><code>POST /v1/auth/token</code></td><td><code>AuthController.token</code></td><td>An access token for an API key</td></tr>
+<tr><td><code>GET /api/usage?format=</code></td><td><code>UsageController.top</code></td><td>(Old) all-time usage</td></tr>
+<tr><td><code>GET /api/usage/{species}?format=</code></td><td><code>UsageController.detail</code></td><td>(Old) one Pokémon's
+all-time counts</td></tr>
+</table>
+<p><b>Status codes.</b> 200 with a body; 304 when <code>If-None-Match</code> matches; 400 for a bad parameter
+(<code>IllegalArgumentException</code>); 401 with a <code>code</code> field when signing in fails; 404 for
+something not stored (<code>NoSuchElementException</code>).</p>
+<p><b>Windows.</b> <code>window=14d</code>, <code>30d</code> (the default) or <code>regulation</code> (every stored
+event of the format).</p>

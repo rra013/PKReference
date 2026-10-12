@@ -1,0 +1,109 @@
+<h1 id="part4">Part 4. Kafka, as this project uses it</h1>
+
+<h2>4.1 The ideas</h2>
+<dl>
+<dt>Topic</dt><dd>A named, append-only log of records. Producers add to the end; consumers read forward from
+wherever they are. Reading does not remove anything.</dd>
+<dt>Record</dt><dd>A key, a value and some headers. Here the key is always a string (an event id, or
+<code>format|month|rating</code>) and the value is JSON.</dd>
+<dt>Partition</dt><dd>A topic is split into partitions, each an ordered log. A record's key decides its
+partition (by hash), so records with the same key stay in order. Each topic here has 3.</dd>
+<dt>Offset</dt><dd>A record's position in its partition. A consumer's progress is "the next offset to read".</dd>
+<dt>Consumer group</dt><dd>A name under which consumers share progress. Kafka stores each group's offsets.
+Two groups reading one topic each see every record, independently; two consumers in one group split the
+partitions between them.</dd>
+<dt>Compaction</dt><dd>A cleanup policy that, instead of deleting old records by age, keeps at least the
+newest record of each key. A compacted topic behaves like a table of "latest value by key" that can still
+be read from the beginning.</dd>
+<dt>Dead letter topic (DLT)</dt><dd>A topic where records are parked after repeated failure, so they can be
+inspected and the rest of the topic isn't blocked.</dd>
+<dt>KRaft</dt><dd>Kafka running its own metadata quorum, with no ZooKeeper. This project runs one node that is
+both broker and controller.</dd>
+</dl>
+
+<h2>4.2 The topics</h2>
+<table class="tight">
+<tr><th>Topic</th><th>Key</th><th>Value</th><th>Written by</th><th>Read by (group)</th><th>Kept</th></tr>
+<tr><td><code>tournaments.discovered</code></td><td>event id</td><td><code>TournamentDiscovered</code></td>
+<td><code>EventDiscovery</code></td><td><code>EventFetcher</code> (standings-fetcher)</td>
+<td>Broker default (7 days): a work queue</td></tr>
+<tr><td><code>standings.fetched</code></td><td>event id</td><td><code>StandingsFetched</code></td>
+<td><code>EventFetcher</code></td><td><code>TeamStoreConsumer</code> (team-store-standings),
+<code>UsageConsumer</code> (usage-aggregator)</td><td>Compacted, for good</td></tr>
+<tr><td><code>pairings.fetched</code></td><td>event id</td><td><code>PairingsFetched</code></td>
+<td><code>EventFetcher</code></td><td><code>TeamStoreConsumer</code> (team-store-pairings)</td>
+<td>Compacted, for good</td></tr>
+<tr><td><code>pokemon.usage</code></td><td><code>format|species</code></td><td><code>UsageUpdated</code></td>
+<td><code>UsageConsumer</code></td><td>Nothing yet</td><td>Compacted</td></tr>
+<tr><td><code>ladder.stats</code></td><td><code>format|month|rating</code></td><td><code>Ladder.StatsFetched</code></td>
+<td><code>LadderDiscovery</code></td><td><code>LadderStoreConsumer</code> (ladder-store)</td>
+<td>Compacted, for good</td></tr>
+<tr><td><code>*.DLT</code> (four)</td><td>as the original</td><td>as the original, plus failure headers</td>
+<td>The error handler</td><td>Nothing: for people to look at</td><td>Broker default</td></tr>
+</table>
+<p>The fetched-data topics accept records up to 5 MB (<code>max.message.bytes</code>), because a large event's
+standings are over the 1 MB default, and the producer compresses with zstd.</p>
+
+<h2>4.3 Why Kafka at all</h2>
+<p>Not for volume: a few hundred events a month would fit in a queue table. Kafka is here as a <b>durable,
+replayable log</b>:</p>
+<ul>
+<li><b>Replay.</b> The compacted topics hold every event ever fetched. If a table is lost, or a rule changes
+(how names are standardized, what counts as a species), the tables are rebuilt by resetting a consumer
+group to the beginning. Limitless doesn't have to be crawled again.</li>
+<li><b>Independent readers.</b> The team store and the usage counters both read
+<code>standings.fetched</code> without knowing about each other. Adding a third reader is a new group
+id.</li>
+<li><b>Decoupling slow from fast.</b> Discovery takes seconds; fetching is throttled and can take hours during
+a backfill. The queue between them survives restarts.</li>
+<li><b>Failure isolation.</b> A record that can't be processed is retried and then set aside, without stopping
+the others.</li>
+</ul>
+<p>The honest cost: a broker is more to run than this volume needs. The plan calls that out, and keeps it to a
+single KRaft node.</p>
+
+<h2>4.4 Delivery guarantees</h2>
+<p><b>Producer.</b> <code>acks=all</code> and <code>enable.idempotence=true</code>: a send succeeds only when the
+broker has the record, and a retried send isn't stored twice. Every send is awaited, so "published" means
+confirmed.</p>
+<p><b>Consumer.</b> Spring Kafka commits offsets only after the listener has returned for the records it was
+given. If the process dies before the commit, those records are delivered again. That is <b>at-least-once</b> delivery: never lost, sometimes
+repeated.</p>
+<p><b>So every consumer is idempotent</b>: handling a record twice ends in the same state as handling it once.</p>
+<ul>
+<li><code>TeamStore</code> deletes an event's rows and inserts them again, in one transaction, and ignores a
+fetch older than the one stored (by <code>fetchedAt</code>).</li>
+<li><code>LadderStore</code> replaces a row unless the stored one is newer.</li>
+<li><code>UsageAggregationService</code> can't "replace" a counter, so it records each processed event's id in
+the same transaction as the counts and skips an id it has seen.</li>
+<li><code>EventFetcher</code> repeating a fetch costs three requests and republishes; compaction and the
+stores absorb the duplicate.</li>
+</ul>
+<p>At-least-once delivery plus idempotent handling gives the effect people mean by "exactly once", without
+Kafka transactions.</p>
+
+<h2>4.5 The settings that matter (<code>application.yml</code>)</h2>
+<table>
+<tr><th>Setting</th><th>Value</th><th>Why</th></tr>
+<tr><td><code>producer.acks</code></td><td><code>all</code></td><td>Don't count a send until it's durable.</td></tr>
+<tr><td><code>enable.idempotence</code></td><td><code>true</code></td><td>Retries can't duplicate.</td></tr>
+<tr><td><code>compression-type</code></td><td><code>zstd</code></td><td>Standings are repetitive JSON.</td></tr>
+<tr><td><code>max.request.size</code></td><td>5 MB</td><td>Large events' standings.</td></tr>
+<tr><td><code>value-serializer</code> / <code>-deserializer</code></td><td>JSON</td><td>Records travel as JSON with a
+type header naming the Java record.</td></tr>
+<tr><td><code>spring.json.trusted.packages</code></td><td><code>...backend.model</code></td><td>The deserializer will
+only build classes from that package, whatever a record's header says.</td></tr>
+<tr><td><code>auto-offset-reset</code></td><td><code>earliest</code></td><td>A new or reset group reads a topic from its
+start: that is what makes rebuilding work.</td></tr>
+<tr><td><code>max-poll-records</code></td><td>10</td><td rowspan="2">The fetcher can wait minutes per request under the
+throttle. A consumer silent for longer than <code>max.poll.interval.ms</code> is presumed dead and its
+records reassigned, so: few records a poll, 15 minutes allowed between polls.</td></tr>
+<tr><td><code>max.poll.interval.ms</code></td><td>900000</td></tr>
+<tr><td><code>admin.modify-topic-configs</code></td><td><code>true</code></td><td>Changes in <code>Topics.java</code> are
+applied to existing topics.</td></tr>
+</table>
+
+<h2>4.6 Errors: retry, then dead-letter</h2>
+<p><code>KafkaErrorHandling</code> defines one <code>DefaultErrorHandler</code>: when a listener throws, retry the
+record up to 3 more times, 2 seconds apart; if it still fails, publish it to <code>&lt;topic&gt;.DLT</code> on
+the same partition and continue with the next record.</p>

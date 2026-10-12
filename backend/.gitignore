@@ -2,3 +2,6 @@ target/
 *.iml
 .idea/
 data/
+# What docs/study-guide/build_study_guide.py makes on the way to the PDF.
+docs/study-guide/build/
+__pycache__/
